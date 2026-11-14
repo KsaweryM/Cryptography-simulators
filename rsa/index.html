@@ -162,7 +162,7 @@ input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface
 .ltab td.same{outline:2.5px solid var(--chg);outline-offset:-2px;font-weight:700}
 .tablewrap{overflow-x:auto}
 
-/* step 2: the key table and Euclid */
+/* step 2: the key table */
 .presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .presets button{font-size:13px;padding:4px 10px}
 .presets button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -178,39 +178,16 @@ input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface
 .sumline .st{font-family:var(--sans);font-size:14px}
 .ktab tr.todo td{color:var(--muted);opacity:.6}
 .badge{display:inline-flex;width:26px;height:26px;border-radius:7px;background:var(--ink);color:var(--surface);font-family:var(--mono);font-weight:700;align-items:center;justify-content:center}
-.etab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:4px}
-.etab th{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px 22px 4px 0;border-bottom:1.5px solid var(--rule)}
-.etab td{padding:4px 22px 4px 0;white-space:nowrap;border-bottom:1px solid var(--rule)}
-.etab tr.start td{color:var(--muted)}
-.etab tr.cur td{background:var(--chg-bg)}
-.etab tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--chg)}
-.etab tr.one td{background:var(--ctr-bg)}
-.etab tr.hide td{opacity:.35}
-.etab tr.hide td:nth-child(n+4){visibility:hidden}
-.etab .tcoef{color:var(--chg);font-weight:700}
 .result{margin-top:12px;font-size:14.5px;line-height:1.8}
+.golink{display:inline-block;margin-top:10px;padding:7px 14px;border-radius:6px;background:var(--ink);color:var(--surface);font-weight:600;text-decoration:none}
+.golink:hover{opacity:.9}
 .twokeys{display:flex;gap:18px;flex-wrap:wrap;align-items:stretch;margin-top:4px}
 .twokeys .kbox{position:static;min-width:300px;flex:1 1 300px}
 .trash{margin-top:12px;border:1.5px dashed var(--rule);border-radius:8px;padding:6px 12px;font-size:13.5px;color:var(--muted)}
 
-/* step 3: square and multiply */
+/* step 3: one power */
 .formula{font-family:var(--mono);font-size:24px;font-weight:600;margin:6px 0 4px;word-break:break-all}
 .formula sup{font-size:15px}
-.bits{display:inline-flex;gap:2px;align-items:flex-start;flex-wrap:wrap}
-.bitcol{display:flex;flex-direction:column;align-items:center;gap:1px}
-.bit{display:inline-block;min-width:22px;height:26px;line-height:26px;text-align:center;font-family:var(--mono);font-size:14px;border-radius:4px;background:var(--sunken);color:var(--muted);padding:0 2px}
-.bit.one{background:var(--ink);color:var(--surface)}
-.bit.cur{background:var(--chg);color:#fff}
-.bitcol small{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
-.ptab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:8px}
-.ptab th{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px 14px 4px 0;border-bottom:1.5px solid var(--rule)}
-.ptab td{padding:5px 14px 5px 0;white-space:nowrap;border-bottom:1px solid var(--rule)}
-.ptab tr.cur td{background:var(--chg-bg)}
-.ptab tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--chg)}
-.ptab tr.hide td{opacity:.35}
-.ptab tr.hide td:nth-child(n+3){visibility:hidden}
-.ptab td.skip{color:var(--muted)}
-.ptab td.res{font-weight:700}
 .sumline{font-family:var(--mono);font-size:15px;margin-top:12px;line-height:1.8;word-break:break-word}
 .sumline b{color:var(--chg)}
 
@@ -358,17 +335,18 @@ function numsToText(a) { return a.map(x => (x < 0x110000n ? String.fromCodePoint
       slides "Making the keys", "The example: encrypt 88", "The example: decrypt 11":
       p = 17, q = 11, n = 187, phi = 160, e = 7, d = 23, 88^7 mod 187 = 11, 11^23 mod 187 = 88,
       88^1, 88^2, 88^4 mod 187 = 88, 77, 132; 11^1, 11^2, 11^4, 11^8, 11^16 mod 187 = 11, 121, 55, 33, 154.
-   2. Lecture 3 slide "Euclid's algorithm": gcd(160, 7): 160 = 22*7 + 6, 7 = 1*6 + 1, 6 = 6*1 + 0;
-      slide "Extended Euclid, step 3": 1 = 23*7 - 1*160.
-   3. Lecture 3, Task 4 (slide "Solution: an inverse by hand"): inverse of 23 mod 120 = 47, 1 = 47*23 - 9*120.
+   2. Euclid's algorithm for gcd(160, 7): 160 = 22*7 + 6, 7 = 1*6 + 1, 6 = 6*1 + 0; 1 = 23*7 - 1*160
+      (shown step by step on the page math/extended-euclid/, which has its own self-test).
+   3. The earlier Lecture 3 exercise: inverse of 23 mod 120 = 47, 1 = 47*23 - 9*120.
    4. Wikipedia "RSA (cryptosystem)", worked example (the version with Euler's phi; the current article uses
       lambda = 780 and d = 413 instead): p = 61, q = 53, n = 3233, phi = 3120, e = 17, d = 2753,
       65^17 mod 3233 = 2790, 2790^2753 mod 3233 = 65.
-   5. Lecture 3, Task 5 (slide "Solution: your own RSA", Task5/solution/my_rsa.py): p = 37908704904578413183,
+   5. Lecture 3, Task 4 (slide "Solution: your own RSA", Task4/solution/my_rsa.py): p = 37908704904578413183,
       q = 58606630333925820283, e = 65537, d = 1367151349159148221410861819858768950381,
       2026 -> C = 736246060401132335090489988934276767570.
-   6. Lecture 3, Task 6: with n = 187, e = 7, d = 23 every P from 0 to 186 comes back; 17 -> 85 -> 17.
-   7. Lecture 3, Task 7 (Task7/pin.py): the bank's 2048-bit n, e = 65537, and C; PIN 4821 gives C.
+   6. Lecture 3, Task 5: with n = 187, e = 7, d = 23 every P from 0 to 186 comes back; 17 -> 85 -> 17.
+   7. Lecture 3, Task 6 (Task6/pin.py; the constants keep their old name TASK7_): the bank's 2048-bit n, e = 65537,
+      and C; PIN 4821 gives C.
    8. Invariant: decrypt(encrypt(m)) = m for every m < n with the preset keys of this page. */
 const TASK7_N = BigInt(
   "1872841195117846544841412217848882016914999669618551874656442540592245157199172284036666" +
@@ -390,7 +368,7 @@ const TASK7_C = BigInt(
 const TASK7_E = 65537n;
 const PRESETS = [   // [p, q, e]
   [17n, 11n, 7n],          // the slides (Stallings)
-  [11n, 13n, 23n],         // phi = 120: the numbers of Task 4
+  [11n, 13n, 23n],         // phi = 120: the inverse 47 (an earlier Lecture 3 exercise)
   [61n, 53n, 17n],         // Wikipedia
   [1009n, 1013n, 65537n],  // e = 65537 as in practice
 ];
@@ -412,24 +390,24 @@ function selfTest() {
   if (er !== "160 7 22 6|7 6 1 1|6 1 6 0") fails.push("Euclid 160, 7");
   const x1 = extEuclid(160n, 7n);
   if (x1.g !== 1n || x1.t !== 23n || x1.s !== -1n || x1.d !== 23n) fails.push("extended Euclid 160, 7");
-  // 3. Task 4
+  // 3. 23 mod 120
   const x2 = extEuclid(120n, 23n);
-  if (x2.d !== 47n || x2.t !== 47n || x2.s !== -9n || euclidRows(120n, 23n).length !== 5) fails.push("Task 4: 23 mod 120");
+  if (x2.d !== 47n || x2.t !== 47n || x2.s !== -9n || euclidRows(120n, 23n).length !== 5) fails.push("23 mod 120");
   // 4. Wikipedia
   const W = makeKeys(61n, 53n, 17n);
   if (!W.ok || W.n !== 3233n || W.phi !== 3120n || W.d !== 2753n) fails.push("keys 61, 53, 17");
   if (encrypt(65n, W) !== 2790n || decrypt(2790n, W) !== 65n) fails.push("65 -> 2790");
-  // 5. Task 5 (20-digit primes)
+  // 5. Task 4 (20-digit primes)
   const p5 = 37908704904578413183n, q5 = 58606630333925820283n, phi5 = (p5 - 1n) * (q5 - 1n);
   const d5 = modInverse(65537n, phi5);
-  if (d5 !== 1367151349159148221410861819858768950381n) fails.push("Task 5: d");
-  if (modPow(2026n, 65537n, p5 * q5) !== 736246060401132335090489988934276767570n) fails.push("Task 5: C");
-  if (modPow(736246060401132335090489988934276767570n, d5, p5 * q5) !== 2026n) fails.push("Task 5: back");
-  // 6. Task 6
-  for (let m = 0n; m < 187n; m++) if (decrypt(encrypt(m, { n: 187n, e: 7n }), { n: 187n, d: 23n }) !== m) { fails.push("Task 6: " + m); break; }
-  if (encrypt(17n, { n: 187n, e: 7n }) !== 85n) fails.push("Task 6: 17 -> 85");
-  // 7. Task 7 (2048 bits)
-  if (modPow(4821n, TASK7_E, TASK7_N) !== TASK7_C) fails.push("Task 7: PIN 4821");
+  if (d5 !== 1367151349159148221410861819858768950381n) fails.push("Task 4: d");
+  if (modPow(2026n, 65537n, p5 * q5) !== 736246060401132335090489988934276767570n) fails.push("Task 4: C");
+  if (modPow(736246060401132335090489988934276767570n, d5, p5 * q5) !== 2026n) fails.push("Task 4: back");
+  // 6. Task 5
+  for (let m = 0n; m < 187n; m++) if (decrypt(encrypt(m, { n: 187n, e: 7n }), { n: 187n, d: 23n }) !== m) { fails.push("Task 5: " + m); break; }
+  if (encrypt(17n, { n: 187n, e: 7n }) !== 85n) fails.push("Task 5: 17 -> 85");
+  // 7. Task 6 (2048 bits)
+  if (modPow(4821n, TASK7_E, TASK7_N) !== TASK7_C) fails.push("Task 6: PIN 4821");
   // 8. invariants: every preset, every m (or 400 spread values), and the trace equals modPow
   for (const [p, q, e] of PRESETS) {
     const k = makeKeys(p, q, e);
@@ -459,12 +437,12 @@ const T = {
     title: "RSA explorer", home: "All simulators",
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
     stepOf: n => "Step " + n + " of 4 · RSA",
-    steps: [["Black box", "Alice encrypts, Bob decrypts, Eve listens"], ["Making the keys", "p, q, n, phi, e, and d from Euclid's table"],
-            ["One power mod n", "square and multiply, bit by bit"], ["Textbook RSA is not enough", "the same m always gives the same c"]],
+    steps: [["Black box", "Alice encrypts, Bob decrypts, Eve listens"], ["Making the keys", "p, q, n, phi, e, and d, the inverse of e"],
+            ["One power mod n", "c = m^e mod n, and back"], ["Textbook RSA is not enough", "the same m always gives the same c"]],
     explain: [
       ["A padlock anyone can close", "Bob has a key pair. Alice encrypts her message m with Bob's public key, Bob decrypts with his private key. Eve sees n, e and c, and that does not help her. Change the message and watch c. Click a key to see how Bob made it, or a box to see the power inside."],
-      ["Five steps from two primes", "Bob picks two secret primes p and q. n and e become public; phi and d stay secret. d is the inverse of e modulo phi, and it falls out of Euclid's table. Try the presets or your own primes. Click a key at the bottom to use it."],
-      ["Encrypting is one power modulo n", "c = m<sup>e</sup> mod n and m = c<sup>d</sup> mod n. Nobody multiplies m by itself e times: we square, take the remainder, and multiply in the powers where the exponent has a 1 bit. The numbers never grow bigger than n². Step through the rows."],
+      ["Five steps from two primes", "Bob picks two secret primes p and q. n and e become public; phi and d stay secret. d is the inverse of e modulo phi; the extended Euclidean algorithm finds it. Try the presets or your own primes. Click a key at the bottom to use it."],
+      ["Encrypting is one power modulo n", "c = m<sup>e</sup> mod n and m = c<sup>d</sup> mod n. Nobody multiplies m by itself e times: the computer squares and multiplies (square-and-multiply) and takes the remainder after every step, so even a 2048-bit d needs only a few thousand multiplications. Switch between encrypting and decrypting."],
       ["The same m always gives the same c", "Textbook RSA has no randomness. Anyone can encrypt with the public key, so Eve encrypts her guesses and compares them with c. If the message comes from a small set (a PIN, yes or no), she finds it without d. Real RSA adds random padding."]],
     selfOk: "✓ checked against Stallings, Wikipedia and the lecture tasks", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
@@ -483,13 +461,13 @@ const T = {
     errText: (ch, code, n) => "The letter “" + ch + "” has the code " + code + ", which is not smaller than n = " + n + ". Pick bigger primes in step 2.",
     errEmpty: "Type a few letters.",
     cardDetails1: "The two powers",
-    rowAlice: "Alice computes", rowBob: "Bob computes", clickPow: "Click a line to see the power step by step.",
+    rowAlice: "Alice computes", rowBob: "Bob computes", clickPow: "Click a line to see the power in step 3.",
     rowLetter: "letter", rowCode: "m (its code)", rowC: "c", rowBack: "Bob: m back", rowLetter2: "Bob reads",
     textNote: "Each letter is encrypted on its own, only because n is tiny here. Real RSA turns the whole short text into one big number (as rsa_ready.py does in Task 2), and real messages go with hybrid encryption.",
     legPub: "public: everybody may know it", legSec: "secret: only Bob", legMsg: "message m", legCt: "ciphertext c", legEve: "Eve, who listens",
     // step 2
     cardKeys: "Bob makes his key pair", presets: "examples:",
-    preNames: ["17, 11, e = 7 (the slides)", "11, 13, e = 23 (Task 4)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
+    preNames: ["17, 11, e = 7 (the slides)", "11, 13, e = 23 (phi = 120)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
     inP: "p (prime, secret)", inQ: "q (prime, secret)", inE: "e (public)", inLimit: "primes below 10⁹ on this page",
     kStep: ["choose two primes p and q", "n = p × q", "phi = (p - 1)(q - 1)", "choose e with gcd(e, phi) = 1", "d = the inverse of e mod phi"],
     pub: "public", sec: "secret",
@@ -499,30 +477,21 @@ const T = {
     errERange: phi => "e must be bigger than 1 and smaller than phi = " + phi + ".",
     errEGcd: (e, phi, g) => "gcd(" + e + ", " + phi + ") = " + g + ", not 1: e has no inverse modulo phi.",
     tryE: e => "try e = " + e,
-    dHow: "how: Euclid's table below",
-    cardEuclid: (e, phi) => "Step 5 in detail: the inverse of " + e + " mod " + phi + " from Euclid's table",
-    euclidNote: "Left: Euclid's algorithm, as on the slides. Right: each remainder written as a mix of phi and e. The first two rows are free; each next row is the row two above minus q times the row above. The number in front of e (orange) in the row with remainder 1 is the inverse. This is the slides' “read it from the bottom”, done from the top.",
-    thA: "a", thB: "b", thDiv: "a = q × b + r", thMix: "r as a mix: s × phi + t × e", start: "start",
-    stopRow: "remainder 0: stop",
-    bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bAll: "all rows",
-    rowK: (k, N) => "row " + k + " of " + N,
-    resOne: (e, phi, t) => "The last non-zero remainder is 1, so gcd(" + e + ", " + phi + ") = 1 and the inverse exists. In that row the number in front of e is <b>" + t + "</b>.",
-    resNeg: (t, phi, d) => t + " is negative, so we add phi: " + t + " + " + phi + " = <b>" + d + "</b>. (Any multiple of phi can be added: it does not change anything mod phi.)",
-    resD: d => "d = <b>" + d + "</b>",
+    dHow: "how: see below",
+    cardD: (e, phi) => "Step 5 in detail: d, the inverse of " + e + " mod " + phi,
+    dWhat: "d is the number with e × d mod phi = 1. It exists because gcd(e, phi) = 1 (step 4). The computer finds it with the extended Euclidean algorithm: a short table of divisions, about 1200 of them even for numbers with 617 digits. Nobody tries every d.",
     resCheck: (e, d, ed, k, phi) => "Check: " + e + " × " + d + " = " + ed + " = " + k + " × " + phi + " + 1, so e × d mod phi = 1 ✓",
     resPy: (e, phi, d) => "In Python: <span class=\"v\">pow(" + e + ", -1, " + phi + ")</span> gives " + d + ".",
-    resBad: g => "The last non-zero remainder is " + g + ", not 1: there is no inverse. Bob must pick another e.",
+    linkEuclid: "How the extended Euclidean algorithm works ▶",
     cardTwo: "The two keys", twoNote: "Click a key to use it: one power modulo n.",
     trash: "p, q and phi: not needed any more; keep them secret or delete them. Whoever knows p and q can compute d.",
     // step 3
     tabEnc: "encrypt: c = m^e mod n", tabDec: "decrypt: m = c^d mod n",
-    cardPow: "One power modulo n, square and multiply", baseM: "Alice's m",
-    expIs: (name, x, bin, parts) => "The exponent " + name + " = " + x + " in binary is " + bin + (parts ? " = " + parts : ""),
-    thK: "bit k", thBit: "bit", thPow: "base^(2^k) mod n: square the row above", thMul: "bit 1: multiply it in", thRes: "result so far",
-    first: "the base itself", skip: "bit 0: skip",
-    sumTitle: "Together, as on the slides:",
-    count: (sq, mul, naive) => "That is " + sq + " " + (sq === 1 ? "squaring" : "squarings") + " and " + mul + " " + (mul === 1 ? "multiplication" : "multiplications") + " instead of " + naive + " " + (naive === 1n ? "multiplication" : "multiplications") + " one by one.",
+    cardPow: "One power modulo n", baseM: "Alice's m",
+    sumTitle: "As on the slides, by powers of two:",
+    count: (sq, mul, naive) => "The computer did " + sq + " " + (sq === 1 ? "squaring" : "squarings") + " and " + mul + " " + (mul === 1 ? "multiplication" : "multiplications") + ", not " + naive + " " + (naive === 1n ? "multiplication" : "multiplications") + " one by one.",
     countBig: "A 2048-bit exponent takes about 2048 squarings. This is why Python's pow(m, e, n) is fast.",
+    linkPow: "How a power mod n is computed fast ▶",
     goDec: "now decrypt this c ▶", goEnc: "◀ back to encrypting",
     mod: "mod",
     // step 4
@@ -532,14 +501,14 @@ const T = {
     cardGuess: "Eve guesses and checks",
     guessIntro: (c, n, e) => "Eve caught c = " + c + ". She knows the public key {e, n} = {" + e + ", " + n + "}, and she knows Alice sends a PIN (a number below 10 000). She encrypts every guess and compares it with c.",
     guessRange: (lim) => "guesses: 0 to " + lim,
-    bGuess: "Eve: try every guess", bGuessBig: "the same on the 2048-bit key of Task 7",
+    bGuess: "Eve: try every guess", bGuessBig: "the same on the 2048-bit key of Task 6",
     found: (m, k, ms) => "Found m = " + m + " after " + k + " " + (k === 1 ? "guess" : "guesses") + " (" + ms + " ms), without the private key.",
     notFound: k => "Not found in " + k + " guesses: Alice's m is not below 10 000, so Eve's assumption was wrong. With a big message space this attack fails; with a PIN it always works.",
     lastTries: "the last guesses:",
-    bigIntro: "Task 7: the bank's public key has 2048 bits (n has 617 digits) and e = 65537. Eve caught C. Same trick, same result: the key size does not help.",
+    bigIntro: "Task 6: the bank's public key has 2048 bits (n has 617 digits) and e = 65537. Eve caught C. Same trick, same result: the key size does not help.",
     bigRun: (k) => "trying… " + k + " guesses",
     bigFound: (pin, k, s) => "PIN " + pin + " found after " + k + " guesses in " + s + " s, in your browser.",
-    showN: "the 2048-bit n of Task 7",
+    showN: "the 2048-bit n of Task 6",
     cardReal: "What real RSA does",
     real: ["<b>Random padding (OAEP).</b> Before encrypting, random bytes are added to the message in a fixed way. The same PIN then gives a different c every time, and Eve's guesses no longer match. Bob removes the padding after decrypting. Every library does this for you.",
            "<b>Big keys.</b> n has at least 2048 bits (617 digits), so nobody can factor it to find p, q and d. The small numbers on this page are only for learning.",
@@ -555,12 +524,12 @@ const T = {
     title: "Eksplorator RSA", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
     stepOf: n => "Krok " + n + " z 4 · RSA",
-    steps: [["Czarna skrzynka", "Alice szyfruje, Bob odszyfrowuje, Eve podsłuchuje"], ["Tworzenie kluczy", "p, q, n, phi, e oraz d z tabeli Euklidesa"],
-            ["Jedna potęga mod n", "kwadrat i mnożenie, bit po bicie"], ["Podręcznikowe RSA nie wystarcza", "to samo m zawsze daje to samo c"]],
+    steps: [["Czarna skrzynka", "Alice szyfruje, Bob odszyfrowuje, Eve podsłuchuje"], ["Tworzenie kluczy", "p, q, n, phi, e oraz d, odwrotność e"],
+            ["Jedna potęga mod n", "c = m^e mod n i z powrotem"], ["Podręcznikowe RSA nie wystarcza", "to samo m zawsze daje to samo c"]],
     explain: [
       ["Kłódka, którą każdy może zamknąć", "Bob ma parę kluczy. Alice szyfruje wiadomość m kluczem publicznym Boba, a Bob odszyfrowuje ją swoim kluczem prywatnym. Eve widzi n, e i c, i nic jej to nie daje. Zmień wiadomość i patrz na c. Kliknij klucz, żeby zobaczyć, jak Bob go zrobił, albo pole, żeby zajrzeć do potęgi."],
-      ["Pięć kroków od dwóch liczb pierwszych", "Bob wybiera dwie tajne liczby pierwsze p i q. n i e są jawne, phi i d zostają tajne. d to odwrotność e modulo phi i wychodzi z tabeli Euklidesa. Wypróbuj przykłady albo własne liczby. Kliknij klucz na dole, żeby go użyć."],
-      ["Szyfrowanie to jedna potęga modulo n", "c = m<sup>e</sup> mod n oraz m = c<sup>d</sup> mod n. Nikt nie mnoży m przez siebie e razy: podnosimy do kwadratu, bierzemy resztę i domnażamy te potęgi, przy których wykładnik ma bit 1. Liczby nigdy nie przekraczają n². Przejdź po wierszach."],
+      ["Pięć kroków od dwóch liczb pierwszych", "Bob wybiera dwie tajne liczby pierwsze p i q. n i e są jawne, phi i d zostają tajne. d to odwrotność e modulo phi; znajduje ją rozszerzony algorytm Euklidesa. Wypróbuj przykłady albo własne liczby. Kliknij klucz na dole, żeby go użyć."],
+      ["Szyfrowanie to jedna potęga modulo n", "c = m<sup>e</sup> mod n oraz m = c<sup>d</sup> mod n. Nikt nie mnoży m przez siebie e razy: komputer podnosi do kwadratu i mnoży (square-and-multiply), a po każdym kroku bierze resztę, więc nawet 2048-bitowe d wymaga tylko kilku tysięcy mnożeń. Przełączaj między szyfrowaniem i odszyfrowaniem."],
       ["To samo m zawsze daje to samo c", "Podręcznikowe RSA nie ma losowości. Każdy może szyfrować kluczem publicznym, więc Eve szyfruje swoje strzały i porównuje je z c. Jeśli wiadomość pochodzi z małego zbioru (PIN, tak lub nie), Eve znajdzie ją bez d. Prawdziwe RSA dodaje losowe dopełnienie."]],
     selfOk: "✓ sprawdzone z przykładami Stallingsa, Wikipedii i zadań z wykładu", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
@@ -579,12 +548,12 @@ const T = {
     errText: (ch, code, n) => "Litera „" + ch + "” ma kod " + code + ", który nie jest mniejszy od n = " + n + ". Wybierz większe liczby pierwsze w kroku 2.",
     errEmpty: "Wpisz kilka liter.",
     cardDetails1: "Dwie potęgi",
-    rowAlice: "Alice liczy", rowBob: "Bob liczy", clickPow: "Kliknij wiersz, żeby zobaczyć potęgę krok po kroku.",
+    rowAlice: "Alice liczy", rowBob: "Bob liczy", clickPow: "Kliknij wiersz, żeby zobaczyć potęgę w kroku 3.",
     rowLetter: "litera", rowCode: "m (jej kod)", rowC: "c", rowBack: "Bob: m z powrotem", rowLetter2: "Bob czyta",
     textNote: "Każda litera jest szyfrowana osobno tylko dlatego, że n jest tu malutkie. Prawdziwe RSA zamienia cały krótki tekst w jedną dużą liczbę (jak rsa_ready.py w zadaniu 2), a prawdziwe wiadomości idą szyfrowaniem hybrydowym.",
     legPub: "jawne: może znać każdy", legSec: "tajne: tylko Bob", legMsg: "wiadomość m", legCt: "szyfrogram c", legEve: "Eve, która podsłuchuje",
     cardKeys: "Bob tworzy parę kluczy", presets: "przykłady:",
-    preNames: ["17, 11, e = 7 (ze slajdów)", "11, 13, e = 23 (zadanie 4)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
+    preNames: ["17, 11, e = 7 (ze slajdów)", "11, 13, e = 23 (phi = 120)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
     inP: "p (pierwsza, tajna)", inQ: "q (pierwsza, tajna)", inE: "e (jawne)", inLimit: "na tej stronie liczby pierwsze poniżej 10⁹",
     kStep: ["wybierz dwie liczby pierwsze p i q", "n = p × q", "phi = (p - 1)(q - 1)", "wybierz e, dla którego gcd(e, phi) = 1", "d = odwrotność e mod phi"],
     pub: "jawne", sec: "tajne",
@@ -594,29 +563,20 @@ const T = {
     errERange: phi => "e musi być większe od 1 i mniejsze od phi = " + phi + ".",
     errEGcd: (e, phi, g) => "gcd(" + e + ", " + phi + ") = " + g + ", a nie 1: e nie ma odwrotności modulo phi.",
     tryE: e => "spróbuj e = " + e,
-    dHow: "jak: tabela Euklidesa niżej",
-    cardEuclid: (e, phi) => "Krok 5 dokładnie: odwrotność " + e + " mod " + phi + " z tabeli Euklidesa",
-    euclidNote: "Po lewej algorytm Euklidesa, jak na slajdach. Po prawej każda reszta zapisana jako mieszanka phi i e. Dwa pierwsze wiersze są za darmo; każdy następny to wiersz dwa wyżej minus q razy wiersz wyżej. Liczba przy e (pomarańczowa) w wierszu z resztą 1 to odwrotność. To samo co „czytanie od dołu” ze slajdów, tylko liczone od góry.",
-    thA: "a", thB: "b", thDiv: "a = q × b + r", thMix: "r jako mieszanka: s × phi + t × e", start: "start",
-    stopRow: "reszta 0: koniec",
-    bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bAll: "wszystkie wiersze",
-    rowK: (k, N) => "wiersz " + k + " z " + N,
-    resOne: (e, phi, t) => "Ostatnia niezerowa reszta to 1, więc gcd(" + e + ", " + phi + ") = 1 i odwrotność istnieje. W tym wierszu liczba przy e to <b>" + t + "</b>.",
-    resNeg: (t, phi, d) => t + " jest ujemne, więc dodajemy phi: " + t + " + " + phi + " = <b>" + d + "</b>. (Można dodać dowolną wielokrotność phi: modulo phi nic to nie zmienia.)",
-    resD: d => "d = <b>" + d + "</b>",
+    dHow: "jak: zobacz niżej",
+    cardD: (e, phi) => "Krok 5 dokładnie: d, odwrotność " + e + " mod " + phi,
+    dWhat: "d to liczba, dla której e × d mod phi = 1. Istnieje, bo gcd(e, phi) = 1 (krok 4). Komputer znajduje ją rozszerzonym algorytmem Euklidesa: krótka tabela dzieleń, około 1200 nawet dla liczb po 617 cyfr. Nikt nie sprawdza wszystkich d po kolei.",
     resCheck: (e, d, ed, k, phi) => "Sprawdzenie: " + e + " × " + d + " = " + ed + " = " + k + " × " + phi + " + 1, więc e × d mod phi = 1 ✓",
     resPy: (e, phi, d) => "W Pythonie: <span class=\"v\">pow(" + e + ", -1, " + phi + ")</span> daje " + d + ".",
-    resBad: g => "Ostatnia niezerowa reszta to " + g + ", a nie 1: odwrotności nie ma. Bob musi wybrać inne e.",
+    linkEuclid: "Jak działa rozszerzony algorytm Euklidesa ▶",
     cardTwo: "Dwa klucze", twoNote: "Kliknij klucz, żeby go użyć: jedna potęga modulo n.",
     trash: "p, q i phi: już niepotrzebne; trzymaj je w tajemnicy albo usuń. Kto zna p i q, ten policzy d.",
     tabEnc: "szyfrowanie: c = m^e mod n", tabDec: "odszyfrowanie: m = c^d mod n",
-    cardPow: "Jedna potęga modulo n: kwadrat i mnożenie", baseM: "m od Alice",
-    expIs: (name, x, bin, parts) => "Wykładnik " + name + " = " + x + " dwójkowo to " + bin + (parts ? " = " + parts : ""),
-    thK: "bit k", thBit: "bit", thPow: "podstawa^(2^k) mod n: kwadrat wiersza wyżej", thMul: "bit 1: domnóż", thRes: "wynik do tej pory",
-    first: "sama podstawa", skip: "bit 0: pomiń",
-    sumTitle: "Razem, jak na slajdach:",
-    count: (sq, mul, naive) => "To " + sq + " " + plN(sq, "podniesienie", "podniesienia", "podniesień") + " do kwadratu i " + mul + " " + plN(mul, "mnożenie", "mnożenia", "mnożeń") + " zamiast " + naive + " " + plN(naive > 1000n ? 100 + Number(naive % 100n) : Number(naive), "mnożenia", "mnożeń", "mnożeń") + " po kolei.",
+    cardPow: "Jedna potęga modulo n", baseM: "m od Alice",
+    sumTitle: "Jak na slajdach, potęgami dwójki:",
+    count: (sq, mul, naive) => "Komputer wykonał " + sq + " " + plN(sq, "podniesienie", "podniesienia", "podniesień") + " do kwadratu i " + mul + " " + plN(mul, "mnożenie", "mnożenia", "mnożeń") + ", a nie " + naive + " " + plN(naive > 1000n ? 100 + Number(naive % 100n) : Number(naive), "mnożenia", "mnożeń", "mnożeń") + " po kolei.",
     countBig: "Wykładnik 2048-bitowy to około 2048 podniesień do kwadratu. Dlatego pow(m, e, n) w Pythonie jest szybkie.",
+    linkPow: "Jak szybko liczy się potęgę mod n ▶",
     goDec: "teraz odszyfruj to c ▶", goEnc: "◀ wróć do szyfrowania",
     mod: "mod",
     cardSame: "Ta sama wiadomość, ten sam szyfrogram",
@@ -625,14 +585,14 @@ const T = {
     cardGuess: "Eve zgaduje i sprawdza",
     guessIntro: (c, n, e) => "Eve przechwyciła c = " + c + ". Zna klucz publiczny {e, n} = {" + e + ", " + n + "} i wie, że Alice wysyła PIN (liczbę mniejszą od 10 000). Szyfruje każdy strzał i porównuje z c.",
     guessRange: (lim) => "strzały: od 0 do " + lim,
-    bGuess: "Eve: sprawdź wszystkie strzały", bGuessBig: "to samo na 2048-bitowym kluczu z zadania 7",
+    bGuess: "Eve: sprawdź wszystkie strzały", bGuessBig: "to samo na 2048-bitowym kluczu z zadania 6",
     found: (m, k, ms) => "Znalezione m = " + m + " po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " (" + ms + " ms), bez klucza prywatnego.",
     notFound: k => "Nie znaleziono w " + k + " strzałach: m od Alice nie jest mniejsze od 10 000, więc założenie Eve było błędne. Przy dużym zbiorze wiadomości ten atak zawodzi; przy PIN-ie działa zawsze.",
     lastTries: "ostatnie strzały:",
-    bigIntro: "Zadanie 7: klucz publiczny banku ma 2048 bitów (n ma 617 cyfr), a e = 65537. Eve przechwyciła C. Ta sama sztuczka, ten sam wynik: długość klucza nie pomaga.",
+    bigIntro: "Zadanie 6: klucz publiczny banku ma 2048 bitów (n ma 617 cyfr), a e = 65537. Eve przechwyciła C. Ta sama sztuczka, ten sam wynik: długość klucza nie pomaga.",
     bigRun: (k) => "sprawdzam… " + k + " " + plN(k, "strzał", "strzały", "strzałów"),
     bigFound: (pin, k, s) => "PIN " + pin + " znaleziony po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " w " + s + " s, w Twojej przeglądarce.",
-    showN: "2048-bitowe n z zadania 7",
+    showN: "2048-bitowe n z zadania 6",
     cardReal: "Co robi prawdziwe RSA",
     real: ["<b>Losowe dopełnienie (OAEP).</b> Przed szyfrowaniem do wiadomości dokleja się w ustalony sposób losowe bajty. Ten sam PIN daje wtedy za każdym razem inne c i strzały Eve przestają pasować. Bob usuwa dopełnienie po odszyfrowaniu. Każda biblioteka robi to za nas.",
            "<b>Duże klucze.</b> n ma co najmniej 2048 bitów (617 cyfr), więc nikt nie rozłoży go na p i q, żeby policzyć d. Małe liczby na tej stronie służą tylko do nauki.",
@@ -659,8 +619,7 @@ const app = {
   mode: "num",
   mText: "88", m: 88n, mErr: false,
   msg: "HELLO BOB",
-  dir: "enc", pStep: -1,        // step 3: rows shown (-1 = all)
-  eStep: -1,                    // step 2: Euclid rows shown (-1 = all)
+  dir: "enc",
   guess: null, big: null, bigRun: 0, leaked: false,
 };
 app.K = makeKeys(17n, 11n, 7n);
@@ -792,7 +751,7 @@ function render1() {
       '<div class="inrow">' + chip("p", t.inP, "role-sec", app.pText) + chip("q", t.inQ, "role-sec", app.qText) + chip("e", t.inE, "role-pub", app.eText) +
       '<span class="note" style="align-self:flex-end">' + t.inLimit + "</span></div>" +
       '<div class="tablewrap" id="s2tab"></div></div>' +
-    '<div class="card" id="s2euc"></div>' +
+    '<div class="card" id="s2d"></div>' +
     '<div class="card" id="s2two"></div>';
 }
 function updateL1() {
@@ -828,10 +787,10 @@ function updateL1() {
     return '<tr class="' + (todo ? "todo" : "") + '"><td class="num"><span class="badge">' + (i + 1) + "</span></td><td>" + t.kStep[i] +
       '</td><td class="val">' + (todo ? "" : r[0]) + "</td><td>" + (r[1] === "pub" ? pubPill() : secPill()) + "</td></tr>";
   }).join("") + "</table>";
-  // Euclid
-  const eu = document.getElementById("s2euc"), two = document.getElementById("s2two");
-  if (app.inErr || !K.ext) { eu.style.display = "none"; }
-  else { eu.style.display = ""; eu.innerHTML = euclidHTML(K); }
+  // step 5: where d comes from (the algorithm itself is on the mathematics page)
+  const dc = document.getElementById("s2d"), two = document.getElementById("s2two");
+  if (!keyOK()) { dc.style.display = "none"; }
+  else { dc.style.display = ""; dc.innerHTML = dCardHTML(K); }
   if (keyOK()) {
     two.style.display = "";
     two.innerHTML = '<h3>' + t.cardTwo + '</h3><div class="twokeys">' +
@@ -840,41 +799,11 @@ function updateL1() {
       '<div class="trash">' + t.trash + '</div><p class="note" style="margin:8px 0 0">' + t.twoNote + "</p>";
   } else two.style.display = "none";
 }
-function fmtMix(r, s, tt, phi, e, hot) {
-  const sStr = String(s), tAbs = tt < 0n ? -tt : tt;
-  const tStr = hot ? '<span class="tcoef">' + tAbs + "</span>" : String(tAbs);
-  return r + " = " + sStr + " × " + phi + (tt < 0n ? " - " : " + ") + tStr + " × " + e;
-}
-function euclidHTML(K) {
-  const t = L(), x = K.ext, phi = K.phi, e = K.e;
-  const N = x.rows.length;
-  const shown = app.eStep < 0 || app.eStep > N ? N : app.eStep;
-  let h = "<h3>" + t.cardEuclid(e, phi) + '</h3><p class="note" style="margin:0 0 6px">' + t.euclidNote + "</p>";
-  h += '<div class="tablewrap"><table class="etab"><tr><th></th><th>' + t.thA + "</th><th>" + t.thB + "</th><th>" + t.thDiv + "</th><th>" + t.thMix + "</th></tr>";
-  h += '<tr class="start"><td>' + t.start + "</td><td></td><td></td><td></td><td>" + fmtMix(phi, 1n, 0n, phi, e, false) + "</td></tr>";
-  h += '<tr class="start"><td>' + t.start + "</td><td></td><td></td><td></td><td>" + fmtMix(e, 0n, 1n, phi, e, false) + "</td></tr>";
-  x.rows.forEach((r, i) => {
-    const m = x.mix[i + 2];
-    const done = shown === N;
-    const isLastNZ = r.r === x.g && i === N - 2;
-    let cls = i >= shown ? "hide" : (i === shown - 1 && !done ? "cur" : "");
-    if (done && x.g === 1n && isLastNZ) cls = "one";
-    h += '<tr class="' + cls + '"><td>' + (i + 1) + "</td><td>" + r.a + "</td><td>" + r.b + "</td><td>" + r.a + " = " + r.q + " × " + r.b + " + " + r.r + "</td><td>" +
-      (r.r === 0n ? '<span class="note">' + t.stopRow + "</span>" : fmtMix(r.r, m.s, m.t, phi, e, isLastNZ && x.g === 1n)) + "</td></tr>";
-  });
-  // e divides phi: the first row has remainder 0, the last non-zero remainder is e itself
-  h += "</table></div>";
-  h += '<div class="btns"><button data-action="eu-reset">' + t.bReset + '</button><button data-action="eu-prev"' + (shown <= 0 ? " disabled" : "") + ">" + t.bPrev +
-    '</button><button data-action="eu-next"' + (shown >= N ? " disabled" : "") + ">" + t.bNext + '</button><button data-action="eu-all"' + (shown >= N ? " disabled" : "") + ">" + t.bAll +
-    '</button><span class="note">' + t.rowK(shown, N) + "</span></div>";
-  if (shown === N) {
-    if (x.g === 1n) {
-      const d = x.d, ed = e * d;
-      h += '<div class="result">' + t.resOne(e, phi, x.t) + "<br>" + (x.t < 0n ? t.resNeg(x.t, phi, d) + "<br>" : "") + t.resD(d) + "<br>" +
-        '<span class="okline">' + t.resCheck(e, d, ed, ed / phi, phi) + "</span><br>" + t.resPy(e, phi, d) + "</div>";
-    } else h += '<div class="result err">' + t.resBad(x.g) + "</div>";
-  }
-  return h;
+function dCardHTML(K) {
+  const t = L(), e = K.e, d = K.d, phi = K.phi, ed = e * d;
+  return "<h3>" + t.cardD(e, phi) + '</h3><p style="margin:0">' + t.dWhat + "</p>" +
+    '<div class="result">d = <b>' + d + '</b><br><span class="okline">' + t.resCheck(e, d, ed, ed / phi, phi) + "</span><br>" + t.resPy(e, phi, d) + "</div>" +
+    '<a class="golink" href="../math/extended-euclid/index.html?a=' + phi + "&amp;b=" + e + '#3">' + t.linkEuclid + "</a>";
 }
 
 /* ---------- step 3: one power ---------- */
@@ -898,56 +827,17 @@ function updateL2() {
   if (!body) return;
   const t = L(), S = powSetup();
   if (!S) { body.innerHTML = '<p class="err">' + t.errM(app.K.n - 1n) + "</p>"; return; }
-  const tr = modPowTrace(S.base, S.exp, S.n), R = tr.rows, N = R.length;
-  const shown = app.pStep < 0 || app.pStep > N ? N : app.pStep;
-  const cur = shown - 1;
-  const bin = S.exp.toString(2);
-  const ones = R.filter(r => r.bit).map(r => r.k).reverse();
-  const parts = ones.length > 1 && ones.length <= 12 ? ones.map(k => String(1n << BigInt(k))).join(" + ") : "";
-  let h = '<div class="formula">' + S.rn + " = " + sup(S.base, S.exp) + " mod " + S.n + "</div>";
-  h += "<p style=\"margin:4px 0\">" + t.expIs(S.en, S.exp, bin, parts) + "</p>";
-  // bits, the most significant first
-  h += '<div class="bits">';
-  for (let k = N - 1; k >= 0; k--) {
-    const b = R[k].bit;
-    h += '<span class="bitcol"><span class="bit' + (k === cur && shown < N ? " cur" : b ? " one" : "") + '">' + b + "</span>" + (N <= 20 ? "<small>" + (1n << BigInt(k)) + "</small>" : "") + "</span>";
+  // only the result and the slides' form; the algorithm step by step is on the mathematics page
+  const tr = modPowTrace(S.base, S.exp, S.n), R = tr.rows;
+  const used = R.filter(r => r.bit).reverse();
+  let h = '<div class="formula">' + S.rn + " = " + sup(S.base, S.exp) + " mod " + S.n + " = " + tr.result + "</div>";
+  if (used.length <= 12) {
+    h += '<div class="sumline"><span style="font-family:var(--sans);font-size:14px">' + t.sumTitle + "</span><br>" + sup(S.base, S.exp) + " = " +
+      used.map(r => sup(S.base, String(1n << BigInt(r.k)))).join(" · ") + " → " + used.map(r => String(r.power)).join(" · ") + " " + t.mod + " " + S.n + " = <b>" + tr.result + "</b></div>";
   }
-  h += "</div>";
-  h += '<div class="tablewrap"><table class="ptab"><tr><th>' + t.thK + "</th><th>" + t.thBit + "</th><th>" + t.thPow + "</th><th>" + t.thMul + "</th><th>" + t.thRes + "</th></tr>";
-  R.forEach((r, i) => {
-    const cls = i >= shown ? "hide" : (i === cur && shown < N ? "cur" : "");
-    const pw = sup(S.base, String(1n << BigInt(r.k)));
-    const how = r.k === 0 ? pw + " mod " + S.n + " = <b>" + r.power + "</b>" + (S.base >= S.n ? "" : ' <span class="note">(' + t.first + ")</span>")
-                          : pw + " = " + r.prev + "² = " + (r.prev * r.prev) + " → " + t.mod + " " + S.n + " = <b>" + r.power + "</b>";
-    const mul = r.bit ? r.before + " × " + r.power + " = " + (r.before * r.power) + " → " + t.mod + " " + S.n + " = <b>" + r.result + "</b>" : t.skip;
-    h += '<tr class="' + cls + '"><td>' + r.k + "</td><td>" + r.bit + "</td><td>" + how + '</td><td class="' + (r.bit ? "" : "skip") + '">' + mul + '</td><td class="res">' + r.result + "</td></tr>";
-  });
-  h += "</table></div>";
-  h += '<div class="btns"><button data-action="pw-reset">' + t.bReset + '</button><button data-action="pw-prev"' + (shown <= 0 ? " disabled" : "") + ">" + t.bPrev +
-    '</button><button data-action="pw-next"' + (shown >= N ? " disabled" : "") + ">" + t.bNext + '</button><button data-action="pw-all"' + (shown >= N ? " disabled" : "") + ">" + t.bAll +
-    '</button><span class="note">' + t.rowK(shown, N) + "</span></div>";
-  if (shown === N) {
-    const used = R.filter(r => r.bit).reverse();
-    h += '<div class="sumline"><span class="st">' + t.sumTitle + "</span><br>" + sup(S.base, S.exp) + " = " + used.map(r => sup(S.base, String(1n << BigInt(r.k)))).join(" · ") +
-      " → " + used.map(r => String(r.power)).join(" · ") + " " + t.mod + " " + S.n + " = <b>" + tr.result + "</b></div>";
-    const sq = N - 1, mul = used.length;
-    const naive = S.exp - 1n;
-    h += '<p class="note" style="margin:8px 0 0">' + t.count(sq, mul, naive) + " " + t.countBig + "</p>";
-    h += '<div class="btns">' + (app.dir === "enc" ? '<button class="dark" data-action="dir" data-d="dec">' + t.goDec + "</button>" : '<button data-action="dir" data-d="enc">' + t.goEnc + "</button>") + "</div>";
-  }
+  h += '<p class="note" style="margin:8px 0 0">' + t.count(R.length - 1, used.length, S.exp - 1n) + " " + t.countBig + "</p>";
+  h += '<div class="btns"><a class="golink" style="margin-top:0" href="../math/fast-exponentiation/index.html?m=' + S.base + "&amp;e=" + S.exp + "&amp;n=" + S.n + '#2">' + t.linkPow + "</a>" + (app.dir === "enc" ? '<button data-action="dir" data-d="dec">' + t.goDec + "</button>" : '<button data-action="dir" data-d="enc">' + t.goEnc + "</button>") + "</div>";
   body.innerHTML = h;
-}
-function pwGo(k) {
-  const S = powSetup(); if (!S) return;
-  const N = modPowTrace(S.base, S.exp, S.n).rows.length;
-  app.pStep = Math.max(0, Math.min(N, k));
-  if (app.pStep === N) app.pStep = -1;
-  updateL2();
-}
-function curPStep() {
-  const S = powSetup(); if (!S) return 0;
-  const N = modPowTrace(S.base, S.exp, S.n).rows.length;
-  return app.pStep < 0 ? N : app.pStep;
 }
 
 /* ---------- step 4: textbook RSA is not enough ---------- */
@@ -1107,7 +997,7 @@ function keysChanged() {
   app.inErr = !ok;
   if (ok) app.K = makeKeys(BigInt(app.pText.trim()), BigInt(app.qText.trim()), BigInt(app.eText.trim()));
   else app.K = { ok: false, err: null };
-  app.eStep = -1; app.pStep = -1; app.guess = null;
+  app.guess = null;
   updateL1();
   document.querySelectorAll(".presets button").forEach(b => {
     const pr = PRESETS[+b.dataset.i];
@@ -1118,7 +1008,6 @@ function setM(v) {
   app.mText = v;
   const s = v.trim();
   if (/^\d{1,40}$/.test(s)) { app.m = BigInt(s); app.mErr = false; } else app.mErr = true;
-  app.pStep = -1;
   updateAll();
 }
 
@@ -1147,7 +1036,7 @@ view.addEventListener("click", e => {
   if (!el) return;
   const a = el.dataset.action;
   if (a === "go") goTo(+el.dataset.to);
-  else if (a === "pow") { app.dir = el.dataset.dir; app.pStep = -1; goTo(2); }
+  else if (a === "pow") { app.dir = el.dataset.dir; goTo(2); }
   else if (a === "mode") { app.mode = el.dataset.m; render(); }
   else if (a === "preset") {
     const pr = PRESETS[+el.dataset.i];
@@ -1156,18 +1045,7 @@ view.addEventListener("click", e => {
     keysChanged();
   }
   else if (a === "sete") { app.eText = el.dataset.e; const inp = view.querySelector('input[data-field="e"]'); if (inp) inp.value = app.eText; keysChanged(); }
-  else if (a === "eu-reset" || a === "eu-prev" || a === "eu-next" || a === "eu-all") {
-    const N = app.K.ext.rows.length, cur = app.eStep < 0 ? N : app.eStep;
-    let k = a === "eu-reset" ? 0 : a === "eu-prev" ? cur - 1 : a === "eu-next" ? cur + 1 : N;
-    k = Math.max(0, Math.min(N, k));
-    app.eStep = k === N ? -1 : k;
-    document.getElementById("s2euc").innerHTML = euclidHTML(app.K);
-  }
-  else if (a === "dir") { app.dir = el.dataset.d; app.pStep = -1; render(); }
-  else if (a === "pw-reset") pwGo(0);
-  else if (a === "pw-prev") pwGo(curPStep() - 1);
-  else if (a === "pw-next") pwGo(curPStep() + 1);
-  else if (a === "pw-all") pwGo(1e9);
+  else if (a === "dir") { app.dir = el.dataset.d; render(); }
   else if (a === "guess") runGuess();
   else if (a === "guess-big") runBig();
   else if (a === "leak") { app.leaked = !app.leaked; updateL3(); }
@@ -1196,8 +1074,6 @@ document.addEventListener("keydown", e => {
   if (e.key === "Enter" && tag === "BUTTON") return;
   if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
   else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
-  else if (app.level === 2 && (e.key === "n" || e.key === " ")) { e.preventDefault(); pwGo(curPStep() + 1); }
-  else if (app.level === 2 && e.key === "p") pwGo(curPStep() - 1);
 });
 
 /* ---------- start ---------- */

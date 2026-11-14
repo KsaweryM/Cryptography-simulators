@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fast modular exponentiation</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --m-b:#2F6FDB; --m-bg:#E5EDFB;
+  --e-b:#2FA84F; --e-bg:#E3F4E8;
+  --n-b:#BCC4CC; --n-bg:#EEF1F4;
+  --sq-b:#0E8C8C; --sq-bg:#DDF3F3;
+  --mu-b:#D9621C; --mu-bg:#FCE8DA;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --m-b:#7FA8F0; --m-bg:#1A2740; --e-b:#4CC877; --e-bg:#15301E; --n-b:#4A5663; --n-bg:#222C37;
+    --sq-b:#4FD1D1; --sq-bg:#123334; --mu-b:#F29A5C; --mu-bg:#3D2414;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --m-b:#7FA8F0; --m-bg:#1A2740; --e-b:#4CC877; --e-bg:#15301E; --n-b:#4A5663; --n-bg:#222C37;
+  --sq-b:#4FD1D1; --sq-bg:#123334; --mu-b:#F29A5C; --mu-bg:#3D2414;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+a{color:var(--focus)}
+
+/* frame: the same as the simulators */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.v{font-family:var(--mono);font-weight:600}
+.why{margin-top:12px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.tablewrap{overflow-x:auto}
+
+/* inputs */
+.presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.presets button{font-size:13px;padding:4px 10px}
+.presets button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.inrow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.chip{display:flex;flex-direction:column;border-radius:8px;padding:6px 10px;border:1.5px solid;font-weight:600;font-size:13.5px}
+.chip input{margin-top:4px;width:15em;max-width:100%;font-size:16px;font-weight:600}
+.chip.wide input{width:27em}
+.role-m{border-color:var(--m-b);background:var(--m-bg)}
+.role-e{border-color:var(--e-b);background:var(--e-bg)}
+.role-n{border-color:var(--n-b);background:var(--n-bg)}
+
+/* formulas, bits and tables */
+.formula{font-family:var(--mono);font-size:24px;font-weight:600;margin:2px 0 4px;word-break:break-all}
+.formula sup{font-size:15px}
+.bits{display:inline-flex;gap:2px;align-items:flex-start;flex-wrap:wrap;margin:4px 0}
+.bitcol{display:flex;flex-direction:column;align-items:center;gap:1px}
+.bit{display:inline-block;min-width:22px;height:26px;line-height:26px;text-align:center;font-family:var(--mono);font-size:14px;border-radius:4px;background:var(--sunken);color:var(--muted);padding:0 2px}
+.bit.one{background:var(--ink);color:var(--surface)}
+.bit.cur{background:var(--chg);color:#fff}
+.bitcol small{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.ptab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:8px}
+.ptab th{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px 14px 4px 0;border-bottom:1.5px solid var(--rule)}
+.ptab td{padding:5px 14px 5px 0;white-space:nowrap;border-bottom:1px solid var(--rule)}
+.ptab tr.start td{color:var(--muted)}
+.ptab tr.cur td{background:var(--chg-bg)}
+.ptab tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--chg)}
+.ptab tr.hide td{opacity:.35}
+.ptab tr.hide td:nth-child(n+3){visibility:hidden}
+.ptab td.skip{color:var(--muted)}
+.ptab td.res{font-weight:700}
+.ptab tr.ell td{color:var(--muted);text-align:left}
+.sumline{font-family:var(--mono);font-size:15px;margin-top:12px;line-height:1.8;word-break:break-word}
+.sumline b{color:var(--chg)}
+.big{font-family:var(--mono);font-size:20px;font-weight:600;word-break:break-all}
+.ctab{border-collapse:collapse;font-size:14px;margin-top:4px}
+.ctab th{font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px 18px 4px 0;border-bottom:1.5px solid var(--rule)}
+.ctab td{padding:5px 18px 5px 0;border-bottom:1px solid var(--rule);font-family:var(--mono);white-space:nowrap}
+.ctab td:first-child{font-family:var(--sans)}
+.ctab td.badc{color:var(--bad);font-weight:600}
+.ctab td.okc{color:var(--ok);font-weight:600}
+
+/* the operation trace: one tile per squaring (S) or multiplication (M) */
+.trace{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:center;margin-top:6px}
+.trace .tl{font-size:13px;font-weight:600;text-align:right}
+.tiles{display:flex;flex-wrap:wrap;gap:6px}
+.tgroup{display:flex;gap:2px;padding:3px;border-radius:6px;background:var(--sunken);min-width:56px;justify-content:center}
+.tgroup.hd{background:none;font-family:var(--mono);font-weight:700;font-size:14px}
+.tile{width:24px;height:22px;line-height:20px;text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;border-radius:4px;border:1.5px solid}
+.tile.S{border-color:var(--sq-b);background:var(--sq-bg)}
+.tile.M{border-color:var(--mu-b);background:var(--mu-bg)}
+.reg{display:inline-block;padding:0 6px;border-radius:5px;font-weight:700}
+.reg.r0{background:var(--m-bg);border:1.5px solid var(--m-b)}
+.reg.r1{background:var(--e-bg);border:1.5px solid var(--e-b)}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html#2"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== the algorithms (BigInt) ===================== */
+// CORE-BEGIN
+// the naive way: multiply by the base e times, taking the remainder each time (e - 1 real multiplications)
+function naivePow(base, exp, n) {
+  let r = 1n % n;
+  for (let i = 0n; i < exp; i++) r = (r * base) % n;
+  return r;
+}
+// square-and-multiply, right to left (the table the RSA explorer had in its step 3):
+// row k squares the power base^(2^k), and multiplies it into the result where bit k of exp is 1
+function modPowTrace(base, exp, n) {
+  const rows = [];
+  let power = base % n, result = 1n % n, k = 0, prev = null;
+  let x = exp;
+  while (x > 0n) {
+    if (k > 0) { prev = power; power = (power * power) % n; }
+    const bit = Number(x & 1n);
+    const before = result;
+    if (bit === 1) result = (result * power) % n;
+    rows.push({ k: k, bit: bit, prev: prev, power: power, before: before, result: result });
+    x >>= 1n; k++;
+  }
+  return { rows: rows, result: result };
+}
+// the Montgomery ladder, left to right: two registers with R1 = R0 * base all the time.
+// bit 0: R1 = R0 * R1, R0 = R0^2      bit 1: R0 = R0 * R1, R1 = R1^2
+// Every bit costs one multiplication and one squaring, whatever its value.
+function ladderTrace(base, exp, n) {
+  const bits = exp.toString(2), rows = [];
+  let R0 = 1n % n, R1 = base % n;
+  if (exp === 0n) return { rows: rows, result: R0 };
+  for (let i = 0; i < bits.length; i++) {
+    const bit = bits[i] === "1" ? 1 : 0, r0 = R0, r1 = R1;
+    if (bit === 0) { R1 = (r0 * r1) % n; R0 = (r0 * r0) % n; }
+    else           { R0 = (r0 * r1) % n; R1 = (r1 * r1) % n; }
+    rows.push({ k: bits.length - 1 - i, bit: bit, r0: r0, r1: r1, R0: R0, R1: R1 });
+  }
+  return { rows: rows, result: R0 };
+}
+// the operations done for each bit (most significant first): "S" = a squaring, "M" = a multiplication
+function opsSquareMultiply(exp) {   // as in modPowTrace: no squaring for bit 0, a multiplication for every 1 bit
+  const b = exp.toString(2), L = b.length;
+  return Array.from(b, (c, i) => (L - 1 - i > 0 ? "S" : "") + (c === "1" ? "M" : ""));
+}
+function opsLadder(exp) { return Array.from(exp.toString(2), () => "MS"); }
+function popcount(x) { let c = 0; while (x > 0n) { c += Number(x & 1n); x >>= 1n; } return c; }
+
+/* Test values and where they come from (each also recomputed with Python 3.12 pow(m, e, n)):
+   1. Lecture 3 (RSA), the slides "The example: encrypt 88" and "The example: decrypt 11" (W. Stallings):
+      88^7 mod 187 = 11 with 88^1, 88^2, 88^4 mod 187 = 88, 77, 132;
+      11^23 mod 187 = 88 with 11^1, 11^2, 11^4, 11^8, 11^16 mod 187 = 11, 121, 55, 33, 154.
+   2. Wikipedia "RSA (cryptosystem)", the worked example with Euler's phi: 65^17 mod 3233 = 2790,
+      2790^2753 mod 3233 = 65.
+   3. Lecture 3, Task 4 (Task4/solution/my_rsa.py): n = 2221701454780507748530735154427775990789,
+      2026^65537 mod n = 736246060401132335090489988934276767570.
+   4. 3^16 mod 7 = 4 with 4 squarings (the old lecture slide "Good to know: fast powers").
+   5. For every 1 <= n <= 30, 0 <= base <= n + 1 and 0 <= e <= 40: both fast algorithms equal the naive
+      repeated multiplication; the ladder does exactly one multiplication and one squaring per bit. */
+const T4_N = 2221701454780507748530735154427775990789n;
+const T4_C = 736246060401132335090489988934276767570n;
+const PRESETS = [   // [base, exp, n]
+  [88n, 7n, 187n],       // the slides: encrypt
+  [11n, 23n, 187n],      // the slides: decrypt
+  [3n, 16n, 7n],         // 4 squarings
+  [65n, 17n, 3233n],     // Wikipedia
+  [2790n, 2753n, 3233n], // Wikipedia: decrypt
+  [2026n, 65537n, T4_N], // Lecture 3, Task 4
+];
+
+function selfTest() {
+  const fails = [];
+  // 1. the slides
+  const a = modPowTrace(88n, 7n, 187n);
+  if (a.result !== 11n || a.rows.map(r => r.power).join(",") !== "88,77,132") fails.push("88^7 mod 187");
+  const b = modPowTrace(11n, 23n, 187n);
+  if (b.result !== 88n || b.rows.map(r => r.power).join(",") !== "11,121,55,33,154") fails.push("11^23 mod 187");
+  if (ladderTrace(88n, 7n, 187n).result !== 11n || ladderTrace(11n, 23n, 187n).result !== 88n) fails.push("ladder 187");
+  // 2. Wikipedia
+  for (const f of [modPowTrace, ladderTrace]) {
+    if (f(65n, 17n, 3233n).result !== 2790n || f(2790n, 2753n, 3233n).result !== 65n) { fails.push("Wikipedia 3233"); break; }
+  }
+  // 3. Task 4
+  if (modPowTrace(2026n, 65537n, T4_N).result !== T4_C || ladderTrace(2026n, 65537n, T4_N).result !== T4_C) fails.push("Task 4: C");
+  // 4. 3^16 mod 7
+  const c = modPowTrace(3n, 16n, 7n);
+  if (c.result !== 4n || c.rows.length - 1 !== 4 || ladderTrace(3n, 16n, 7n).result !== 4n) fails.push("3^16 mod 7");
+  // 5. every small case against the naive way
+  outer:
+  for (let n = 1n; n <= 30n; n++) {
+    for (let m = 0n; m <= n + 1n; m++) {
+      for (let e = 0n; e <= 40n; e++) {
+        const want = naivePow(m, e, n);
+        const sm = modPowTrace(m, e, n), ld = ladderTrace(m, e, n);
+        if (sm.result !== want) { fails.push("square-and-multiply " + m + "^" + e + " mod " + n); break outer; }
+        if (ld.result !== want) { fails.push("ladder " + m + "^" + e + " mod " + n); break outer; }
+        if (e > 0n && ld.rows.length !== e.toString(2).length) { fails.push("ladder steps " + e); break outer; }
+        if (e > 0n && opsSquareMultiply(e).join("").split("M").length - 1 !== popcount(e)) { fails.push("multiplications " + e); break outer; }
+      }
+    }
+  }
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  n = Number(n);
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const T = {
+  en: {
+    title: "Fast modular exponentiation", home: "Mathematics",
+    intro: "Section 12 of the maths contents. How m^e mod n is computed when e has hundreds of digits.",
+    stepOf: n => "Step " + n + " of 3 · Mathematics, section 12",
+    steps: [["The naive way", "e - 1 multiplications: far too many"], ["Square-and-multiply", "one squaring per bit of e"],
+            ["The Montgomery ladder", "the same work for every bit"]],
+    explain: [
+      ["Multiply by m, e times", "The obvious way to compute m<sup>e</sup> mod n is to multiply by m again and again and take the remainder each time, so the numbers stay below n. That needs e - 1 multiplications. In RSA the private exponent d has 2048 bits, so this would never finish. Steps 2 and 3 do the same job with a few thousand multiplications."],
+      ["Square the power, multiply where the bit is 1", "Write e in binary. Squaring m gives m², squaring again gives m⁴, then m⁸, …: one squaring per bit of e. Then multiply together the powers where e has a 1 bit, because e is their sum. Take the remainder after every step, so the numbers never grow bigger than n². This is what Python's pow(m, e, n) does. Step through the rows."],
+      ["Two registers, the same steps for every bit", "Square-and-multiply does an extra multiplication only for the 1 bits, so its running time shows how many 1 bits the key has, and when. The Montgomery ladder keeps two numbers R0 and R1 with R1 = R0 × m, goes through the bits from the top and does one multiplication and one squaring for every bit. The work is the same whatever the bits are. Step through the rows."]],
+    selfOk: "✓ checked against the RSA slides, Wikipedia and plain repeated multiplication", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "← / →: step · n / p: next / previous row",
+    cardIn: "One power: m^e mod n", presets: "examples:",
+    preNames: ["88^7 mod 187 (the slides)", "11^23 mod 187 (the slides)", "3^16 mod 7", "65^17 mod 3233 (Wikipedia)", "2790^2753 mod 3233", "Task 4: 2026^65537"],
+    inM: "m (the base)", inE: "e (the exponent)", inN: "n (the modulus)", inLimit: "whole numbers, up to 80 digits",
+    errNum: "Type whole numbers (up to 80 digits) with e ≥ 1 and n ≥ 2.",
+    cardNaive: "Multiply by m, one step at a time",
+    thI: "step", thNaive: "m^i mod n = (the row above) × m mod n",
+    rowsOmitted: k => "… " + k + " more rows …",
+    tooMany: "Too many steps to run here: the table stops after the first rows.",
+    naiveCount: (e, m) => "That is <b>" + e + "</b> " + (e === 1n ? "multiplication" : "multiplications") + " (e - 1). " + m,
+    withoutMod: (m, e, digits) => "Without the remainder after each step, " + m + "<sup>" + e + "</sup> would have " + digits + " digits before the final mod n.",
+    cardCount: "How many multiplications?",
+    thWhat: "exponent", thNaiveC: "the naive way", thSM: "square-and-multiply", thLad: "Montgomery ladder",
+    rowThis: "this e", row65537: "e = 65537 (the usual public exponent)", row2048: "a 2048-bit d (a private exponent)",
+    about: "about ", twoTo2048: "about 3.2 × 10<sup>616</sup>",
+    impossible: "<b>Why the naive way is impossible.</b> 3.2 × 10<sup>616</sup> multiplications at a billion per second take about 10<sup>607</sup> seconds, which is 10<sup>600</sup> years. The universe is about 1.4 × 10<sup>10</sup> years old. Square-and-multiply needs about 3000 multiplications for the same exponent.",
+    goSM: "square-and-multiply ▶",
+    cardSM: "Square-and-multiply, bit by bit",
+    expIs: (x, bin, parts) => "The exponent e = " + x + " in binary is " + bin + (parts ? " = " + parts : ""),
+    thK: "bit k", thBit: "bit", thPow: "m^(2^k) mod n: square the row above", thMul: "bit 1: multiply it in", thRes: "result so far",
+    first: "the base itself", skip: "bit 0: skip", mod: "mod",
+    bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bAll: "all rows",
+    rowK: (k, N) => "row " + k + " of " + N,
+    sumTitle: "Together (the form on the RSA slides):",
+    count: (sq, mul, naive) => "That is " + sq + " " + (sq === 1 ? "squaring" : "squarings") + " and " + mul + " " + (mul === 1 ? "multiplication" : "multiplications") + " instead of " + naive + " " + (naive === 1n ? "multiplication" : "multiplications") + " one by one.",
+    dblAdd: "<b>On elliptic curves</b> the same idea is called <b>double-and-add</b>: a point is added to itself (doubled) for every bit of k, and G is added where the bit is 1. ",
+    dblLink: "See it in the elliptic-curve explorer ▶",
+    goLad: "the Montgomery ladder ▶",
+    cardLad: "The Montgomery ladder, from the top bit down",
+    ladStart: "start", thOp: "what this bit does", thR0: "R0", thR1: "R1",
+    op0: "bit 0: R1 = R0 × R1, R0 = R0²", op1: "bit 1: R0 = R0 × R1, R1 = R1²",
+    ladRes: (m, e, n, r) => "The result is in R0: " + m + "<sup>" + e + "</sup> mod " + n + " = <b>" + r + "</b>",
+    ladSame: (r) => "The same as square-and-multiply: " + r + " ✓",
+    invariant: "<b>Why it works.</b> At the start R0 = m⁰ = 1 and R1 = m¹. After each bit, R0 = m<sup>x</sup> and R1 = m<sup>x+1</sup>, where x is the part of e read so far. A bit 0 turns x into 2x (R0²), a bit 1 into 2x + 1 (R0 × R1 = m<sup>2x+1</sup>). The other register follows one power ahead.",
+    cardTime: "What Eve sees: the operations, bit by bit",
+    timeNote: "S is a squaring, M a multiplication, one group per bit of e (the top bit on the left). A multiplication takes measurable time and power, so Eve can watch the pattern.",
+    trSM: "square-and-multiply", trLad: "Montgomery ladder", trBits: "bits of e",
+    eveSM: (bits) => "From square-and-multiply Eve reads the bits directly: a group with M is a 1, a group without M is a 0. She gets " + bits + ".",
+    eveLad: "From the ladder she learns only how many bits e has: every group is M S.",
+    countLad: (L, sq, mul) => "The ladder does " + L + " multiplications and " + L + " squarings; square-and-multiply did " + mul + " and " + sq + ". The ladder is a little slower, and the same for every key.",
+    whyReal: "<b>In real code</b> even the “if bit = 1” is hidden: R0 and R1 are swapped with arithmetic, not with a branch, so the processor runs the same instructions for every bit. X25519 (the elliptic-curve Diffie-Hellman in TLS and Signal) is built on a Montgomery ladder.",
+  },
+  pl: {
+    title: "Szybkie potęgowanie modulo", home: "Matematyka",
+    intro: "Punkt 12 spisu treści matematyki. Jak liczy się m^e mod n, gdy e ma setki cyfr.",
+    stepOf: n => "Krok " + n + " z 3 · Matematyka, punkt 12",
+    steps: [["Sposób naiwny", "e - 1 mnożeń: zdecydowanie za dużo"], ["Square-and-multiply", "jedno podniesienie do kwadratu na bit e"],
+            ["Drabina Montgomery'ego", "ta sama praca przy każdym bicie"]],
+    explain: [
+      ["Mnożymy przez m, e razy", "Najprostszy sposób na m<sup>e</sup> mod n to mnożyć przez m raz za razem i za każdym razem brać resztę, żeby liczby zostały mniejsze od n. To e - 1 mnożeń. W RSA prywatny wykładnik d ma 2048 bitów, więc to nigdy by się nie skończyło. Kroki 2 i 3 robią to samo kilkoma tysiącami mnożeń."],
+      ["Podnosimy do kwadratu, mnożymy tam, gdzie bit to 1", "Zapisz e dwójkowo. Podniesienie m do kwadratu daje m², kolejne daje m⁴, potem m⁸, …: jedno podniesienie na bit e. Potem mnożymy te potęgi, przy których e ma bit 1, bo e jest ich sumą. Po każdym kroku bierzemy resztę, więc liczby nie przekraczają n². Tak działa pow(m, e, n) w Pythonie. Przejdź po wierszach."],
+      ["Dwa rejestry, te same kroki przy każdym bicie", "Square-and-multiply robi dodatkowe mnożenie tylko przy bitach 1, więc czas działania zdradza, ile bitów 1 ma klucz i gdzie. Drabina Montgomery'ego trzyma dwie liczby R0 i R1, takie że R1 = R0 × m, idzie po bitach od najstarszego i przy każdym bicie robi jedno mnożenie i jedno podniesienie do kwadratu. Praca jest taka sama niezależnie od bitów. Przejdź po wierszach."]],
+    selfOk: "✓ sprawdzone z przykładami ze slajdów RSA, Wikipedii i zwykłym mnożeniem po kolei", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "← / →: krok · n / p: następny / poprzedni wiersz",
+    cardIn: "Jedna potęga: m^e mod n", presets: "przykłady:",
+    preNames: ["88^7 mod 187 (slajdy)", "11^23 mod 187 (slajdy)", "3^16 mod 7", "65^17 mod 3233 (Wikipedia)", "2790^2753 mod 3233", "zadanie 4: 2026^65537"],
+    inM: "m (podstawa)", inE: "e (wykładnik)", inN: "n (moduł)", inLimit: "liczby całkowite, do 80 cyfr",
+    errNum: "Wpisz liczby całkowite (do 80 cyfr), e ≥ 1 i n ≥ 2.",
+    cardNaive: "Mnożymy przez m, krok po kroku",
+    thI: "krok", thNaive: "m^i mod n = (wiersz wyżej) × m mod n",
+    rowsOmitted: k => "… jeszcze " + k + " " + plN(k, "wiersz", "wiersze", "wierszy") + " …",
+    tooMany: "Za dużo kroków, żeby je tu wykonać: tabela kończy się po pierwszych wierszach.",
+    naiveCount: (e, m) => "To <b>" + e + "</b> " + plN(e > 1000n ? 100n + e % 100n : e, "mnożenie", "mnożenia", "mnożeń") + " (e - 1). " + m,
+    withoutMod: (m, e, digits) => "Bez brania reszty po każdym kroku " + m + "<sup>" + e + "</sup> miałoby " + digits + " cyfr przed końcowym mod n.",
+    cardCount: "Ile mnożeń?",
+    thWhat: "wykładnik", thNaiveC: "sposób naiwny", thSM: "square-and-multiply", thLad: "drabina Montgomery'ego",
+    rowThis: "to e", row65537: "e = 65537 (zwykły wykładnik publiczny)", row2048: "2048-bitowe d (wykładnik prywatny)",
+    about: "około ", twoTo2048: "około 3,2 × 10<sup>616</sup>",
+    impossible: "<b>Dlaczego sposób naiwny jest niemożliwy.</b> 3,2 × 10<sup>616</sup> mnożeń po miliard na sekundę to około 10<sup>607</sup> sekund, czyli 10<sup>600</sup> lat. Wszechświat ma około 1,4 × 10<sup>10</sup> lat. Square-and-multiply potrzebuje dla tego samego wykładnika około 3000 mnożeń.",
+    goSM: "square-and-multiply ▶",
+    cardSM: "Square-and-multiply, bit po bicie",
+    expIs: (x, bin, parts) => "Wykładnik e = " + x + " dwójkowo to " + bin + (parts ? " = " + parts : ""),
+    thK: "bit k", thBit: "bit", thPow: "m^(2^k) mod n: kwadrat wiersza wyżej", thMul: "bit 1: domnóż", thRes: "wynik do tej pory",
+    first: "sama podstawa", skip: "bit 0: pomiń", mod: "mod",
+    bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bAll: "wszystkie wiersze",
+    rowK: (k, N) => "wiersz " + k + " z " + N,
+    sumTitle: "Razem (postać ze slajdów o RSA):",
+    count: (sq, mul, naive) => "To " + sq + " " + plN(sq, "podniesienie", "podniesienia", "podniesień") + " do kwadratu i " + mul + " " + plN(mul, "mnożenie", "mnożenia", "mnożeń") + " zamiast " + naive + " " + plN(naive > 1000n ? 100n + naive % 100n : naive, "mnożenia", "mnożeń", "mnożeń") + " po kolei.",
+    dblAdd: "<b>Na krzywych eliptycznych</b> ten sam pomysł nazywa się <b>double-and-add</b>: punkt jest dodawany do siebie (podwajany) przy każdym bicie k, a G jest dodawane tam, gdzie bit to 1. ",
+    dblLink: "Zobacz w eksploratorze krzywych eliptycznych ▶",
+    goLad: "drabina Montgomery'ego ▶",
+    cardLad: "Drabina Montgomery'ego, od najstarszego bitu",
+    ladStart: "start", thOp: "co robi ten bit", thR0: "R0", thR1: "R1",
+    op0: "bit 0: R1 = R0 × R1, R0 = R0²", op1: "bit 1: R0 = R0 × R1, R1 = R1²",
+    ladRes: (m, e, n, r) => "Wynik jest w R0: " + m + "<sup>" + e + "</sup> mod " + n + " = <b>" + r + "</b>",
+    ladSame: (r) => "Tak samo jak w square-and-multiply: " + r + " ✓",
+    invariant: "<b>Dlaczego to działa.</b> Na starcie R0 = m⁰ = 1 i R1 = m¹. Po każdym bicie R0 = m<sup>x</sup> i R1 = m<sup>x+1</sup>, gdzie x to przeczytana dotąd część e. Bit 0 zmienia x w 2x (R0²), bit 1 w 2x + 1 (R0 × R1 = m<sup>2x+1</sup>). Drugi rejestr idzie o jedną potęgę wyżej.",
+    cardTime: "Co widzi Eve: operacje, bit po bicie",
+    timeNote: "S to podniesienie do kwadratu, M to mnożenie, jedna grupa na bit e (najstarszy bit z lewej). Mnożenie zajmuje mierzalny czas i prąd, więc Eve może obserwować ten wzór.",
+    trSM: "square-and-multiply", trLad: "drabina Montgomery'ego", trBits: "bity e",
+    eveSM: (bits) => "Z square-and-multiply Eve czyta bity wprost: grupa z M to 1, grupa bez M to 0. Dostaje " + bits + ".",
+    eveLad: "Z drabiny dowiaduje się tylko, ile bitów ma e: każda grupa to M S.",
+    countLad: (L, sq, mul) => "Drabina robi " + L + " " + plN(L, "mnożenie", "mnożenia", "mnożeń") + " i " + L + " " + plN(L, "podniesienie", "podniesienia", "podniesień") + " do kwadratu; square-and-multiply zrobiło " + mul + " i " + sq + ". Drabina jest trochę wolniejsza, ale taka sama dla każdego klucza.",
+    whyReal: "<b>W prawdziwym kodzie</b> nawet „jeśli bit = 1” jest ukryte: R0 i R1 zamienia się arytmetyką, a nie rozgałęzieniem, więc procesor wykonuje te same instrukcje przy każdym bicie. X25519 (Diffie-Hellman na krzywej eliptycznej w TLS i Signalu) jest zbudowany na drabinie Montgomery'ego.",
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+/* one language setting for all the simulators on the site */
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+const app = { level: 0, mText: "88", eText: "7", nText: "187", m: 88n, e: 7n, n: 187n, inErr: false, k: -1 };   // k: rows shown (-1 = all)
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+const sup = (b, x) => b + "<sup>" + x + "</sup>";
+const NAIVE_MAX = 200000n;   // the naive table runs at most this many multiplications in the browser
+const NAIVE_SHOW = 8;        // rows shown at the top of the naive table
+
+// the numbers can come in the address: ?m=88&e=7&n=187 (the RSA explorer links here with its numbers)
+(function () {
+  try {
+    const q = new URLSearchParams(location.search), m = q.get("m"), e = q.get("e"), n = q.get("n");
+    if (m && e && n && [m, e, n].every(x => /^\d{1,80}$/.test(x))) { app.mText = m; app.eText = e; app.nText = n; }
+  } catch (e) {}
+})();
+function readInputs() {
+  const ok = [app.mText, app.eText, app.nText].every(x => /^\d{1,80}$/.test(x.trim()));
+  app.inErr = !ok || BigInt(app.eText.trim()) < 1n || BigInt(app.nText.trim()) < 2n;
+  if (!app.inErr) { app.m = BigInt(app.mText.trim()); app.e = BigInt(app.eText.trim()); app.n = BigInt(app.nText.trim()); }
+  app.k = -1;
+}
+readInputs();
+
+function inputsCard() {
+  const t = L();
+  const pre = PRESETS.map((pr, i) => '<button data-action="preset" data-i="' + i + '" aria-pressed="' +
+    (app.mText === String(pr[0]) && app.eText === String(pr[1]) && app.nText === String(pr[2])) + '">' + t.preNames[i] + "</button>").join("");
+  const chip = (f, lbl, role, v) => '<label class="chip ' + role + '">' + lbl + '<input data-field="' + f + '" inputmode="numeric" spellcheck="false" value="' + esc(v) + '"></label>';
+  return '<div class="card"><h3>' + t.cardIn + '</h3><div class="presets"><span class="note">' + t.presets + "</span>" + pre + "</div>" +
+    '<div class="inrow">' + chip("m", t.inM, "role-m", app.mText) + chip("e", t.inE, "role-e", app.eText) + chip("n", t.inN, "role-n wide", app.nText) +
+    '<span class="note">' + t.inLimit + "</span></div></div>";
+}
+function stepButtons(shown, N) {
+  const t = L();
+  return '<div class="btns"><button data-action="k-reset">' + t.bReset + '</button><button data-action="k-prev"' + (shown <= 0 ? " disabled" : "") + ">" + t.bPrev +
+    '</button><button data-action="k-next"' + (shown >= N ? " disabled" : "") + ">" + t.bNext + '</button><button data-action="k-all"' + (shown >= N ? " disabled" : "") + ">" + t.bAll +
+    '</button><span class="note">' + t.rowK(shown, N) + "</span></div>";
+}
+function bitsHTML(e, curK, done) {
+  const b = e.toString(2), N = b.length;
+  let h = '<div class="bits">';
+  for (let i = 0; i < N; i++) {
+    const k = N - 1 - i, one = b[i] === "1";
+    h += '<span class="bitcol"><span class="bit' + (k === curK && !done ? " cur" : one ? " one" : "") + '">' + b[i] + "</span>" +
+      (N <= 20 ? "<small>" + (1n << BigInt(k)) + "</small>" : "") + "</span>";
+  }
+  return h + "</div>";
+}
+function plusParts(e) {
+  const b = e.toString(2), ks = [];
+  for (let i = 0; i < b.length; i++) if (b[i] === "1") ks.push(b.length - 1 - i);
+  return ks.length > 1 && ks.length <= 12 ? ks.map(k => String(1n << BigInt(k))).join(" + ") : "";
+}
+function digitsOfPower(m, e) {   // the number of digits of m^e, from log10
+  if (m <= 1n) return "1";
+  const lg = Math.log10(Number(m.toString().slice(0, 15))) + (m.toString().length - Math.min(15, m.toString().length));
+  const d = lg * Number(e);
+  return d < 1e15 ? String(Math.floor(d) + 1).replace(/\B(?=(\d{3})+(?!\d))/g, lang === "pl" ? " " : ",") : "≈ 10^" + Math.floor(Math.log10(d));
+}
+
+/* ---------- step 1: the naive way ---------- */
+function render0() {
+  const t = L();
+  let h = inputsCard();
+  if (app.inErr) return h + '<div class="card"><p class="err">' + t.errNum + "</p></div>";
+  const { m, e, n } = app;
+  // the first rows, then the last one if it can be computed here
+  let rows = "", r = 1n % n;
+  const show = e < BigInt(NAIVE_SHOW + 2) ? Number(e) : NAIVE_SHOW;
+  for (let i = 1; i <= show; i++) {
+    const before = r; r = (r * m) % n;
+    rows += "<tr><td>" + i + "</td><td>" + (i === 1 ? sup(m, 1) + " " + t.mod + " " + n + " = <b>" + r + "</b>" :
+      before + " × " + m + " = " + (before * m) + " → " + t.mod + " " + n + " = <b>" + r + "</b>") + "</td></tr>";
+  }
+  let tail = "", tooMany = "";
+  if (BigInt(show) < e) {
+    if (e <= NAIVE_MAX) {
+      const res = naivePow(m, e, n);
+      tail = '<tr class="ell"><td></td><td>' + t.rowsOmitted(e - 1n - BigInt(show)) + "</td></tr><tr><td>" + e + "</td><td>" + sup(m, e) + " " + t.mod + " " + n + " = <b>" + res + "</b></td></tr>";
+    } else {
+      tail = '<tr class="ell"><td></td><td>' + t.rowsOmitted(e - BigInt(show)) + "</td></tr>";
+      tooMany = '<p class="note" style="margin:6px 0 0">' + t.tooMany + "</p>";
+    }
+  }
+  h += '<div class="card"><h3>' + t.cardNaive + '</h3><div class="formula">' + sup(m, e) + " mod " + n + "</div>" +
+    '<div class="tablewrap"><table class="ptab"><tr><th>' + t.thI + "</th><th>" + t.thNaive + "</th></tr>" + rows + tail + "</table></div>" + tooMany +
+    '<p style="margin:10px 0 0">' + t.naiveCount(e - 1n, t.withoutMod(m, e, digitsOfPower(m, e))) + "</p></div>";
+  // how many multiplications
+  // square-and-multiply as in step 2: (bits - 1) squarings and one multiplication per 1 bit; the ladder: 2 per bit
+  const smCount = x => popcount(x) + x.toString(2).length - 1, ldCount = x => 2 * x.toString(2).length;
+  const fmt = x => String(x).replace(/\B(?=(\d{3})+(?!\d))/g, lang === "pl" ? " " : ",");   // 65,536 or 65 536
+  const row = (what, naive, sm, lad) => "<tr><td>" + what + '</td><td class="' + (sm === null ? "" : "badc") + '">' + naive + '</td><td class="okc">' + sm + '</td><td class="okc">' + lad + "</td></tr>";
+  h += '<div class="card"><h3>' + t.cardCount + '</h3><div class="tablewrap"><table class="ctab"><tr><th>' + t.thWhat + "</th><th>" + t.thNaiveC + "</th><th>" + t.thSM + "</th><th>" + t.thLad + "</th></tr>" +
+    row(t.rowThis + " = " + (String(e).length > 24 ? String(e).slice(0, 20) + "…" : e), fmt(e - 1n), fmt(smCount(e)), fmt(ldCount(e))) +
+    row(t.row65537, fmt(65536), fmt(smCount(65537n)), fmt(ldCount(65537n))) +
+    row(t.row2048, t.twoTo2048, t.about + fmt(3000), fmt(4096)) +
+    '</table></div><div class="why">' + t.impossible + '</div><div class="btns"><button class="dark" data-go="1">' + t.goSM + "</button></div></div>";
+  return h;
+}
+
+/* ---------- step 2: square-and-multiply ---------- */
+function render1() {
+  const t = L();
+  let h = inputsCard();
+  if (app.inErr) return h + '<div class="card"><p class="err">' + t.errNum + "</p></div>";
+  const { m, e, n } = app;
+  const tr = modPowTrace(m, e, n), R = tr.rows, N = R.length;
+  const shown = app.k < 0 || app.k > N ? N : app.k, cur = shown - 1, done = shown === N;
+  h += '<div class="card"><h3>' + t.cardSM + '</h3><div class="formula">' + sup(m, e) + " mod " + n + "</div>" +
+    '<p style="margin:4px 0">' + t.expIs(e, e.toString(2), plusParts(e)) + "</p>" + bitsHTML(e, cur, done);
+  h += '<div class="tablewrap"><table class="ptab"><tr><th>' + t.thK + "</th><th>" + t.thBit + "</th><th>" + t.thPow + "</th><th>" + t.thMul + "</th><th>" + t.thRes + "</th></tr>";
+  R.forEach((r, i) => {
+    const cls = i >= shown ? "hide" : (i === cur && !done ? "cur" : "");
+    const pw = sup(m, String(1n << BigInt(r.k)));
+    const how = r.k === 0 ? pw + " " + t.mod + " " + n + " = <b>" + r.power + "</b>" + (m >= n ? "" : ' <span class="note">(' + t.first + ")</span>")
+                          : pw + " = " + r.prev + "² = " + (r.prev * r.prev) + " → " + t.mod + " " + n + " = <b>" + r.power + "</b>";
+    const mul = r.bit ? r.before + " × " + r.power + " = " + (r.before * r.power) + " → " + t.mod + " " + n + " = <b>" + r.result + "</b>" : t.skip;
+    h += '<tr class="' + cls + '"><td>' + r.k + "</td><td>" + r.bit + "</td><td>" + how + '</td><td class="' + (r.bit ? "" : "skip") + '">' + mul + '</td><td class="res">' + r.result + "</td></tr>";
+  });
+  h += "</table></div>" + stepButtons(shown, N);
+  if (done) {
+    const used = R.filter(r => r.bit).reverse();
+    h += '<div class="sumline"><span style="font-family:var(--sans);font-size:14px">' + t.sumTitle + "</span><br>" + sup(m, e) + " = " +
+      (used.length <= 16 ? used.map(r => sup(m, String(1n << BigInt(r.k)))).join(" · ") + " → " + used.map(r => String(r.power)).join(" · ") + " " + t.mod + " " + n + " = " : "… = ") +
+      "<b>" + tr.result + "</b></div>";
+    h += '<p class="note" style="margin:8px 0 0">' + t.count(N - 1, used.length, e - 1n) + "</p>";
+  }
+  h += '<div class="why">' + t.dblAdd + '<a href="../../elliptic-curves/index.html#3">' + t.dblLink + "</a></div>" +
+    '<div class="btns"><button class="dark" data-go="2">' + t.goLad + "</button></div></div>";
+  return h;
+}
+
+/* ---------- step 3: the Montgomery ladder ---------- */
+function render2() {
+  const t = L();
+  let h = inputsCard();
+  if (app.inErr) return h + '<div class="card"><p class="err">' + t.errNum + "</p></div>";
+  const { m, e, n } = app;
+  const tr = ladderTrace(m, e, n), R = tr.rows, N = R.length;
+  const shown = app.k < 0 || app.k > N ? N : app.k, cur = shown - 1, done = shown === N;
+  const curK = cur >= 0 ? R[cur].k : -1;
+  h += '<div class="card"><h3>' + t.cardLad + '</h3><div class="formula">' + sup(m, e) + " mod " + n + "</div>" +
+    '<p style="margin:4px 0">' + t.expIs(e, e.toString(2), "") + "</p>" + bitsHTML(e, curK, done);
+  h += '<div class="tablewrap"><table class="ptab"><tr><th>' + t.thK + "</th><th>" + t.thBit + "</th><th>" + t.thOp + '</th><th><span class="reg r0">' + t.thR0 +
+    '</span></th><th><span class="reg r1">' + t.thR1 + "</span></th></tr>";
+  h += '<tr class="start"><td>' + t.ladStart + "</td><td></td><td></td><td>1</td><td>" + m + " " + t.mod + " " + n + " = " + (m % n) + "</td></tr>";
+  R.forEach((r, i) => {
+    const cls = i >= shown ? "hide" : (i === cur && !done ? "cur" : "");
+    const prod = r.r0 + " × " + r.r1 + " = " + (r.r0 * r.r1) + " → <b>" + (r.r0 * r.r1) % n + "</b>";
+    const sq0 = r.r0 + "² = " + (r.r0 * r.r0) + " → <b>" + (r.r0 * r.r0) % n + "</b>";
+    const sq1 = r.r1 + "² = " + (r.r1 * r.r1) + " → <b>" + (r.r1 * r.r1) % n + "</b>";
+    h += '<tr class="' + cls + '"><td>' + r.k + "</td><td>" + r.bit + "</td><td>" + (r.bit ? t.op1 : t.op0) + "</td><td>" + (r.bit ? prod : sq0) + "</td><td>" + (r.bit ? sq1 : prod) + "</td></tr>";
+  });
+  h += "</table></div>" + stepButtons(shown, N);
+  if (done) {
+    h += '<div class="sumline"><span style="font-family:var(--sans)">' + t.ladRes(m, e, n, tr.result) + '</span><br><span class="okline" style="font-family:var(--sans);font-size:14px">' +
+      t.ladSame(modPowTrace(m, e, n).result) + "</span></div>";
+  }
+  h += '<div class="why">' + t.invariant + "</div></div>";
+  // what Eve sees
+  const smOps = opsSquareMultiply(e), ldOps = opsLadder(e), bits = e.toString(2);
+  const tiles = ops => ops.map(o => '<span class="tgroup">' + Array.from(o, c => '<span class="tile ' + c + '">' + c + "</span>").join("") + "</span>").join("");
+  const capped = bits.length <= 40;
+  const sq = smOps.join("").split("S").length - 1, mul = smOps.join("").split("M").length - 1;
+  h += '<div class="card"><h3>' + t.cardTime + '</h3><p class="note" style="margin:0 0 6px">' + t.timeNote + "</p>";
+  if (capped) {
+    h += '<div class="trace"><span class="tl">' + t.trBits + '</span><div class="tiles">' + Array.from(bits, b => '<span class="tgroup hd">' + b + "</span>").join("") + "</div>" +
+      '<span class="tl">' + t.trSM + '</span><div class="tiles">' + tiles(smOps) + "</div>" +
+      '<span class="tl">' + t.trLad + '</span><div class="tiles">' + tiles(ldOps) + "</div></div>";
+  }
+  const read = smOps.map((o, i) => (o.includes("M") ? "1" : "0")).join("");
+  h += '<p style="margin:10px 0 0">' + t.eveSM('<span class="v">' + read + "</span>" + (BigInt("0b" + read) === e ? " = " + e + " = e" : "")) + "</p>" +
+    '<p style="margin:4px 0 0">' + t.eveLad + "</p>" +
+    '<p class="note" style="margin:6px 0 0">' + t.countLad(bits.length, sq, mul) + "</p>" +
+    '<div class="why">' + t.whyReal + "</div></div>";
+  return h;
+}
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function body() { return [render0, render1, render2][app.level](); }
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + '</div><div id="stepbody">' + body() + "</div></div>";
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+}
+// redraw only the step, keeping the focus in an input while typing
+function update() {
+  const el = document.getElementById("stepbody");
+  const f = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.field : null;
+  const pos = f ? document.activeElement.selectionStart : null;
+  el.innerHTML = body();
+  if (f) { const inp = el.querySelector('input[data-field="' + f + '"]'); if (inp) { inp.focus(); try { inp.setSelectionRange(pos, pos); } catch (e) {} } }
+  updateMore();
+}
+function goTo(level) {
+  if (level < 0 || level > 2) return;
+  app.level = level; app.k = -1;
+  render();
+  view.scrollTop = 0;
+}
+function rowGo(k) {
+  if (app.inErr || app.level === 0) return;
+  const N = app.e.toString(2).length, cur = app.k < 0 ? N : app.k;
+  k = k === "all" ? N : k === "next" ? cur + 1 : k === "prev" ? cur - 1 : k;
+  k = Math.max(0, Math.min(N, k));
+  app.k = k === N ? -1 : k;
+  update();
+}
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+view.addEventListener("click", e => {
+  const go = e.target.closest("[data-go]");
+  if (go) { goTo(+go.dataset.go); return; }
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "preset") {
+    const pr = PRESETS[+el.dataset.i];
+    app.mText = String(pr[0]); app.eText = String(pr[1]); app.nText = String(pr[2]);
+    readInputs(); update();
+  }
+  else if (a === "k-reset") rowGo(0);
+  else if (a === "k-prev") rowGo("prev");
+  else if (a === "k-next") rowGo("next");
+  else if (a === "k-all") rowGo("all");
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (f !== "m" && f !== "e" && f !== "n") return;
+  app[f + "Text"] = e.target.value;
+  readInputs(); update();
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); goTo(app.level + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); goTo(app.level - 1); }
+  else if (e.key === "n" || e.key === " ") { e.preventDefault(); rowGo("next"); }
+  else if (e.key === "p") rowGo("prev");
+});
+window.addEventListener("hashchange", () => {
+  const n = parseInt(location.hash.slice(1), 10);
+  if (n >= 1 && n <= 3 && n - 1 !== app.level) goTo(n - 1);
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+const startStep = parseInt(location.hash.slice(1), 10);
+if (startStep >= 1 && startStep <= 3) app.level = startStep - 1;
+render();
+</script>
+</body>
+</html>
