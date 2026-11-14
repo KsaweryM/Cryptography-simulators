@@ -37,4 +37,4 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+Creative Commons Attribution 4.0 International (CC BY 4.0), see [LICENSE](LICENSE).
