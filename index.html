@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cryptography simulators</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA;
+  --key-b:#E2A60E; --key-bg:#FDF3DC; --ctr-b:#2FA84F; --ctr-bg:#E3F4E8; --non-b:#2F6FDB; --non-bg:#E5EDFB; --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414;
+    --key-b:#F5C044; --key-bg:#3A2E10; --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740; --const-b:#4A5663; --const-bg:#222C37;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+main{max-width:1100px;margin:0 auto;padding:22px 20px 40px}
+.lead{margin:0 0 18px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.card{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;color:inherit;text-decoration:none}
+a.card{transition:border-color .15s,box-shadow .15s,transform .15s}
+a.card:hover{border-color:var(--ink);box-shadow:0 6px 18px rgba(0,0,0,.08);transform:translateY(-2px)}
+.card.soon{opacity:.55}
+.topic{font-size:12.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.card h2{margin:0;font-size:18px;font-weight:600}
+.card p{margin:0;color:var(--muted);font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.chips span{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--sunken);color:var(--ink)}
+.chips span.plan{background:transparent;border:1px dashed var(--muted);color:var(--muted);padding:1px 7px;border-radius:8px}
+.chips span.plan small{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-left:5px}
+.foot{margin-top:auto;padding-top:6px;display:flex;justify-content:space-between;align-items:center}
+.open{font-weight:600;color:var(--chg)}
+.badge{font-size:12px;padding:2px 8px;border-radius:999px;border:1px dashed var(--muted);color:var(--muted)}
+.icon{flex:none}
+footer{margin-top:28px;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><h1 id="title"></h1><p id="intro"></p></div>
+  <div class="langs" role="group" aria-label="Language">
+    <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+    <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+  </div>
+</header>
+<main>
+  <p class="lead" id="lead"></p>
+  <div class="grid" id="grid"></div>
+  <footer id="foot"></footer>
+</main>
+<script>
+/* One entry per topic; cards appear in this order. To add a simulator: put it in its own folder
+   next to this file (for example "rc4/index.html") and fill in "href" for its topic below, or add
+   a new entry. An empty "href" shows the card as "coming soon". Each entry has en and pl texts:
+   topic, name, desc and optional chips (the steps); "icon" is optional (a key of ICONS).
+   A chip written as { soon: "text" } is a planned step: it is shown dimmed, with a dashed border
+   and a "soon" label, and is not numbered.
+   Links are relative, so the site works the same from a local folder and from GitHub Pages. */
+const TOPICS = [
+  { href: "math/index.html", icon: "math",
+    en: { topic: "Mathematics for cryptography", name: "Mathematics: the contents",
+          desc: "The maths behind classical and post-quantum cryptography, in learning order, from number theory to lattices: 9 chapters, each using only the earlier ones.",
+          chips: ["Foundations", "Number theory", "Groups", "Rings and fields", "Linear algebra", "Transforms", "Probability", "Elliptic curves", "Lattices"] },
+    pl: { topic: "Matematyka do kryptografii", name: "Matematyka: spis treści",
+          desc: "Matematyka stojąca za kryptografią klasyczną i postkwantową, w kolejności nauki, od teorii liczb po kraty: 9 rozdziałów, każdy korzysta tylko z wcześniejszych.",
+          chips: ["Podstawy", "Teoria liczb", "Grupy", "Pierścienie i ciała", "Algebra liniowa", "Transformaty", "Prawdopodobieństwo", "Krzywe eliptyczne", "Kraty"] } },
+  { href: "", icon: "classic",
+    en: { topic: "Classical ciphers and the one-time pad", name: "Classical ciphers",
+          desc: "Caesar and Vigenère, broken by counting letters, then the one-time pad: perfect secrecy, and why a pad must never be reused." },
+    pl: { topic: "Szyfry klasyczne i szyfr z kluczem jednorazowym", name: "Szyfry klasyczne",
+          desc: "Szyfr Cezara i szyfr Vigenère'a, złamane przez liczenie liter, a potem szyfr z kluczem jednorazowym: doskonała tajność i dlaczego klucza nigdy nie wolno użyć dwa razy." } },
+  { href: "", icon: "random",
+    en: { topic: "Randomness", name: "Random numbers",
+          desc: "Where good random numbers come from: entropy, cryptographic random number generators (CSPRNG) and famous failures, such as the 2008 Debian OpenSSL bug and a repeated nonce or k." },
+    pl: { topic: "Losowość", name: "Liczby losowe",
+          desc: "Skąd brać dobre liczby losowe: entropia, kryptograficzne generatory liczb losowych (CSPRNG) i słynne wpadki, takie jak błąd OpenSSL w Debianie z 2008 roku albo powtórzony nonce lub k." } },
+  { href: "aes/index.html", icon: "aes",
+    en: { topic: "AES and its modes", name: "AES explorer",
+          desc: "One 16-byte block, the 10 rounds inside, one round step by step, then the modes that turn AES into real encryption: ECB, CTR, GCM and XTS, compared side by side.",
+          chips: ["Black box", "Inside", "One round", "Modes", "Comparison",
+                  { soon: "CBC and the padding-oracle attack" }, { soon: "Differential and linear cryptanalysis (on a toy cipher)" }] },
+    pl: { topic: "AES i jego tryby", name: "Eksplorator AES",
+          desc: "Jeden 16-bajtowy blok, 10 rund w środku, jedna runda krok po kroku, a potem tryby, które robią z AES prawdziwe szyfrowanie: ECB, CTR, GCM i XTS, porównane obok siebie.",
+          chips: ["Czarna skrzynka", "W środku", "Jedna runda", "Tryby", "Porównanie",
+                  { soon: "CBC i atak padding oracle" }, { soon: "Kryptoanaliza różnicowa i liniowa (na szyfrze zabawce)" }] } },
+  { href: "rc4/index.html", icon: "rc4",
+    en: { topic: "Stream ciphers and RC4", name: "RC4 explorer",
+          desc: "One key in, a keystream out: how the key shuffles the table S, how each keystream byte is made, and the three design mistakes measured with real RC4.",
+          chips: ["Black box", "Preparing the key (KSA)", "Producing the bytes (PRGA)", "The weaknesses"] },
+    pl: { topic: "Szyfry strumieniowe i RC4", name: "Eksplorator RC4",
+          desc: "Jeden klucz na wejściu, keystream na wyjściu: jak klucz tasuje tablicę S, jak powstaje każdy bajt keystreamu i trzy błędy projektu zmierzone na prawdziwym RC4.",
+          chips: ["Czarna skrzynka", "Przygotowanie klucza (KSA)", "Wytwarzanie bajtów (PRGA)", "Słabości"] } },
+  { href: "chacha20/index.html", icon: "grid",
+    en: { topic: "Salsa20 and ChaCha20", name: "ChaCha20 explorer",
+          desc: "From the outside in: how a key, a nonce and a counter become a keystream, down to a single add, xor or rotate.",
+          chips: ["Black box", "Inside", "One round", "One operation"] },
+    pl: { topic: "Salsa20 i ChaCha20", name: "Eksplorator ChaCha20",
+          desc: "Od ogółu do szczegółu: jak klucz, nonce i licznik stają się keystreamem, aż do jednego dodawania, XOR albo rotacji.",
+          chips: ["Czarna skrzynka", "W środku", "Jedna runda", "Jedna operacja"] } },
+  { href: "", icon: "aead",
+    en: { topic: "Authenticated encryption (AEAD)", name: "AEAD",
+          desc: "Encryption and a tag in one step: AES-GCM and ChaCha20-Poly1305 side by side, associated data that is protected but not hidden, and what a repeated nonce breaks." },
+    pl: { topic: "Szyfrowanie uwierzytelnione (AEAD)", name: "AEAD",
+          desc: "Szyfrowanie i znacznik w jednym kroku: AES-GCM i ChaCha20-Poly1305 obok siebie, dane dodatkowe chronione, ale nie ukryte, i co psuje powtórzony nonce." } },
+  { href: "rsa/index.html", icon: "rsa",
+    en: { topic: "Public-key cryptography and RSA", name: "RSA explorer",
+          desc: "Alice encrypts with Bob's public key, Bob decrypts with his private key: how the keys are made, how one power mod n is computed, and why textbook RSA is not enough.",
+          chips: ["Black box", "Making the keys", "One power mod n", "Textbook RSA is not enough"] },
+    pl: { topic: "Kryptografia klucza publicznego i RSA", name: "Eksplorator RSA",
+          desc: "Alice szyfruje kluczem publicznym Boba, Bob odszyfrowuje swoim prywatnym: jak powstają klucze, jak liczy się jedną potęgę mod n i dlaczego podręcznikowe RSA nie wystarcza.",
+          chips: ["Czarna skrzynka", "Tworzenie kluczy", "Jedna potęga mod n", "Podręcznikowe RSA nie wystarcza"] } },
+  { href: "diffie-hellman/index.html", icon: "dh",
+    en: { topic: "Diffie-Hellman and ElGamal", name: "Diffie-Hellman explorer",
+          desc: "Alice and Bob agree on a secret while Eve hears everything: why going back is hard, how Mallory breaks it in the middle, and ElGamal encryption.",
+          chips: ["Black box", "The powers of g", "Mallory in the middle", "ElGamal", "One power"] },
+    pl: { topic: "Diffie-Hellman i ElGamal", name: "Eksplorator Diffie-Hellmana",
+          desc: "Alice i Bob uzgadniają sekret, choć Eve słyszy wszystko: dlaczego wstecz jest trudno, jak Mallory psuje to pośrodku i szyfrowanie ElGamal.",
+          chips: ["Czarna skrzynka", "Potęgi g", "Mallory pośrodku", "ElGamal", "Jedna potęga"] } },
+  { href: "elliptic-curves/index.html", icon: "ec",
+    en: { topic: "Elliptic curves", name: "Elliptic-curve explorer",
+          desc: "Diffie-Hellman with points: adding points with a chord and a tangent, the same curve modulo 17, kG by double and add, and one addition worked out by hand.",
+          chips: ["Black box", "Adding points", "Modulo 17", "One addition"] },
+    pl: { topic: "Krzywe eliptyczne", name: "Eksplorator krzywych eliptycznych",
+          desc: "Diffie-Hellman na punktach: dodawanie punktów sieczną i styczną, ta sama krzywa modulo 17, kG przez podwajanie i dodawanie oraz jedno dodawanie policzone ręcznie.",
+          chips: ["Czarna skrzynka", "Dodawanie punktów", "Modulo 17", "Jedno dodawanie"] } },
+  { href: "", icon: "hash",
+    en: { topic: "Hash functions", name: "Hash functions",
+          desc: "What a hash promises and how one is built, Merkle trees, and the attacks: the birthday attack, length extension, and the real MD5 and SHA-1 collisions." },
+    pl: { topic: "Funkcje skrótu", name: "Funkcje skrótu",
+          desc: "Co obiecuje funkcja skrótu i jak się ją buduje, drzewa Merkle'a oraz ataki: atak urodzinowy, przedłużanie wiadomości (length extension) i prawdziwe kolizje MD5 i SHA-1." } },
+  { href: "", icon: "mac",
+    en: { topic: "Message authentication codes (MAC)", name: "MAC functions",
+          desc: "A tag that proves the message came from someone with the key and was not changed: HMAC, why H(key ‖ message) is not enough, and Poly1305 and GHASH as one-time MACs." },
+    pl: { topic: "Kody uwierzytelniające wiadomości (MAC)", name: "Funkcje MAC",
+          desc: "Znacznik, który dowodzi, że wiadomość wysłał ktoś z kluczem i że nikt jej nie zmienił: HMAC, dlaczego H(klucz ‖ wiadomość) nie wystarcza oraz Poly1305 i GHASH jako jednorazowe MAC." } },
+  { href: "", icon: "kdf",
+    en: { topic: "Passwords and key derivation", name: "Passwords and KDFs",
+          desc: "Why a plain hash is not enough for passwords: salt, slow functions (PBKDF2, scrypt, Argon2), and HKDF, which turns one secret into many keys." },
+    pl: { topic: "Hasła i wyprowadzanie kluczy", name: "Hasła i funkcje KDF",
+          desc: "Dlaczego zwykły skrót nie wystarcza do haseł: sól, celowo wolne funkcje (PBKDF2, scrypt, Argon2) i HKDF, który z jednego sekretu robi wiele kluczy." } },
+  { href: "", icon: "sig",
+    en: { topic: "Digital signatures", name: "Digital signatures",
+          desc: "Sign with the private key, check with the public one: RSA-PSS, ECDSA and Ed25519, how a repeated k gives away the key, and the post-quantum ML-DSA and SLH-DSA." },
+    pl: { topic: "Podpisy cyfrowe", name: "Podpisy cyfrowe",
+          desc: "Podpis kluczem prywatnym, sprawdzenie publicznym: RSA-PSS, ECDSA i Ed25519, jak powtórzone k zdradza klucz oraz postkwantowe ML-DSA i SLH-DSA." } },
+  { href: "pki/index.html", icon: "pki",
+    en: { topic: "Certificates and PKI", name: "PKI: the contents",
+          desc: "How a browser knows whose public key it got: X.509 certificates, the chain of trust up to a certificate authority, and Certificate Transparency. 10 chapters, filled in one by one.",
+          chips: ["Why PKI", "X.509", "CAs and chains", "Lifecycle", "Validation and revocation", "TLS and apps", "In practice", "Good practices", "Incidents", "After quantum"] },
+    pl: { topic: "Certyfikaty i PKI", name: "PKI: spis treści",
+          desc: "Skąd przeglądarka wie, czyj klucz publiczny dostała: certyfikaty X.509, łańcuch zaufania aż do urzędu certyfikacji i Certificate Transparency. 10 rozdziałów, uzupełnianych po kolei.",
+          chips: ["Po co PKI", "X.509", "CA i łańcuchy", "Cykl życia", "Walidacja i unieważnianie", "TLS i aplikacje", "W praktyce", "Dobre praktyki", "Incydenty", "Po kwantach"] } },
+  { href: "", icon: "tls",
+    en: { topic: "TLS 1.3", name: "The TLS 1.3 handshake",
+          desc: "One handshake step by step, where everything comes together: key exchange, signatures, certificates, key derivation and AEAD." },
+    pl: { topic: "TLS 1.3", name: "Nawiązanie połączenia TLS 1.3",
+          desc: "Jedno nawiązanie połączenia krok po kroku, w którym wszystko się spotyka: wymiana klucza, podpisy, certyfikaty, wyprowadzanie kluczy i AEAD." } },
+  { href: "", icon: "signal",
+    en: { topic: "Secure messaging (Signal)", name: "The Signal protocol",
+          desc: "How Alice and Bob chat safely even if a phone is stolen: X3DH, the double ratchet, forward secrecy and post-compromise security." },
+    pl: { topic: "Bezpieczne komunikatory (Signal)", name: "Protokół Signal",
+          desc: "Jak Alice i Bob rozmawiają bezpiecznie, nawet gdy ktoś ukradnie telefon: X3DH, podwójna zapadka (double ratchet), ochrona dawnych wiadomości (forward secrecy) i powrót bezpieczeństwa po włamaniu (post-compromise security)." } },
+  { href: "", icon: "pqc",
+    en: { topic: "Post-quantum cryptography (PQC)", name: "Post-quantum cryptography",
+          desc: "Why first: Shor's algorithm on a quantum computer breaks RSA, DH and ECC, while Grover only halves the strength of symmetric keys. Then lattices, ML-KEM, ML-DSA and hash-based signatures." },
+    pl: { topic: "Kryptografia postkwantowa (PQC)", name: "Kryptografia postkwantowa",
+          desc: "Najpierw dlaczego: algorytm Shora na komputerze kwantowym łamie RSA, DH i ECC, a algorytm Grovera tylko o połowę zmniejsza siłę kluczy symetrycznych. Potem kraty, ML-KEM, ML-DSA i podpisy oparte na funkcjach skrótu." } },
+  { href: "", icon: "side",
+    en: { topic: "Side-channel attacks", name: "Side channels",
+          desc: "Getting the key from how a device works, not from the maths: timing, the cache (AES tables), power use and injected faults." },
+    pl: { topic: "Ataki kanałami bocznymi", name: "Kanały boczne",
+          desc: "Klucz odczytany z tego, jak pracuje urządzenie, a nie z matematyki: czas, pamięć podręczna (tablice AES), pobór prądu i wstrzykiwane błędy." } },
+  { href: "", icon: "share",
+    en: { topic: "Secret sharing", name: "Shamir's secret sharing",
+          desc: "Split a secret into n shares so that any k of them rebuild it: a polynomial through k points, and Lagrange interpolation." },
+    pl: { topic: "Podział sekretu", name: "Podział sekretu Shamira",
+          desc: "Podziel sekret na n udziałów tak, by dowolne k z nich go odtworzyło: wielomian przez k punktów i interpolacja Lagrange'a." } },
+  { href: "", icon: "zk",
+    en: { topic: "Zero-knowledge proofs and commitments", name: "Zero knowledge",
+          desc: "Prove that you know a secret without showing it: commitments, the Schnorr protocol, and the idea behind zk-SNARKs." },
+    pl: { topic: "Dowody z wiedzą zerową i zobowiązania", name: "Wiedza zerowa",
+          desc: "Udowodnij, że znasz sekret, nie pokazując go: zobowiązania, protokół Schnorra i idea zk-SNARK." } },
+  { href: "", icon: "he",
+    en: { topic: "Homomorphic encryption and secure computation", name: "Computing on encrypted data",
+          desc: "Adding numbers nobody can read (Paillier), the idea of fully homomorphic encryption (FHE), multi-party computation and oblivious transfer." },
+    pl: { topic: "Szyfrowanie homomorficzne i obliczenia wielostronne", name: "Obliczenia na zaszyfrowanych danych",
+          desc: "Dodawanie liczb, których nikt nie widzi (Paillier), idea w pełni homomorficznego szyfrowania (FHE), obliczenia wielostronne i transfer nieświadomy (oblivious transfer)." } },
+];
+const T = {
+  en: { title: "Cryptography simulators", intro: "Interactive pages, one per cryptography topic",
+        lead: "Pick a topic. Every simulator runs in your browser, offline; nothing you type is sent anywhere.",
+        open: "Open ▶", soon: "coming soon", chipSoon: "soon",
+        foot: "Made to accompany a cryptography course. Every simulator that computes something checks itself against official test vectors." },
+  pl: { title: "Symulatory kryptograficzne", intro: "Interaktywne strony, jedna na każdy temat z kryptografii",
+        lead: "Wybierz temat. Każdy symulator działa w przeglądarce, bez internetu; nic, co wpiszesz, nie jest nigdzie wysyłane.",
+        open: "Otwórz ▶", soon: "wkrótce", chipSoon: "wkrótce",
+        foot: "Przygotowane jako pomoc do kursu kryptografii. Każdy symulator, który coś liczy, sprawdza się sam na oficjalnych wektorach testowych." },
+};
+const SVG = body => '<svg class="icon" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">' + body + "</svg>";
+const ICONS = {
+  // ChaCha20: one quarter round on four words a, b, c, d: add, xor, rotate
+  grid: SVG([["key", 7], ["ctr", 17], ["non", 27], ["chg", 37]].map(([c, y]) =>
+      '<path d="M2 ' + y + ' H42" stroke="var(--' + c + (c === "chg" ? "" : "-b") + ')" stroke-width="2.4" stroke-linecap="round"/>').join("") +
+    '<path d="M11 17 V11.5 M22 7 V32.5" stroke="var(--ink)" stroke-width="1.6"/>' +
+    '<circle cx="11" cy="17" r="2" fill="var(--ink)"/><circle cx="22" cy="7" r="2" fill="var(--ink)"/>' +
+    '<rect x="6.2" y="2.2" width="9.6" height="9.6" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.6"/><path d="M8.3 7 h5.4 M11 4.3 v5.4" stroke="var(--ink)" stroke-width="1.6"/>' +
+    '<circle cx="22" cy="37" r="4.6" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.6"/><path d="M18.4 37 h7.2 M22 33.4 v7.2" stroke="var(--ink)" stroke-width="1.4"/>' +
+    '<rect x="28" y="32" width="14" height="10" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.6"/>' +
+    '<path d="M33 34.5 l-2.5 2.5 l2.5 2.5 M36.5 34.5 l-2.5 2.5 l2.5 2.5 M40 34.5 l-2.5 2.5 l2.5 2.5" fill="none" stroke="var(--ink)" stroke-width="1.3"/>'),
+  // Mathematics: a clock face for "mod 12", the hand on 5
+  math: SVG('<circle cx="22" cy="22" r="19" fill="var(--non-bg)" stroke="var(--non-b)" stroke-width="1.8"/>' +
+    Array.from({ length: 12 }, (_, k) => {
+      const a = k * Math.PI / 6, x = (22 + 14.5 * Math.sin(a)).toFixed(1), y = (22 - 14.5 * Math.cos(a)).toFixed(1);
+      return '<circle cx="' + x + '" cy="' + y + '" r="' + (k === 5 ? 3 : 1.7) + '" fill="var(--' + (k === 5 ? "chg" : "ink") + ')"/>';
+    }).join("") +
+    '<path d="M22 22 L' + (22 + 11 * Math.sin(5 * Math.PI / 6)).toFixed(1) + " " + (22 - 11 * Math.cos(5 * Math.PI / 6)).toFixed(1) + '" stroke="var(--chg)" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<circle cx="22" cy="22" r="2.4" fill="var(--ink)"/>'),
+  // AES: a 4x4 block of bytes and the key that encrypts it
+  aes: SVG([0, 1, 2, 3].map(r => [0, 1, 2, 3].map(c =>
+      '<rect x="' + (2 + c * 8.6) + '" y="' + (2 + r * 8.6) + '" width="7.4" height="7.4" rx="1.5" fill="var(--non-bg)" stroke="var(--non-b)" stroke-width="1.3"/>'
+    ).join("")).join("") +
+    '<circle cx="34" cy="34" r="6" fill="var(--key-bg)" stroke="var(--key-b)" stroke-width="2.4"/>' +
+    '<path d="M28 34 h-12 M20 34 v4.5 M24 34 v3.5" stroke="var(--key-b)" stroke-width="2.4" stroke-linecap="round"/>'),
+  // RC4: the table S as a ring of cells, with the two pointers i and j
+  rc4: SVG(Array.from({ length: 16 }, (_, k) => {
+      const a = k * Math.PI / 8, x = 22 + 16 * Math.sin(a), y = 22 - 16 * Math.cos(a);
+      const role = k === 2 ? "chg" : k === 11 ? "ctr-b" : "";
+      return '<rect x="' + (x - 3.3).toFixed(1) + '" y="' + (y - 3.3).toFixed(1) + '" width="6.6" height="6.6" rx="1.3" transform="rotate(' + (k * 22.5) + " " + x.toFixed(1) + " " + y.toFixed(1) + ')" fill="var(--' + (role || "key-bg") + ')" stroke="var(--' + (role || "key-b") + ')" stroke-width="1.2"/>';
+    }).join("") +
+    '<text x="22" y="26" text-anchor="middle" font-family="var(--mono)" font-size="11" font-weight="700"><tspan fill="var(--chg)">i</tspan><tspan fill="var(--ink)"> </tspan><tspan fill="var(--ctr-b)">j</tspan></text>'),
+  // RSA: a padlock with n = p·q on it
+  rsa: SVG('<path d="M13 19 v-5 a9 9 0 0 1 18 0 v5" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="6" y="18" width="32" height="23" rx="4" fill="var(--key-bg)" stroke="var(--key-b)" stroke-width="2"/>' +
+    '<text x="22" y="33.5" text-anchor="middle" font-family="var(--mono)" font-size="10.5" font-weight="700" fill="var(--ink)">p·q</text>'),
+  // Diffie-Hellman: Alice and Bob each send one value and meet at the same shared key
+  dh: SVG('<path d="M9 12 L20 30 M35 12 L24 30" stroke="var(--muted)" stroke-width="1.8" stroke-dasharray="3 2.5"/>' +
+    '<circle cx="8" cy="9" r="6" fill="var(--non-bg)" stroke="var(--non-b)" stroke-width="1.8"/><text x="8" y="12" text-anchor="middle" font-size="8" font-weight="700" fill="var(--ink)">A</text>' +
+    '<circle cx="36" cy="9" r="6" fill="var(--ctr-bg)" stroke="var(--ctr-b)" stroke-width="1.8"/><text x="36" y="12" text-anchor="middle" font-size="8" font-weight="700" fill="var(--ink)">B</text>' +
+    '<circle cx="22" cy="33" r="5.5" fill="var(--key-bg)" stroke="var(--key-b)" stroke-width="2.2"/>' +
+    '<path d="M27.5 33 h12 M35 33 v4 M38.5 33 v3" stroke="var(--key-b)" stroke-width="2.2" stroke-linecap="round"/>'),
+  // Elliptic curves: y^2 = x^3 - 2x + 2.5, two points P, Q and the chord through them
+  ec: (() => {
+    const f = x => x * x * x - 2 * x + 2.5;
+    let lo = -2, hi = -1.5;                       // the curve's left end: the root of f
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (f(m) < 0) lo = m; else hi = m; }
+    const X = x => (4 + (x - hi) * 9.4).toFixed(1), Y = y => (22 - y * 7.5).toFixed(1), top = [], bot = [];
+    for (let i = 0; i <= 50; i++) {
+      const x = hi + i * (1.9 - hi) / 50, y = Math.sqrt(Math.max(0, f(x)));
+      top.push(X(x) + " " + Y(y)); bot.push(X(x) + " " + Y(-y));
+    }
+    const pts = top.reverse().concat(bot.slice(1));
+    const P = [-1, Math.sqrt(f(-1))], Q = [1, Math.sqrt(f(1))];
+    const m = (Q[1] - P[1]) / (Q[0] - P[0]), at = x => P[1] + m * (x - P[0]);
+    return SVG('<path d="M' + pts.join(" L") + '" fill="none" stroke="var(--ink)" stroke-width="2"/>' +
+      '<path d="M' + X(hi) + " " + Y(at(hi)) + " L" + X(1.9) + " " + Y(at(1.9)) + '" stroke="var(--chg)" stroke-width="1.6"/>' +
+      '<circle cx="' + X(P[0]) + '" cy="' + Y(P[1]) + '" r="3.2" fill="var(--non-b)"/>' +
+      '<circle cx="' + X(Q[0]) + '" cy="' + Y(Q[1]) + '" r="3.2" fill="var(--non-b)"/>');
+  })(),
+  // Hash functions: many lines of any length go in, a short fixed fingerprint comes out
+  hash: SVG([6, 13, 20, 27, 34].map(y => '<path d="M2 ' + y + " C14 " + y + " 14 22 25 22" + '" fill="none" stroke="var(--muted)" stroke-width="1.6"/>').join("") +
+    '<rect x="25" y="13" width="17" height="18" rx="3" fill="var(--sunken)" stroke="var(--ink)" stroke-width="1.8"/>' +
+    '<text x="33.5" y="27" text-anchor="middle" font-family="var(--mono)" font-size="13" font-weight="700" fill="var(--ink)">#</text>'),
+  // AEAD: a padlock (encryption) with a seal (the tag) on it
+  aead: SVG('<path d="M10 18 v-5 a8 8 0 0 1 16 0 v5" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="4" y="17" width="28" height="22" rx="4" fill="var(--non-bg)" stroke="var(--non-b)" stroke-width="2"/>' +
+    '<circle cx="18" cy="26" r="2.6" fill="var(--non-b)"/><path d="M18 27 v6" stroke="var(--non-b)" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<circle cx="34" cy="34" r="8" fill="var(--chg-bg)" stroke="var(--chg)" stroke-width="2"/>' +
+    '<path d="M30.5 34 l2.5 2.5 l4.5 -5" fill="none" stroke="var(--chg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'),
+  // MAC: a message with a seal (the tag) attached
+  mac: SVG('<path d="M5 3 h22 l7 7 v28 h-29 z" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/>' +
+    [12, 17, 22, 27].map((y, i) => '<path d="M10 ' + y + " h" + (i === 3 ? 9 : 18) + '" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round"/>').join("") +
+    '<path d="M29 37 l-3 6 l5 -2 l2 3 l1 -6 M35 37 l3 6 l-5 -2" fill="var(--chg)"/>' +
+    '<circle cx="32" cy="32" r="8" fill="var(--chg-bg)" stroke="var(--chg)" stroke-width="2"/>' +
+    '<path d="M28.5 32 l2.5 2.5 l4.5 -5" fill="none" stroke="var(--chg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'),
+  // Post-quantum: a skewed lattice of dots and one short vector in it
+  pqc: SVG([0, 1, 2, 3].map(r => [0, 1, 2, 3].map(c =>
+      '<circle cx="' + (5 + c * 9 + r * 3) + '" cy="' + (38 - r * 10.5) + '" r="' + (r === 1 && c === 1 ? 2.8 : 2.2) + '" fill="var(--' + (r === 1 && c === 1 ? "ink" : "muted") + ')"/>'
+    ).join("")).join("") +
+    '<path d="M17 27.5 L19.3 19.5" stroke="var(--chg)" stroke-width="2.4" stroke-linecap="round"/><path d="M20 16 l-4 4.6 l6 1.6 z" fill="var(--chg)"/>'),
+  // Classical ciphers: Caesar, every letter moves 3 places on: A B C become D E F
+  classic: SVG(["A", "B", "C"].map((ch, k) => {
+      const x = 2 + k * 14, d = String.fromCharCode(ch.charCodeAt(0) + 3);
+      return '<rect x="' + x + '" y="2" width="12" height="13" rx="2" fill="var(--const-bg)" stroke="var(--const-b)" stroke-width="1.4"/>' +
+        '<text x="' + (x + 6) + '" y="12.5" text-anchor="middle" font-family="var(--mono)" font-size="10" font-weight="700" fill="var(--ink)">' + ch + "</text>" +
+        '<path d="M' + (x + 6) + " 17.5 V25.5 M" + (x + 3) + " 22.5 L" + (x + 6) + " 26 L" + (x + 9) + ' 22.5" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<rect x="' + x + '" y="29" width="12" height="13" rx="2" fill="var(--chg-bg)" stroke="var(--chg)" stroke-width="1.4"/>' +
+        '<text x="' + (x + 6) + '" y="39.5" text-anchor="middle" font-family="var(--mono)" font-size="10" font-weight="700" fill="var(--chg)">' + d + "</text>";
+    }).join("")),
+  // Randomness: two dice, a five in front and a three behind
+  random: (() => {
+    const die = (cx, cy, s, rot, c, pips) => '<g transform="translate(' + cx + " " + cy + ") rotate(" + rot + ')">' +
+      '<rect x="' + (-s / 2) + '" y="' + (-s / 2) + '" width="' + s + '" height="' + s + '" rx="' + (s / 5) + '" fill="var(--' + c + '-bg)" stroke="var(--' + c + '-b)" stroke-width="1.8"/>' +
+      pips.map(([u, v]) => '<circle cx="' + (u * s / 4) + '" cy="' + (v * s / 4) + '" r="' + (s / 11) + '" fill="var(--ink)"/>').join("") + "</g>";
+    return SVG(die(31, 13, 17, 14, "key", [[-1, -1], [0, 0], [1, 1]]) +
+      die(17, 28, 23, -10, "non", [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]]));
+  })(),
+  // Passwords and key derivation: a hidden password goes in, a key comes out
+  kdf: SVG('<rect x="2" y="3" width="40" height="14" rx="3" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.8"/>' +
+    [9, 15.5, 22, 28.5, 35].map(x => '<circle cx="' + x + '" cy="10" r="2.2" fill="var(--ink)"/>').join("") +
+    '<path d="M22 19.5 V27 M18.5 24 L22 27.5 L25.5 24" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="12" cy="35" r="5.5" fill="var(--key-bg)" stroke="var(--key-b)" stroke-width="2.4"/>' +
+    '<path d="M17.5 35 h21 M33 35 v4.5 M37.5 35 v3.5" stroke="var(--key-b)" stroke-width="2.4" stroke-linecap="round"/>'),
+  // Digital signatures: a page signed with a pen
+  sig: SVG('<rect x="3" y="3" width="28" height="38" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.8"/>' +
+    [9, 14, 19].map((y, i) => '<path d="M8 ' + y + " h" + (i === 2 ? 11 : 18) + '" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round"/>').join("") +
+    '<path d="M7 34 h20" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 2"/>' +
+    '<path d="M8 31 c2 -7 5 -8 5 -3 c0 4 2 4 4 0 c1.5 -3 3 -3 3 0 c0 2 2 2 4 -1" fill="none" stroke="var(--non-b)" stroke-width="1.8" stroke-linecap="round"/>' +
+    '<path d="M33 27 L40.5 7.5" stroke="var(--chg)" stroke-width="4.5" stroke-linecap="round"/>' +
+    '<path d="M29.2 34.5 L31 26 L35.3 27.7 z" fill="var(--ink)"/>'),
+  // Certificates and PKI: the chain of trust, from the root down to one site
+  pki: SVG([[2, 2, "key"], [13, 17, "const"], [24, 31, "ctr"]].map(([x, y, c]) =>
+      '<rect x="' + x + '" y="' + y + '" width="18" height="11" rx="2" fill="var(--' + c + '-bg)" stroke="var(--' + c + '-b)" stroke-width="1.6"/>' +
+      '<path d="M' + (x + 4) + " " + (y + 4) + " h10 M" + (x + 4) + " " + (y + 7.5) + ' h6" stroke="var(--ink)" stroke-width="1.3" stroke-linecap="round"/>').join("") +
+    '<path d="M8 13 V22.5 H13 M19 28 V36.5 H24" fill="none" stroke="var(--ink)" stroke-width="1.6"/>' +
+    '<circle cx="16" cy="6" r="2.6" fill="var(--key-b)"/>'),
+  // TLS 1.3: the handshake, messages going back and forth between client and server
+  tls: SVG('<path d="M7 3 V41" stroke="var(--non-b)" stroke-width="3" stroke-linecap="round"/><path d="M37 3 V41" stroke="var(--ctr-b)" stroke-width="3" stroke-linecap="round"/>' +
+    [[10, 1, "ink"], [21, -1, "ink"], [32, 1, "chg"]].map(([y, d, c]) => {
+      const a = d > 0 ? 11 : 33, b = d > 0 ? 33 : 11;
+      return '<path d="M' + a + " " + y + " H" + b + '" stroke="var(--' + c + ')" stroke-width="2" stroke-linecap="round"/>' +
+        '<path d="M' + b + " " + y + " l" + (-4 * d) + " -3.2 v6.4 z" + '" fill="var(--' + c + ')"/>';
+    }).join("")),
+  // Secure messaging: two chat bubbles and the ratchet that turns after every message
+  signal: SVG('<path d="M7 3 h20 a5 5 0 0 1 5 5 v5 a5 5 0 0 1 -5 5 h-14 l-5 4 v-4 a5 5 0 0 1 -6 -5 v-5 a5 5 0 0 1 5 -5 z" fill="var(--non-bg)" stroke="var(--non-b)" stroke-width="1.7" stroke-linejoin="round"/>' +
+    '<path d="M8 9 h17 M8 13 h10" stroke="var(--non-b)" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<path d="M37 24 h-15 a5 5 0 0 0 -5 5 v4 a5 5 0 0 0 5 5 h12 l5 4 v-4.3 a5 5 0 0 0 3 -4.7 v-4 a5 5 0 0 0 -5 -5 z" fill="var(--ctr-bg)" stroke="var(--ctr-b)" stroke-width="1.7" stroke-linejoin="round"/>' +
+    '<path d="M22 29.5 h15 M22 33.5 h9" stroke="var(--ctr-b)" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<path d="M14 33 A5.5 5.5 0 1 1 11.2 28.2" fill="none" stroke="var(--chg)" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="M14.2 29.6 L10 26 L10.3 31.6 z" fill="var(--chg)"/>'),
+  // Side channels: a chip at work and the power trace that gives its key away
+  side: SVG([15, 22, 29].map(x => '<path d="M' + x + " 1 V4 M" + x + ' 18 V21" stroke="var(--ink)" stroke-width="1.6"/>').join("") +
+    '<rect x="10" y="4" width="24" height="14" rx="2" fill="var(--sunken)" stroke="var(--ink)" stroke-width="1.8"/>' +
+    '<text x="22" y="14" text-anchor="middle" font-family="var(--mono)" font-size="7.5" font-weight="700" fill="var(--ink)">AES</text>' +
+    '<path d="M2 41.5 H42" stroke="var(--rule)" stroke-width="1.2"/>' +
+    '<path d="M2 34 h5 l2 -3 l2 5 l2 -2 h4 l2 -10 l2 16 l2 -6 h4 l2 -4 l2 6 l2 -2 h7" fill="none" stroke="var(--chg)" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/>'),
+  // Secret sharing: a parabola through three shares; where it meets the y-axis is the secret
+  share: (() => {
+    const f = x => 12 + 0.055 * (x - 27) * (x - 27), pts = [];
+    for (let x = 8; x <= 42; x += 1) pts.push(x + " " + f(x).toFixed(1));
+    return SVG('<path d="M8 3 V41 M5 38 H42" stroke="var(--muted)" stroke-width="1.3"/>' +
+      '<path d="M' + pts.join(" L") + '" fill="none" stroke="var(--ink)" stroke-width="1.8"/>' +
+      [[16, "key"], [26, "ctr"], [37, "non"]].map(([x, c]) => '<circle cx="' + x + '" cy="' + f(x).toFixed(1) + '" r="3" fill="var(--' + c + '-bg)" stroke="var(--' + c + '-b)" stroke-width="1.8"/>').join("") +
+      '<circle cx="8" cy="' + f(8).toFixed(1) + '" r="3.6" fill="var(--chg)"/>');
+  })(),
+  // Zero knowledge: the cave with a locked door; Bob calls out a side, Alice comes out of it
+  zk: SVG('<circle cx="22" cy="19" r="13" fill="none" stroke="var(--const-b)" stroke-width="6"/>' +
+    '<path d="M22 32 V42" stroke="var(--const-b)" stroke-width="6"/>' +
+    '<rect x="20" y="2.5" width="4" height="9" rx="1" fill="var(--chg)"/>' +
+    '<text x="22" y="22.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="var(--muted)">?</text>' +
+    '<text x="3" y="40" font-size="8" font-weight="700" fill="var(--ink)">A</text><text x="35" y="40" font-size="8" font-weight="700" fill="var(--ink)">B</text>' +
+    '<circle cx="9" cy="19" r="2.8" fill="var(--non-b)"/>'),
+  // Homomorphic encryption: two encrypted numbers are added without opening them
+  he: SVG([[2, "a"], [27, "b"]].map(([x, ch]) =>
+      '<rect x="' + x + '" y="2" width="15" height="14" rx="3" fill="var(--non-bg)" stroke="var(--non-b)" stroke-width="1.7"/>' +
+      '<text x="' + (x + 7.5) + '" y="12.5" text-anchor="middle" font-family="var(--mono)" font-size="10" font-weight="700" fill="var(--ink)">' + ch + "</text>").join("") +
+    '<path d="M18.5 9 h7 M22 5.5 v7" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/>' +
+    '<path d="M22 18 V24.5 M18.8 21.8 L22 25 L25.2 21.8" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<rect x="7" y="27" width="30" height="15" rx="3" fill="var(--chg-bg)" stroke="var(--chg)" stroke-width="1.7"/>' +
+    '<text x="22" y="38" text-anchor="middle" font-family="var(--mono)" font-size="10.5" font-weight="700" fill="var(--ink)">a+b</text>'),
+};
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function render() {
+  const t = T[lang];
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("lead").textContent = t.lead;
+  document.getElementById("foot").textContent = t.foot;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  document.getElementById("grid").innerHTML = TOPICS.map(tp => {
+    const x = tp[lang], ready = !!tp.href;
+    const inner =
+      '<div class="topic">' + esc(x.topic) + "</div>" +
+      '<div style="display:flex;gap:12px;align-items:center">' + (tp.icon ? ICONS[tp.icon] : "") + "<h2>" + esc(x.name) + "</h2></div>" +
+      (x.desc ? "<p>" + esc(x.desc) + "</p>" : "") +
+      (x.chips ? '<div class="chips">' + x.chips.map((c, i) => typeof c === "string" ? "<span>" + (i + 1) + ". " + esc(c) + "</span>"
+        : '<span class="plan">' + esc(c.soon) + "<small>" + esc(t.chipSoon) + "</small></span>").join("") + "</div>" : "") +
+      '<div class="foot">' + (ready ? '<span class="open">' + esc(t.open) + "</span>" : '<span class="badge">' + esc(t.soon) + "</span>") + "</div>";
+    return ready ? '<a class="card" href="' + esc(tp.href) + '">' + inner + "</a>" : '<div class="card soon" aria-disabled="true">' + inner + "</div>";
+  }).join("");
+}
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mathematics for cryptography</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* frame: the same as the simulators */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:8px}
+.sidefoot .legend{display:flex;flex-direction:column;gap:4px}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* the intro box and the list of sections */
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px;max-width:980px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.explain p{margin:6px 0 0}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:4px 18px;margin-bottom:14px;max-width:980px}
+.secs{list-style:none;margin:0;padding:0}
+.sec{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-top:1px solid var(--rule)}
+.sec:first-child{border-top:0}
+.sec .num{flex:none;width:34px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.sec.hard .num{background:var(--chg-bg);color:var(--chg)}
+.sec .stext{flex:1 1 auto;padding-top:3px}
+.sec a.stext{color:inherit}
+.sec .tags{flex:none;display:flex;gap:6px;align-items:center;padding-top:4px}
+.star{color:var(--chg);font-weight:700}
+.opt{color:var(--muted);font-style:italic}
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.tag.hardt{background:var(--chg-bg);color:var(--chg);font-weight:600;border:1px solid var(--chg)}
+.tag.soon{border:1px dashed var(--muted);color:var(--muted)}
+.next{display:flex;gap:8px;max-width:980px}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+  .sec{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Chapters">
+      <div id="steps"></div>
+      <div class="sidefoot"><div class="legend" id="legend"></div><div id="status"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* The contents of the mathematics course: one entry per chapter, in learning order (each chapter
+   uses only the earlier ones). Every chapter has en and pl texts (title, sub = the one-line
+   subtitle, intro = the box at the top) and a list of sections. Sections are numbered 1, 2, 3, ...
+   across all chapters, in the order of this array, so the numbers are not stored.
+
+   A section: { en: "...", pl: "..." } plus optional flags
+     hard: true   its text contains a ★ problem: a computational problem that cryptographic
+                  algorithms rely on being hard; it gets the "hard problem" tag;
+     href: "..."  the section's own page, relative to this file (for example "gcd/index.html").
+   Without href the section shows a grey "coming soon" badge. When a section is written, add its
+   href here: the title becomes a link and the badge disappears. Nothing else needs to change. */
+const CHAPTERS = [
+  { en: { title: "Foundations", sub: "logic, sets, counting and how hard a problem is",
+          intro: "The language the other chapters are written in: how to prove things, and how to measure how hard a computational problem is. Cryptography is built on problems that are easy one way and hard the other way." },
+    pl: { title: "Podstawy", sub: "logika, zbiory, zliczanie i to, jak trudny jest problem",
+          intro: "Język, w którym napisane są pozostałe rozdziały: jak się dowodzi i jak mierzy się, jak trudny jest problem obliczeniowy. Kryptografia opiera się na problemach łatwych w jedną stronę i trudnych w drugą." },
+    sections: [
+      { en: "Logic, kinds of proof, induction.",
+        pl: "Logika, rodzaje dowodów, indukcja." },
+      { en: "Sets, functions (injection, surjection, bijection), permutations, equivalence relations and equivalence classes.",
+        pl: "Zbiory, funkcje (injekcja, surjekcja, bijekcja), permutacje, relacje równoważności i klasy abstrakcji." },
+      { en: "Combinatorics.",
+        pl: "Kombinatoryka." },
+      { en: "Asymptotic notation, the complexity of algorithms.",
+        pl: "Notacja asymptotyczna, złożoność algorytmów." },
+      { en: "Complexity theory: the classes P and NP, NP-completeness, decision versus computational problems, worst-case versus average-case hardness, reductions between problems.",
+        pl: "Teoria złożoności: klasy P i NP, NP-zupełność, problemy decyzyjne a obliczeniowe, trudność w najgorszym i w przeciętnym przypadku, redukcje między problemami." },
+    ] },
+  { en: { title: "Elementary number theory", sub: "whole numbers, remainders and primes: the maths of RSA",
+          intro: "Arithmetic on whole numbers modulo n, the setting of RSA and of classical Diffie-Hellman. The chapter ends with the first hard problems: factoring a large number and taking roots modulo n." },
+    pl: { title: "Elementarna teoria liczb", sub: "liczby całkowite, reszty i liczby pierwsze: matematyka RSA",
+          intro: "Arytmetyka liczb całkowitych modulo n, czyli świat RSA i klasycznego Diffiego-Hellmana. Rozdział kończy się pierwszymi trudnymi problemami: rozkładem dużej liczby na czynniki i pierwiastkami modulo n." },
+    sections: [
+      { en: "Divisibility, division with remainder, the gcd, the Euclidean algorithm.",
+        pl: "Podzielność, dzielenie z resztą, NWD, algorytm Euklidesa." },
+      { en: "The extended Euclidean algorithm, Bézout's identity.",
+        pl: "Rozszerzony algorytm Euklidesa, tożsamość Bézouta." },
+      { en: "Congruences, modular arithmetic, the ring Z_n, the group (Z_n)*.",
+        pl: "Kongruencje, arytmetyka modularna, pierścień Z_n, grupa (Z_n)*." },
+      { en: "Prime numbers, factorisation into primes, the prime number theorem.",
+        pl: "Liczby pierwsze, rozkład na czynniki, twierdzenie o liczbach pierwszych." },
+      { en: "Euler's totient function, Fermat's little theorem, Euler's theorem.",
+        pl: "Funkcja Eulera, małe twierdzenie Fermata, twierdzenie Eulera." },
+      { en: "The Chinese remainder theorem.",
+        pl: "Chińskie twierdzenie o resztach." },
+      { en: "Fast modular exponentiation.",
+        pl: "Szybkie potęgowanie modulo." },
+      { en: "The order of an element, primitive roots.",
+        pl: "Rząd elementu, pierwiastki pierwotne." },
+      { en: "Quadratic residues, the Legendre and Jacobi symbols, square roots modulo p.",
+        pl: "Reszty kwadratowe, symbol Legendre'a i Jacobiego, pierwiastki kwadratowe modulo p." },
+      { en: "Primality tests: Fermat, Miller-Rabin.",
+        pl: "Testy pierwszości: Fermat, Miller-Rabin." },
+      { hard: true,
+        en: "★ The factoring problem and ★ the RSA problem (the e-th root modulo n).",
+        pl: "★ Problem faktoryzacji i ★ problem RSA (pierwiastek e-tego stopnia modulo n)." },
+      { hard: true,
+        en: "★ The quadratic residuosity problem and ★ square roots modulo n (equivalent to factoring).",
+        pl: "★ Problem reszt kwadratowych i ★ pierwiastek kwadratowy modulo n (równoważny faktoryzacji)." },
+      { en: "Factoring algorithms: Pollard's p−1, Pollard's rho, the quadratic sieve, the idea of the GNFS.",
+        pl: "Algorytmy faktoryzacji: p−1 Pollarda, rho Pollarda, sito kwadratowe, idea GNFS." },
+    ] },
+  { en: { title: "Groups", sub: "one operation and its rules: the setting of Diffie-Hellman",
+          intro: "A group is a set with one operation that behaves well; the numbers modulo p and the points of a curve are both groups. Here the discrete logarithm appears, the hard problem behind Diffie-Hellman." },
+    pl: { title: "Grupy", sub: "jedno działanie i jego reguły: świat Diffiego-Hellmana",
+          intro: "Grupa to zbiór z jednym działaniem, które zachowuje się porządnie; liczby modulo p i punkty krzywej to grupy. Tu pojawia się logarytm dyskretny, trudny problem stojący za Diffiem-Hellmanem." },
+    sections: [
+      { en: "Groups, subgroups, abelian and cyclic groups, homomorphisms, isomorphisms.",
+        pl: "Grupa, podgrupa, grupy abelowe i cykliczne, homomorfizm, izomorfizm." },
+      { en: "Lagrange's theorem and its consequences.",
+        pl: "Twierdzenie Lagrange'a i wnioski." },
+      { en: "Cosets, normal subgroups, quotient groups.",
+        pl: "Warstwy, podgrupa normalna, grupa ilorazowa." },
+      { hard: true,
+        en: "★ The discrete logarithm problem (DLP), ★ the computational Diffie-Hellman problem (CDH), ★ the decisional Diffie-Hellman problem (DDH) and how they relate.",
+        pl: "★ Problem logarytmu dyskretnego (DLP), ★ obliczeniowy problem Diffiego-Hellmana (CDH), ★ decyzyjny problem Diffiego-Hellmana (DDH) i zależności między nimi." },
+      { en: "Algorithms for the DLP: baby-step giant-step, Pollard's rho, Pohlig-Hellman, index calculus.",
+        pl: "Algorytmy na DLP: baby-step giant-step, rho Pollarda, Pohlig-Hellman, index calculus." },
+      { en: "(optional) Group actions on a set (the basis of the isogeny problems in section 52).",
+        pl: "(opcjonalnie) Działanie grupy na zbiorze (podstawa problemów izogenii w punkcie 52)." },
+    ] },
+  { en: { title: "Rings and fields", sub: "two operations, polynomials and finite fields",
+          intro: "Adding and multiplying together: polynomials and finite fields such as GF(2⁸), where AES computes. Polynomial rings are also where lattice-based cryptography lives." },
+    pl: { title: "Pierścienie i ciała", sub: "dwa działania, wielomiany i ciała skończone",
+          intro: "Dodawanie i mnożenie naraz: wielomiany i ciała skończone, takie jak GF(2⁸), w którym liczy AES. W pierścieniach wielomianów działa też kryptografia oparta na kratach." },
+    sections: [
+      { en: "Rings, ideals, quotient rings, zero divisors.",
+        pl: "Pierścień, ideał, pierścień ilorazowy, dzielniki zera." },
+      { en: "Fields, the prime fields GF(p).",
+        pl: "Ciała, ciała proste GF(p)." },
+      { en: "Polynomial rings, division with remainder, the gcd of polynomials.",
+        pl: "Pierścienie wielomianów, dzielenie z resztą, NWD wielomianów." },
+      { en: "Irreducible polynomials, K[x]/(f) as a field.",
+        pl: "Wielomiany nierozkładalne, K[x]/(f) jako ciało." },
+      { en: "Finite fields GF(pⁿ): the construction, the multiplicative group is cyclic, primitive elements, the Frobenius automorphism.",
+        pl: "Ciała skończone GF(pⁿ): konstrukcja, cykliczność grupy multiplikatywnej, element pierwotny, automorfizm Frobeniusa." },
+      { en: "Arithmetic in GF(2ⁿ).",
+        pl: "Arytmetyka w GF(2ⁿ)." },
+      { en: "Roots of polynomials over finite fields, factoring polynomials.",
+        pl: "Pierwiastki wielomianów nad ciałami skończonymi, rozkład wielomianów na czynniki." },
+      { en: "Cyclotomic polynomials, roots of unity modulo q.",
+        pl: "Wielomiany cyklotomiczne, pierwiastki z jedynki modulo q." },
+      { en: "The Chinese remainder theorem for polynomial rings.",
+        pl: "Chińskie twierdzenie o resztach dla pierścieni wielomianów." },
+      { hard: true,
+        en: "Systems of polynomial equations over finite fields, the idea of Gröbner bases; ★ the MQ problem (solving a system of quadratic equations, the basis of multivariate cryptography).",
+        pl: "Układy równań wielomianowych nad ciałami skończonymi, idea baz Gröbnera; ★ problem MQ (rozwiązywanie układu równań kwadratowych, podstawa kryptografii wielu zmiennych)." },
+    ] },
+  { en: { title: "Linear algebra over finite fields", sub: "vectors, matrices and codes over GF(2) and GF(p)",
+          intro: "Vectors and matrices whose entries come from a finite field. They give error-correcting codes, the basis of code-based cryptography such as McEliece, and the tools to study how block ciphers mix bits." },
+    pl: { title: "Algebra liniowa nad ciałami skończonymi", sub: "wektory, macierze i kody nad GF(2) i GF(p)",
+          intro: "Wektory i macierze o elementach z ciała skończonego. Dają kody korekcyjne, podstawę kryptografii opartej na kodach, takiej jak McEliece, oraz narzędzia do badania, jak szyfry blokowe mieszają bity." },
+    sections: [
+      { en: "Vector spaces over GF(2) and GF(p), basis, dimension, the rank of a matrix, Gaussian elimination.",
+        pl: "Przestrzenie wektorowe nad GF(2) i GF(p), baza, wymiar, rząd macierzy, eliminacja Gaussa." },
+      { en: "Linear and affine maps.",
+        pl: "Przekształcenia liniowe i afiniczne." },
+      { en: "Modules over a ring.",
+        pl: "Moduły nad pierścieniem." },
+      { en: "Coding theory: linear codes, the parity-check matrix, the syndrome, Hamming distance, MDS codes, Reed-Solomon codes, Goppa codes.",
+        pl: "Teoria kodów: kody liniowe, macierz kontrolna, syndrom, odległość Hamminga, kody MDS, Reed-Solomon, kody Goppy." },
+      { hard: true,
+        en: "★ The syndrome decoding problem (decoding a random linear code, the basis of McEliece and HQC).",
+        pl: "★ Problem dekodowania syndromu (dekodowanie losowego kodu liniowego, podstawa McEliece i HQC)." },
+      { en: "Boolean functions, the Walsh-Hadamard transform.",
+        pl: "Funkcje boolowskie, transformata Walsha-Hadamarda." },
+    ] },
+  { en: { title: "Discrete analysis and transforms", sub: "Fourier transforms and fast polynomial multiplication",
+          intro: "How to multiply long polynomials fast. ML-KEM and ML-DSA do it with the NTT, a Fourier transform modulo q." },
+    pl: { title: "Analiza dyskretna i transformaty", sub: "transformaty Fouriera i szybkie mnożenie wielomianów",
+          intro: "Jak szybko mnożyć długie wielomiany. ML-KEM i ML-DSA robią to za pomocą NTT, transformaty Fouriera modulo q." },
+    sections: [
+      { en: "The discrete Fourier transform.",
+        pl: "Dyskretna transformata Fouriera." },
+      { en: "The NTT (the DFT over Z_q), fast polynomial multiplication.",
+        pl: "NTT (DFT nad Z_q), szybkie mnożenie wielomianów." },
+    ] },
+  { en: { title: "Probability", sub: "chance, collisions and distributions",
+          intro: "Security is stated as a probability: how likely an attacker is to succeed. This chapter gives the tools for that, from the birthday paradox to the noise used in lattice cryptography." },
+    pl: { title: "Prawdopodobieństwo", sub: "szansa, kolizje i rozkłady",
+          intro: "Bezpieczeństwo wyraża się prawdopodobieństwem: jak duża jest szansa, że atakujący odniesie sukces. Ten rozdział daje do tego narzędzia, od paradoksu urodzinowego po szum używany w kryptografii kratowej." },
+    sections: [
+      { en: "Discrete probability, expected value, independence.",
+        pl: "Prawdopodobieństwo dyskretne, wartość oczekiwana, niezależność." },
+      { en: "The Markov, Chebyshev and Chernoff inequalities.",
+        pl: "Nierówności Markowa, Czebyszewa, Chernoffa." },
+      { en: "The birthday paradox.",
+        pl: "Paradoks urodzinowy." },
+      { en: "Statistical distance.",
+        pl: "Odległość statystyczna." },
+      { en: "Discrete distributions: binomial, discrete Gaussian.",
+        pl: "Rozkłady dyskretne: dwumianowy, dyskretny gaussowski." },
+    ] },
+  { en: { title: "Elliptic curves", sub: "points that form a group: shorter keys, the same security",
+          intro: "The points of an elliptic curve over a finite field form a group in which the discrete logarithm is much harder than modulo p. That is why ECDH keys are so much shorter than RSA keys." },
+    pl: { title: "Krzywe eliptyczne", sub: "punkty tworzące grupę: krótsze klucze, to samo bezpieczeństwo",
+          intro: "Punkty krzywej eliptycznej nad ciałem skończonym tworzą grupę, w której logarytm dyskretny jest dużo trudniejszy niż modulo p. Dlatego klucze ECDH są o tyle krótsze od kluczy RSA." },
+    sections: [
+      { en: "Curves in Weierstrass form over ℝ and over a finite field, the group law.",
+        pl: "Krzywa w postaci Weierstrassa nad ℝ i nad ciałem skończonym, prawo grupowe." },
+      { en: "Projective coordinates, the Montgomery and Edwards forms.",
+        pl: "Współrzędne rzutowe, postać Montgomery'ego i Edwardsa." },
+      { en: "The order of the group of points, Hasse's theorem, the structure of the group of points.",
+        pl: "Rząd grupy punktów, twierdzenie Hassego, struktura grupy punktów." },
+      { hard: true,
+        en: "★ ECDLP and ★ ECDH (CDH on a curve); why index calculus does not work here.",
+        pl: "★ ECDLP i ★ ECDH (CDH na krzywej); dlaczego index calculus tu nie działa." },
+      { hard: true,
+        en: "(optional) Isogenies between curves, supersingular curves; ★ isogeny problems (SIDH broken in 2022, CSIDH and SQIsign still being studied).",
+        pl: "(opcjonalnie) Izogenie między krzywymi, krzywe supersingularne; ★ problemy izogenii (SIDH złamane w 2022, CSIDH i SQIsign wciąż badane)." },
+      { hard: true,
+        en: "(optional) Bilinear maps (pairings), divisors; ★ the bilinear Diffie-Hellman problem.",
+        pl: "(opcjonalnie) Iloczyny dwuliniowe (pairingi), dywizory; ★ dwuliniowy problem Diffiego-Hellmana." },
+    ] },
+  { en: { title: "Lattices", sub: "the maths of post-quantum cryptography",
+          intro: "A lattice is a regular grid of points in many dimensions. Finding a short vector in it is believed to be hard even for a quantum computer, and the new standards ML-KEM, ML-DSA and FN-DSA are built on this." },
+    pl: { title: "Kraty", sub: "matematyka kryptografii postkwantowej",
+          intro: "Krata to regularna siatka punktów w wielu wymiarach. Znalezienie w niej krótkiego wektora uważa się za trudne nawet dla komputera kwantowego i na tym opierają się nowe standardy ML-KEM, ML-DSA i FN-DSA." },
+    sections: [
+      { en: "Lattices, bases, the Gram matrix, the determinant, the dual lattice.",
+        pl: "Krata, baza, macierz Grama, wyznacznik, krata dualna." },
+      { en: "Gram-Schmidt orthogonalisation, Minkowski's theorem.",
+        pl: "Ortogonalizacja Grama-Schmidta, twierdzenie Minkowskiego." },
+      { hard: true,
+        en: "★ SVP and CVP (the shortest and the closest vector) and their approximate versions.",
+        pl: "★ SVP i CVP (najkrótszy i najbliższy wektor) oraz ich wersje przybliżone." },
+      { en: "Basis reduction: LLL, BKZ, the idea of lattice sieving.",
+        pl: "Redukcja bazy: LLL, BKZ, idea sita kratowego." },
+      { en: "Norms in polynomial rings, rounding modulo q.",
+        pl: "Normy w pierścieniach wielomianów, zaokrąglanie modulo q." },
+      { hard: true,
+        en: "★ LWE, ★ Ring-LWE, ★ Module-LWE (the basis of ML-KEM and ML-DSA) and ★ SIS / Module-SIS (the basis of ML-DSA); reductions from worst-case lattice problems.",
+        pl: "★ LWE, ★ Ring-LWE, ★ Module-LWE (podstawa ML-KEM i ML-DSA) i ★ SIS / Module-SIS (podstawa ML-DSA); redukcje z problemów kratowych w najgorszym przypadku." },
+      { hard: true,
+        en: "★ The NTRU problem (the basis of Falcon, that is FN-DSA).",
+        pl: "★ Problem NTRU (podstawa Falcona, czyli FN-DSA)." },
+    ] },
+];
+
+const T = {
+  en: {
+    title: "Mathematics for cryptography", home: "All simulators",
+    intro: "The maths behind classical and post-quantum cryptography, from number theory to lattices. Pick a chapter on the left.",
+    chapterOf: n => "Chapter " + n + " of " + CHAPTERS.length + " · Mathematics",
+    range: (a, b) => a === b ? "section " + a : "sections " + a + " to " + b,
+    order: "The chapters are in the order that makes most sense to learn them: each one uses only the earlier ones.",
+    soon: "coming soon", hard: "hard problem", optional: "(optional)",
+    legend: ["★ hard problem: a computational problem that cryptographic algorithms rely on being hard to solve.",
+             "(optional): can be skipped on a first reading."],
+    status: "Contents only: the sections will be added one by one.",
+    prev: "← Previous chapter", next: "Next chapter →",
+    moreBelow: "More below", keys: "← / →: previous / next chapter",
+  },
+  pl: {
+    title: "Matematyka do kryptografii", home: "Wszystkie symulatory",
+    intro: "Matematyka stojąca za kryptografią klasyczną i postkwantową, od teorii liczb po kraty. Wybierz rozdział po lewej.",
+    chapterOf: n => "Rozdział " + n + " z " + CHAPTERS.length + " · Matematyka",
+    range: (a, b) => a === b ? "punkt " + a : "punkty " + a + " do " + b,
+    order: "Rozdziały są ułożone w kolejności, w której najlepiej się ich uczyć: każdy korzysta tylko z wcześniejszych.",
+    soon: "wkrótce", hard: "trudny problem", optional: "(opcjonalnie)",
+    legend: ["★ trudny problem: problem obliczeniowy, na którego trudności opierają się algorytmy kryptograficzne.",
+             "(opcjonalnie): można pominąć przy pierwszym czytaniu."],
+    status: "Na razie tylko spis treści: punkty będą dodawane po kolei.",
+    prev: "← Poprzedni rozdział", next: "Następny rozdział →",
+    moreBelow: "Niżej jest więcej", keys: "← / →: poprzedni / następny rozdział",
+  },
+};
+
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const app = { ch: 0 };
+const L = () => T[lang];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// the global number of the first section of each chapter
+const FIRST = [];
+CHAPTERS.reduce((n, c, i) => { FIRST[i] = n; return n + c.sections.length; }, 1);
+
+// a section title: the stars in orange, the "(optional)" mark in grey
+function fmtTitle(s) {
+  return esc(s).replace(/★/g, '<span class="star">★</span>')
+               .replace(/^\((optional|opcjonalnie)\)/, '<span class="opt">($1)</span>');
+}
+
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = CHAPTERS.map((c, i) => {
+    const a = FIRST[i], b = a + c.sections.length - 1;
+    return '<button class="step" data-step="' + i + '" aria-pressed="' + (i === app.ch) + '">' +
+      '<span class="gnum">' + (i + 1) + "</span><span><b>" + esc(c[lang].title) + "</b><small>" + t.range(a, b) + "</small></span></button>";
+  }).join("");
+}
+function renderChapter() {
+  const t = L(), c = CHAPTERS[app.ch], x = c[lang];
+  const rows = c.sections.map((s, k) => {
+    const n = FIRST[app.ch] + k;
+    const text = s.href ? '<a class="stext" href="' + esc(s.href) + '">' + fmtTitle(s[lang]) + "</a>"
+                        : '<span class="stext">' + fmtTitle(s[lang]) + "</span>";
+    const tags = (s.hard ? '<span class="tag hardt">★ ' + esc(t.hard) + "</span>" : "") +
+                 (s.href ? "" : '<span class="tag soon">' + esc(t.soon) + "</span>");
+    return '<li class="sec' + (s.hard ? " hard" : "") + '"><span class="num">' + n + "</span>" + text +
+           '<span class="tags">' + tags + "</span></li>";
+  }).join("");
+  const nav = '<div class="next">' +
+    (app.ch > 0 ? '<button data-go="' + (app.ch - 1) + '">' + esc(t.prev) + "</button>" : "") +
+    (app.ch < CHAPTERS.length - 1 ? '<button data-go="' + (app.ch + 1) + '">' + esc(t.next) + "</button>" : "") + "</div>";
+  return '<div class="fade"><div class="explain"><b>' + esc(x.title) + "</b>" + esc(x.intro) +
+    (app.ch === 0 ? "<p>" + esc(t.order) + "</p>" : "") + "</div>" +
+    '<div class="card"><ol class="secs" start="' + FIRST[app.ch] + '">' + rows + "</ol></div>" + nav + "</div>";
+}
+function render() {
+  const t = L(), x = CHAPTERS[app.ch][lang];
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.getElementById("status").textContent = t.status;
+  document.getElementById("legend").innerHTML = t.legend.map(l => "<div>" + fmtTitle(l) + "</div>").join("");
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.chapterOf(app.ch + 1);
+  document.getElementById("mhTitle").textContent = x.title;
+  document.getElementById("mhSub").textContent = x.sub;
+  document.getElementById("view").innerHTML = renderChapter();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  if (location.hash !== "#" + (app.ch + 1)) { try { history.replaceState(null, "", "#" + (app.ch + 1)); } catch (e) {} }
+}
+function goTo(ch) {
+  if (ch < 0 || ch >= CHAPTERS.length) return;
+  app.ch = ch;
+  render();
+  document.getElementById("view").scrollTop = 0;
+}
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+view.addEventListener("click", e => {
+  const b = e.target.closest("[data-go]");
+  if (b) goTo(+b.dataset.go);
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); goTo(app.ch + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); goTo(app.ch - 1); }
+});
+function chapterFromHash() {
+  const n = parseInt(location.hash.slice(1), 10);
+  return n >= 1 && n <= CHAPTERS.length ? n - 1 : null;
+}
+window.addEventListener("hashchange", () => {
+  const ch = chapterFromHash();
+  if (ch !== null && ch !== app.ch) goTo(ch);
+});
+
+/* ---------- start ---------- */
+const startCh = chapterFromHash();
+if (startCh !== null) app.ch = startCh;
+render();
+</script>
+</body>
+</html>

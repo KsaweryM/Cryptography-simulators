@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChaCha20 explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  --key-b:#E2A60E;   --key-bg:#FDF3DC;
+  --ctr-b:#2FA84F;   --ctr-bg:#E3F4E8;
+  --non-b:#2F6FDB;   --non-bg:#E5EDFB;
+  --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
+  --p:#2F6FDB; --z:#9A6B00; --c:#7446C4;
+  --g0:#2F6FDB; --g1:#2FA84F; --g2:#E5484D; --g3:#E2A60E;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+    --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+    --ct-b:#B596F5; --ct-bg:#2A2142;
+    --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+    --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+  --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+  --ct-b:#B596F5; --ct-bg:#2A2142;
+  --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+  --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+.mono{font-family:var(--mono)}
+
+/* frame: like the Computer Hardware simulators */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+.row>.card{flex:1 1 auto}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.iname{font-weight:600}
+input.wide{width:calc(64ch + 20px);max-width:100%}
+input.mid{width:calc(24ch + 20px);max-width:100%}
+.center{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:4px}
+.tape{position:relative;height:118px;overflow-x:auto;overflow-y:hidden;margin-bottom:6px}
+.tblocks{display:flex;gap:8px}
+.tblock{flex:none;width:150px;height:76px;border:1.5px solid var(--rule);border-radius:8px;padding:5px 8px;background:var(--sunken);font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.tblock b{display:block;font-family:var(--sans);font-size:12px;color:var(--ink);font-weight:600}
+.tblock.in{background:var(--key-bg);border-color:var(--key-b);color:var(--ink)}
+.tblock.unused{opacity:.4;border-style:dashed}
+.tblock small{display:block;font-family:var(--sans);font-size:11px;color:var(--muted);margin-top:2px}
+.fill{height:6px;background:var(--rule);border-radius:3px;margin-top:5px;overflow:hidden}
+.fill span{display:block;height:100%;background:var(--key-b)}
+.flowlbl{display:block;font-weight:600;margin:4px 0 6px}
+.schwrap{overflow-x:auto}
+.sch{position:relative;width:1045px;height:445px;color:var(--muted)}
+.sch .arrows{position:absolute;left:0;top:0;color:var(--ink)}
+.sch label{display:block;font-size:12.5px;font-weight:600;color:var(--ink)}
+.sch label input{display:block;margin-top:3px}
+.sg-top{position:absolute;left:473px;top:0;width:320px;min-height:70px;border:1.5px solid;border-radius:8px;padding:6px 10px}
+.sg-ctr{position:absolute;left:802px;top:0;width:236px;min-height:70px;border:1.5px solid;border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--ink)}
+.sg-ctr .ctrline{margin-top:3px}
+.sg-ctr input[type=number]{width:7em}
+.sg-box{position:absolute;left:40px;top:165px;width:200px;height:76px;justify-content:center}
+.sg-key{position:absolute;left:8px;top:0;width:455px;min-height:70px;border:1.5px solid;border-radius:8px;padding:6px 10px}
+.keyin{width:100%;font-size:10.5px;box-sizing:border-box;padding-left:5px;padding-right:5px}
+.node{position:absolute;border-radius:10px;padding:8px 12px;border:1.5px solid;color:var(--ink)}
+.node .nh{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
+.node .nb{font-size:13.5px;margin:4px 0 2px;line-height:1.5}
+.node small{font-size:12px;color:var(--muted)}
+.sg-ks{left:300px;top:150px;width:270px;height:106px;background:var(--key-bg);border-color:var(--key-b)}
+.sg-ks .nh svg{color:var(--key-b)}
+.sg-ct{left:750px;top:150px;width:270px;height:106px;background:var(--ct-bg);border-color:var(--ct-b)}
+.sg-pt{left:500px;top:300px;width:492px;height:140px;background:var(--non-bg);border-color:var(--non-b)}
+.sg-pt textarea{margin-top:6px;font-size:13.5px;resize:none;line-height:19px;height:84px;padding:6px 9px 0;box-sizing:border-box}
+textarea{scrollbar-width:thin;scrollbar-color:var(--rule) transparent}
+textarea::-webkit-scrollbar{width:8px}
+textarea::-webkit-scrollbar-track{background:transparent}
+textarea::-webkit-scrollbar-thumb{background:var(--rule);border-radius:4px}
+textarea::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+.sg-xor{position:absolute;left:618px;top:171px;width:64px;height:64px;border-radius:50%;background:var(--chg);color:#fff;font-size:40px;line-height:62px;text-align:center}
+.uses{margin:12px 0 4px;font-weight:600}
+.btable td.seghead{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--z);text-align:left;padding:2px 4px;border-bottom:1.5px solid var(--key-b)}
+.btable td.sep{width:16px}
+.btable td.ell{color:var(--muted);text-align:center}
+.btable tr.zrow td.b{background:var(--key-bg)}
+.btable tr.xorrow td{font-family:var(--sans);font-size:12.5px;color:var(--muted);text-align:center;padding:3px 0}
+.twin{position:absolute;top:80px;height:14px;border:2px solid var(--chg);border-top:0;border-radius:0 0 8px 8px;transition:left .45s ease,width .45s ease}
+.twin span{position:absolute;top:15px;left:0;white-space:nowrap;font-size:12.5px;font-weight:600;color:var(--chg)}
+@media (prefers-reduced-motion:reduce){.twin{transition:none}}
+.tablewrap{overflow-x:auto}
+.btable td.b{padding:1px 2px;text-align:center;min-width:1.9em;font-size:12.5px}
+.btable tr.rt td{color:var(--muted)}
+.btable td.bstart{border-left:2px solid var(--chg)}
+.btable td.zb0{background:var(--key-bg)}
+.btable td.zb1{background:var(--non-bg)}
+.btable td.hot{outline:2px solid var(--chg);outline-offset:-2px}
+.xorline{font-family:var(--mono);font-size:13.5px;margin:8px 0 0;min-height:1.5em}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+
+/* step 1 and 2: boxes and arrows */
+.bb,.flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.inputs{display:flex;flex-direction:column;gap:8px}
+.chip{display:flex;flex-direction:column;border-radius:8px;padding:6px 10px;border:1.5px solid;font-weight:600;font-size:14px}
+.chip small{font-weight:400;color:var(--muted);font-size:12px}
+.chip input{margin-top:4px;width:31em}
+.chip input[type=number]{width:8em}
+.ctrline{display:flex;gap:6px;align-items:center;margin-top:4px}
+.ctrline button{padding:3px 10px}
+.role-const{border-color:var(--const-b);background:var(--const-bg)}
+.role-key{border-color:var(--key-b);background:var(--key-bg)}
+.role-ctr{border-color:var(--ctr-b);background:var(--ctr-bg)}
+.role-nonce{border-color:var(--non-b);background:var(--non-bg)}
+.box{background:var(--ink);color:var(--surface);border:0;border-radius:10px;padding:16px 22px;font-size:21px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px}
+.box:hover{background:var(--ink);box-shadow:0 0 0 3px var(--chg)}
+.box small{font-size:12px;font-weight:400;opacity:.8}
+.arrow{font-size:24px;color:var(--muted)}
+.ksbox{border:1.5px solid var(--key-b);background:var(--key-bg);border-radius:8px;padding:12px 16px;font-weight:600;display:flex;flex-direction:column}
+.ksbox small{font-weight:400;font-size:12px;color:var(--muted)}
+.plus{font-size:16px;font-weight:600}
+textarea{width:100%;font-size:14px}
+.btable{border-collapse:collapse;font-family:var(--mono);font-size:13.5px;margin-top:6px}
+.btable td{padding:1px 4px}
+.btable td.lbl{font-weight:600;padding-right:10px}
+.btable tr.rp td{color:var(--p)}
+.btable tr.rz td{color:var(--z)}
+.btable tr.rc td{color:var(--c)}
+.btable tr.gap td{height:6px}
+
+/* the 4x4 table */
+.grid{display:inline-grid;grid-template-columns:repeat(4,auto);gap:5px}
+figure{margin:0;text-align:center}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:4px}
+.cell{font-family:var(--mono);font-size:13.5px;padding:5px 7px;border-radius:5px;border:1.5px solid var(--rule);background:var(--surface);text-align:center;min-width:6.2em}
+.grid.sm .cell{font-size:12.5px;padding:4px 5px;min-width:5.6em}
+.cell.click{cursor:pointer}
+.cell.g0{outline:2.5px solid var(--g0)} .cell.g1{outline:2.5px solid var(--g1)}
+.cell.g2{outline:2.5px solid var(--g2)} .cell.g3{outline:2.5px solid var(--g3)}
+.cell.sel{background:var(--sunken);font-weight:700}
+.cell.role-const{border-color:var(--const-b);background:var(--const-bg)}
+.cell.role-key{border-color:var(--key-b);background:var(--key-bg)}
+.cell.role-ctr{border-color:var(--ctr-b);background:var(--ctr-bg)}
+.cell.role-nonce{border-color:var(--non-b);background:var(--non-bg)}
+.cell.ks{border-color:var(--key-b);background:var(--key-bg)}
+.grid.xs{gap:4px}.grid.xs .cell{font-size:12px;padding:3px 4px;min-width:0}
+.cell.hotw{outline:2.5px solid var(--chg);outline-offset:1px}
+.eq{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+.eq .sign{font-size:30px;font-weight:600;color:var(--ink)}
+.eq .sign.add{width:44px;height:44px;border-radius:50%;background:var(--chg);color:#fff;line-height:42px;text-align:center}
+.addline{font-family:var(--mono);font-size:13.5px;margin:10px 0 0;min-height:1.5em}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.sch2{position:relative;width:1045px;height:600px;color:var(--ink)}
+.sch2 .arrows{position:absolute;left:0;top:0}
+.rnd{position:absolute;top:4px;right:6px;padding:2px 5px;line-height:0;border-radius:5px;color:var(--ink)}
+.sch2 .inbox{position:absolute;top:0;min-height:70px;border:1.5px solid;border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600}
+.sch2 .inbox label{display:block}.sch2 .inbox label input{display:block;margin-top:3px}
+.sch2 .ctrline{display:flex;gap:4px;margin-top:3px}.sch2 input[type=number]{width:7em}
+.ccframe{position:absolute;left:8px;top:108px;width:1030px;height:322px;border:2.5px solid var(--ink);border-radius:14px;background:var(--sunken)}
+.ccframe .cctab{position:absolute;left:14px;top:-15px;background:var(--ink);color:var(--surface);font-weight:700;font-size:15px;padding:3px 12px;border-radius:7px}
+.sch2 .pos{position:absolute;text-align:center}
+.sch2 .sbox{position:absolute;left:28px;top:146px;width:320px;height:162px;border:1.5px solid var(--ink);border-radius:9px;background:var(--surface);padding:4px 11px}
+.sch2 .stitle{font-size:12.5px;color:var(--muted);text-align:center;margin-bottom:4px}
+.sch2 .pos figcaption{white-space:nowrap}
+.sch2 .rbox{position:absolute;left:400px;top:194px;width:180px;height:76px;justify-content:center;font-size:19px}
+.sch2 .addc{position:absolute;left:733px;top:338px;width:44px;height:44px;border-radius:50%;background:var(--chg);color:#fff;font-size:30px;line-height:42px;text-align:center;font-weight:600}
+.sch2 .bylbl{position:absolute;left:300px;top:338px;font-size:12.5px;color:var(--muted)}
+.sch2 .outlbl{position:absolute;left:330px;top:480px;width:250px;font-size:13.5px;text-align:right}
+.sch2 .outlbl b{display:block;font-size:14px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+
+/* step 3: one round */
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rlabel{font-weight:600;margin-top:8px}
+.pips{display:inline-flex;gap:3px;flex-wrap:wrap}
+.pip{width:30px;height:30px;padding:0;font-size:12.5px;font-family:var(--mono);border-radius:6px}
+.pip.c{border-bottom:3px solid var(--muted)}
+.pip.d{border-bottom:3px dotted var(--muted)}
+.pip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.rview{overflow:hidden;position:relative;height:262px}
+.rview::before,.rview::after{content:"";position:absolute;top:0;bottom:0;width:70px;z-index:2;pointer-events:none}
+.rview::before{left:0;background:linear-gradient(90deg,var(--surface),transparent)}
+.rview::after{right:0;background:linear-gradient(270deg,var(--surface),transparent)}
+.rstrip{position:absolute;left:0;top:0;height:100%;width:1px;transition:transform .6s cubic-bezier(.4,0,.2,1)}
+.rstrip .seg{position:absolute;top:50%;transform:translateY(-50%);display:flex;justify-content:center}
+.rstrip figure{margin:0}
+.rstrip .seg.off{opacity:.28}
+.rstrip .seg.off[data-action]{cursor:pointer}
+.rstrip .seg.off[data-action]:hover{opacity:.5}
+.rstrip .arrow{font-size:24px;color:var(--muted)}
+.qrcol{flex-direction:column;gap:6px}
+.qrhead{font-size:12.5px;font-weight:600;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){.rstrip{transition:none}}
+.qrstack{display:flex;flex-direction:column;gap:6px}
+.qrbtn{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:4px 12px;border-width:2px;border-radius:8px;width:100%;text-align:left}
+.qrbtn small{font-size:11.5px;color:var(--muted)}
+.qrbtn.g0{border-color:var(--g0)}.qrbtn.g1{border-color:var(--g1)}.qrbtn.g2{border-color:var(--g2)}.qrbtn.g3{border-color:var(--g3)}
+.qrbtn.on{background:var(--ink);color:var(--surface)}.qrbtn.on small{color:var(--surface);opacity:.8}
+.ladder{display:block;color:var(--ink);font-family:var(--mono)}
+.ladder .lane{stroke-width:3}
+.ladder .lname{font-family:var(--sans);font-weight:700;font-size:20px;fill:var(--ink)}
+.ladder .lsub{font-family:var(--sans);font-size:12px;fill:var(--muted)}
+.ladder .lval{font-size:13.5px;fill:var(--ink)}
+.ladder .lval.now{fill:var(--chg);font-weight:700}
+.ladder .band{fill:var(--chg-bg)}
+.ladder .hit{fill:transparent}
+.ladder .lop{cursor:pointer}
+.ladder .lop:hover .hit{fill:var(--sunken)}
+.ladder .halo{stroke:var(--surface);stroke-width:7}
+.ladder .wire{stroke:currentColor;stroke-width:2}
+.ladder .dot{fill:currentColor}
+.ladder .node{fill:var(--surface);stroke:currentColor;stroke-width:2}
+.ladder .glyph{stroke:currentColor;stroke-width:2;fill:none}
+.ladder .rtxt{font-size:12px;font-weight:600;fill:currentColor}
+.ladder .ctxt{font-size:15px;fill:currentColor}
+.ladder .vtxt{font-size:13.5px;fill:var(--muted)}
+.ladder .lop.todo{opacity:.3}
+.ladder .lop.next{opacity:.6}
+.ladder .lop.cur{color:var(--chg)}
+.ladder .lop.cur .node{fill:var(--chg-bg);stroke-width:2.5}
+.ladder .lop.cur .vtxt{fill:var(--chg);font-weight:700}
+.opnow{font-family:var(--mono);background:var(--chg);color:#fff;border-radius:5px;padding:2px 8px}
+
+/* bits */
+.bits{display:inline-flex;gap:2px;align-items:center}
+.bit{display:inline-block;width:16px;height:22px;line-height:22px;text-align:center;font-family:var(--mono);font-size:12px;border-radius:3px;background:var(--sunken);color:var(--muted)}
+.bit.one{background:var(--ink);color:var(--surface)}
+.bit.chg{background:var(--chg);color:#fff}
+.bit.wrap{box-shadow:inset 0 0 0 2.5px var(--chg)}
+.bitgap{display:inline-block;width:7px}
+.carryrow .bit{background:transparent;color:var(--chg);font-weight:700;height:15px;line-height:15px}
+
+/* words as bits */
+.hx{font-family:var(--mono);width:7.2em;display:inline-block}
+.code{font-family:var(--mono);font-size:15px;background:var(--sunken);border-radius:8px;padding:10px 14px;line-height:2}
+.op{padding:2px 6px;border-radius:4px;cursor:pointer}
+.op:hover{background:var(--surface)}
+.op.done{color:var(--muted)}
+.op.next{outline:1px dashed var(--muted)}
+.op.cur{background:var(--chg);color:#fff}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+
+/* step 5 */
+.tabs{display:inline-flex;gap:4px}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.opctl{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:4px 0}
+.opctl input[type=text]{width:8em}
+.oprow{display:flex;align-items:center;gap:10px;margin:3px 0}
+.oprow .lbl{width:4.4em;text-align:right;font-weight:600}
+.ruler{border-top:2px solid var(--ink);margin:3px 0 3px 4.9em}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== ChaCha20 core (RFC 8439) ===================== */
+// CORE-BEGIN
+const SIGMA = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];   // "expand 32-byte k"
+const COLS  = [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]];
+const DIAGS = [[0, 5, 10, 15], [1, 6, 11, 12], [2, 7, 8, 13], [3, 4, 9, 14]];
+
+function rotl(v, n) { v = v >>> 0; return ((v << n) | (v >>> (32 - n))) >>> 0; }
+function u32le(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
+
+function initState(key, counter, nonce) {
+  const s = new Uint32Array(16);
+  for (let i = 0; i < 4; i++) s[i] = SIGMA[i];
+  for (let i = 0; i < 8; i++) s[4 + i] = u32le(key, 4 * i);
+  s[12] = counter >>> 0;
+  for (let i = 0; i < 3; i++) s[13 + i] = u32le(nonce, 4 * i);
+  return s;
+}
+
+function quarterRound(s, a, b, c, d) {
+  s[a] = s[a] + s[b]; s[d] = rotl(s[d] ^ s[a], 16);
+  s[c] = s[c] + s[d]; s[b] = rotl(s[b] ^ s[c], 12);
+  s[a] = s[a] + s[b]; s[d] = rotl(s[d] ^ s[a], 8);
+  s[c] = s[c] + s[d]; s[b] = rotl(s[b] ^ s[c], 7);
+}
+
+// round r (1..20): odd rounds mix the columns, even rounds the diagonals
+function groupsOfRound(r) { return (r % 2 === 1) ? COLS : DIAGS; }
+
+// the table after 0, 1, ..., 20 rounds
+function roundStates(init) {
+  const states = [Uint32Array.from(init)];
+  const s = Uint32Array.from(init);
+  for (let r = 1; r <= 20; r++) {
+    for (const g of groupsOfRound(r)) quarterRound(s, g[0], g[1], g[2], g[3]);
+    states.push(Uint32Array.from(s));
+  }
+  return states;
+}
+
+// one 64-byte block: (table after 20 rounds) + (start table), written little-endian
+function blockWords(init) {
+  const end = roundStates(init)[20];
+  const out = new Uint32Array(16);
+  for (let i = 0; i < 16; i++) out[i] = end[i] + init[i];
+  return out;
+}
+function wordsToBytes(words) {
+  const b = new Uint8Array(4 * words.length);
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    b[4 * i] = w & 255; b[4 * i + 1] = (w >>> 8) & 255; b[4 * i + 2] = (w >>> 16) & 255; b[4 * i + 3] = (w >>> 24) & 255;
+  }
+  return b;
+}
+function keystream(key, nonce, counter, len) {
+  const out = new Uint8Array(len);
+  for (let blk = 0; 64 * blk < len; blk++) {
+    const bytes = wordsToBytes(blockWords(initState(key, (counter + blk) >>> 0, nonce)));
+    for (let i = 0; i < 64 && 64 * blk + i < len; i++) out[64 * blk + i] = bytes[i];
+  }
+  return out;
+}
+function popcount(x) { x = x >>> 0; let c = 0; while (x) { c += x & 1; x >>>= 1; } return c; }
+
+// the quarter round as 12 small steps on the words a, b, c, d (indexes 0..3)
+const QR_OPS = [
+  { t: "add", d: 0, s: 1, txt: "a += b" }, { t: "xor", d: 3, s: 0, txt: "d ^= a" }, { t: "rot", d: 3, n: 16, txt: "d <<<= 16" },
+  { t: "add", d: 2, s: 3, txt: "c += d" }, { t: "xor", d: 1, s: 2, txt: "b ^= c" }, { t: "rot", d: 1, n: 12, txt: "b <<<= 12" },
+  { t: "add", d: 0, s: 1, txt: "a += b" }, { t: "xor", d: 3, s: 0, txt: "d ^= a" }, { t: "rot", d: 3, n: 8,  txt: "d <<<= 8" },
+  { t: "add", d: 2, s: 3, txt: "c += d" }, { t: "xor", d: 1, s: 2, txt: "b ^= c" }, { t: "rot", d: 1, n: 7,  txt: "b <<<= 7" },
+];
+function applyOp(w, op) {
+  const r = w.slice();
+  if (op.t === "add") r[op.d] = (r[op.d] + r[op.s]) >>> 0;
+  else if (op.t === "xor") r[op.d] = (r[op.d] ^ r[op.s]) >>> 0;
+  else r[op.d] = rotl(r[op.d], op.n);
+  return r;
+}
+function qrTrace(words) {
+  const tr = [words.slice()];
+  for (const op of QR_OPS) tr.push(applyOp(tr[tr.length - 1], op));
+  return tr;
+}
+
+function parseHex(text, n) {
+  const s = text.replace(/[\s:]/g, "");
+  if (!/^[0-9a-fA-F]*$/.test(s) || s.length !== 2 * n) return null;
+  const b = new Uint8Array(n);
+  for (let i = 0; i < n; i++) b[i] = parseInt(s.substr(2 * i, 2), 16);
+  return b;
+}
+function bytesHex(b) { return Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); }
+
+// test vectors from RFC 8439
+const RFC_QR_IN  = [0x11111111, 0x01020304, 0x9b8d6f43, 0x01234567];   // section 2.1.1
+const RFC_QR_OUT = [0xea2a92f4, 0xcb1cf8ce, 0x4581472e, 0x5881c4bb];
+const RFC_KEY = Uint8Array.from({ length: 32 }, (_, i) => i);
+const RFC_BLOCK_KS = "10f1e7e4d13b5915500fdd1fa32071c4c7d1f4c733c068030422aa9ac3d46c4e" +
+                     "d2826446079faa0914c2d705d98b02a2b5129cd1de164eb9cbd083e8a2503c4e";   // section 2.3.2
+const RFC_MSG = "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.";
+const RFC_CT_START = "6e2e359a2568f980";                                                // section 2.4.2
+
+function selfTest() {
+  const fails = [];
+  const s = new Uint32Array(16);
+  RFC_QR_IN.forEach((w, i) => { s[i] = w; });
+  quarterRound(s, 0, 1, 2, 3);
+  if ([0, 1, 2, 3].some(i => s[i] !== RFC_QR_OUT[i])) fails.push("quarter round (2.1.1)");
+  const tr = qrTrace(RFC_QR_IN);
+  if (tr[12].some((w, i) => w !== RFC_QR_OUT[i])) fails.push("quarter round, step by step");
+  const ks = bytesHex(wordsToBytes(blockWords(initState(RFC_KEY, 1, parseHex("000000090000004a00000000", 12)))));
+  if (ks !== RFC_BLOCK_KS) fails.push("block function (2.3.2)");
+  const msg = new TextEncoder().encode(RFC_MSG);
+  const z = keystream(RFC_KEY, parseHex("000000000000004a00000000", 12), 1, msg.length);
+  const ct = msg.map((x, i) => x ^ z[i]);
+  if (bytesHex(ct.slice(0, 8)) !== RFC_CT_START) fails.push("encryption (2.4.2)");
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const T = {
+  en: {
+    title: "ChaCha20 explorer", home: "All simulators",
+    intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
+    stepOf: n => "Step " + n + " of 4 · ChaCha20",
+    steps: [["Black box", "key, nonce, counter in; keystream out"], ["Inside", "the inputs fill a 4×4 table"],
+            ["One round", "4 quarter rounds, 12 small steps each"], ["One operation", "add, xor, rotate, bit by bit"]],
+    explain: [
+      ["Three inputs, one keystream", "Three inputs go in, a keystream comes out, 64 bytes per block. Encrypting is XOR of the message with the keystream. Change the counter and watch your message move along the keystream. Click the ChaCha20 box to look inside."],
+      ["A table, mixed and added back", "The key, the nonce and the counter fill a 4×4 table S together with 4 fixed constants. 20 rounds mix S into X. At the end S is added back to X, word by word, and the result is one block of keystream. Click “20 rounds” to zoom in."],
+      ["Inside one round", "One round splits the table into 4 groups of 4 words and runs a quarter round on each: odd rounds take the columns, even rounds the diagonals. ChaCha20 does this 20 times. Pick a group, then step through its 12 small operations. Click an operation to see it bit by bit."],
+      ["Three simple operations", "Everything in ChaCha20 is built from add, xor and rotate on 32-bit words. No tables, the same work for every key."]],
+    selfOk: "✓ checked against RFC 8439", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back", fixFirst: "Fix the key or the nonce in step 1.",
+    cardInputs: "Inputs", key: "key", key_s: "the shared secret: 32 bytes = 256 bits (64 hex digits)", nonce: "nonce", nonce_s: "public, new for every message, so no two messages share a keystream (12 bytes = 24 hex digits)",
+    counter: "counter", counter_s: "the number of the first 64-byte block; the next blocks use +1, +2, …", boxCC_s: "click to look inside",
+    randKey: "random key", randNonce: "random nonce", keyShort: "secret key (32 bytes, hex)", nonceShort: "nonce (12 bytes): new for every message", counterShort: "counter: number of the first block",
+    nodeKs: "keystream Z", nodePt: "plaintext P", nodeCt: "ciphertext C",
+    ksCap: (c1, c2) => "from block " + c1 + (c2 > c1 ? " to " + c2 : ""), ctCap: n => n + " byte" + (n === 1 ? "" : "s"),
+    cardDetails: "Details: the keystream block by block, and the XOR byte by byte",
+    cardMsg: "Encrypting with ChaCha20", msgLabel: "message P (type anything)", blockN: n => "block " + n,
+    streamLabel: "keystream Z", streamNote: "Grey blocks are not used. The counter picks where the message starts: change it and watch the used blocks move along the keystream. Point at a block to see all its 64 bytes.",
+    winLabel: (c1, c2) => "used by the message: " + (c1 === c2 ? "block " + c1 : "blocks " + c1 + " to " + c2),
+    usedAll: "all 64 bytes used", usedPart: k => k + " / 64 bytes used",
+    rowText: "text", rowP: "P plaintext", rowZ: "Z keystream", rowC: "C ciphertext", xorRow: "XOR, byte by byte",
+    segHead: (b, k) => "from block " + b + " (" + k + " byte" + (k === 1 ? "" : "s") + ")", moreSeg: k => "+ " + k + " more block" + (k > 1 ? "s" : ""),
+    xorHint: "Point at a byte to see how it is encrypted.",
+    xorByte: (i, p, z, c, b, j) => "byte " + i + " (block " + b + ", byte " + j + "):  " + p + " XOR " + z + " = " + c,
+    usesLine: (n, c1, c2) => { const last = n - 64 * (c2 - c1), fullEnd = last === 64 ? c2 : c2 - 1, parts = [];
+      if (fullEnd >= c1) parts.push(fullEnd === c1 ? "all of block " + c1 : "all of blocks " + c1 + " to " + fullEnd);
+      if (last < 64) parts.push(last === 1 ? "the first byte of block " + c2 : "the first " + last + " bytes of block " + c2);
+      return "The message uses " + (n === 1 ? "byte 0" : "bytes 0 to " + (n - 1)) + " of the keystream: " + parts.join(" and ") + "."; },
+    more: k => "… and " + k + " more bytes.", typeMsg: "Type a message to encrypt it.",
+    errKey: "The key must be exactly 32 bytes (64 hex digits). ", errNonce: "The nonce must be exactly 12 bytes (24 hex digits).",
+    startTable: c => "start table S (counter " + c + ")", rounds20: "20 rounds",
+    afterRounds: "X: after 20 rounds", cardOpen: "Inside the ChaCha20 box", bypass: "S again, around the rounds",
+    outTitle: c => "keystream Z, block " + c, outSub: "64 bytes, out of the box",
+    addRule: "Word by word: each word of X plus the word of S in the same place. Plain 32-bit addition, as with uint32_t in C: a carry past 32 bits is dropped (mod 2³²). It is addition, not XOR.",
+    addHint: "Point at a word to see its addition.",
+    addWord: (i, x, s, o, c) => "word " + i + ":  " + x + " + " + s + " = " + o + (c ? "   (the carry past 32 bits is dropped)" : ""),
+    whyAdd: "<b>Why add S back?</b> The 20 rounds alone can be run backwards: every step has an inverse. Without this step, anyone who knows one keystream block (for example from a known message) could undo the rounds, get S and read the key from it. With this step, they would first have to subtract S, and S holds the key.",
+    zoomIn_s: "click to zoom in",
+    legConst: "constants (fixed)", legKey: "key", legCtr: "counter", legNonce: "nonce",
+    pipNote: "20 rounds = 10 × (a column round, then a diagonal round). Pick any of them.",
+    rN: (r, col) => "round " + r + " of 20: the 4 " + (col ? "columns" : "diagonals") + " are mixed",
+    gGen: ["blue", "green", "red", "yellow"],
+    cardRound: r => "Round " + r + ": the table goes through 4 quarter rounds",
+    beforeR: r => r === 1 ? "before round 1 (the start table S)" : "after round " + (r - 1),
+    afterR1: r => r === 20 ? "after round 20 (the table X)" : "after round " + r,
+    qrName: "quarter round", wordsOf: w => "words " + w,
+    afterN: i => "after round " + i, roundLbl: (i, col) => "round " + i + " · " + (col ? "columns" : "diagonals"),
+    colNote: "Odd round: each quarter round takes one column (top to bottom). Click a group or a word to pick it.",
+    diagNote: "Even round: each quarter round takes one diagonal, so words from different columns meet. Click a group or a word to pick it.",
+    cardLadder: (g, idx) => "Inside the " + g + " quarter round: words " + idx + " go in as a, b, c, d",
+    wordN: i => "word " + i, ladCode: "in C", ladAfter: "result", nowLbl: "now",
+    ladLegend: "Each line is one word. ⊞ adds the arrow's word (mod 2³²), ⊕ XORs it in, &lt;&lt;&lt;n rotates the word left by n bits. Click any step to see it bit by bit.",
+    bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶",
+    stepK: k => "step " + k + " / 12",
+    tabAdd: "add", tabXor: "xor", tabRot: "rotate", rotBy: "rotate by",
+    origin: (k, txt) => "From the quarter round: step " + k + " of 12, " + txt + " (a, b, c, d as before that step).",
+    carry: "carry", cardOp: "The operation",
+    exAdd: W => "Add like at school, but in binary. A carry that falls off the top bit is thrown away (we count modulo 2<sup>" + W + "</sup>).",
+    exAddDrop: "Here a carry fell off the top.",
+    exXor: "XOR gives 1 where the two bits differ, 0 where they are the same. Do it twice with the same b and you get a back.",
+    exRot: n => "Rotate left by " + n + ": every bit moves " + n + " places to the left. The " + n + " bits that fall off the left (framed) come back on the right. Nothing is lost.",
+  },
+  pl: {
+    title: "Eksplorator ChaCha20", home: "Wszystkie symulatory",
+    intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
+    stepOf: n => "Krok " + n + " z 4 · ChaCha20",
+    steps: [["Czarna skrzynka", "klucz, nonce i licznik na wejściu, keystream na wyjściu"], ["W środku", "wejścia wypełniają tabelę 4×4"],
+            ["Jedna runda", "4 ćwiartki rundy, po 12 małych kroków"], ["Jedna operacja", "dodawanie, XOR, rotacja bit po bicie"]],
+    explain: [
+      ["Trzy wejścia, jeden keystream", "Na wejściu trzy wartości, na wyjściu keystream, po 64 bajty na blok. Szyfrowanie to XOR wiadomości z keystreamem. Zmień licznik i patrz, jak wiadomość przesuwa się wzdłuż keystreamu. Kliknij pole ChaCha20, żeby zajrzeć do środka."],
+      ["Tabela, wymieszana i dodana z powrotem", "Klucz, nonce i licznik wypełniają tabelę 4×4 S razem z 4 stałymi. 20 rund miesza S w X. Na końcu S jest dodawana z powrotem do X, słowo po słowie, i wynik to jeden blok keystreamu. Kliknij „20 rund”, żeby wejść głębiej."],
+      ["Wnętrze jednej rundy", "Runda dzieli tabelę na 4 grupy po 4 słowa i na każdej wykonuje ćwiartkę rundy: rundy nieparzyste biorą kolumny, parzyste przekątne. ChaCha20 robi to 20 razy. Wybierz grupę i przejdź krok po kroku przez jej 12 małych operacji. Kliknij operację, żeby zobaczyć ją bit po bicie."],
+      ["Trzy proste operacje", "Cały ChaCha20 jest zbudowany z dodawania, XOR i rotacji na słowach 32-bitowych. Bez tablic, ta sama praca dla każdego klucza."]],
+    selfOk: "✓ sprawdzone z RFC 8439", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej", fixFirst: "Popraw klucz albo nonce w kroku 1.",
+    cardInputs: "Wejścia", key: "klucz", key_s: "wspólny sekret: 32 bajty = 256 bitów (64 cyfry hex)", nonce: "nonce", nonce_s: "jawny, nowy dla każdej wiadomości, żeby dwie wiadomości nie dostały tego samego keystreamu (12 bajtów = 24 cyfry hex)",
+    counter: "licznik", counter_s: "numer pierwszego bloku 64 bajtów; kolejne bloki dostają +1, +2, …", boxCC_s: "kliknij, by zajrzeć",
+    randKey: "losowy klucz", randNonce: "losowy nonce", keyShort: "tajny klucz (32 bajty, hex)", nonceShort: "nonce (12 bajtów): nowy co wiadomość", counterShort: "licznik: numer pierwszego bloku",
+    nodeKs: "keystream Z", nodePt: "tekst jawny P", nodeCt: "szyfrogram C",
+    ksCap: (c1, c2) => (c2 > c1 ? "z bloków " + c1 + " do " + c2 : "z bloku " + c1), ctCap: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
+    cardDetails: "Szczegóły: keystream blok po bloku i XOR bajt po bajcie",
+    cardMsg: "Szyfrowanie ChaCha20", msgLabel: "wiadomość P (wpisz cokolwiek)", blockN: n => "blok " + n,
+    streamLabel: "keystream Z", streamNote: "Szare bloki nie są używane. Licznik wybiera, gdzie zaczyna się wiadomość: zmień go i patrz, jak używane bloki przesuwają się wzdłuż keystreamu. Najedź na blok, żeby zobaczyć wszystkie jego 64 bajty.",
+    winLabel: (c1, c2) => "używane przez wiadomość: " + (c1 === c2 ? "blok " + c1 : "bloki " + c1 + " do " + c2),
+    usedAll: "użyte: wszystkie 64 bajty", usedPart: k => "użyte: " + k + " z 64 bajtów",
+    rowText: "tekst", rowP: "P tekst jawny", rowZ: "Z keystream", rowC: "C szyfrogram", xorRow: "XOR, bajt po bajcie",
+    segHead: (b, k) => "z bloku " + b + " (" + k + " " + plN(k, "bajt", "bajty", "bajtów") + ")", moreSeg: k => "+ jeszcze " + k + " " + plN(k, "blok", "bloki", "bloków"),
+    xorHint: "Najedź na bajt, żeby zobaczyć, jak jest szyfrowany.",
+    xorByte: (i, p, z, c, b, j) => "bajt " + i + " (blok " + b + ", bajt " + j + "):  " + p + " XOR " + z + " = " + c,
+    usesLine: (n, c1, c2) => { const last = n - 64 * (c2 - c1), fullEnd = last === 64 ? c2 : c2 - 1, parts = [];
+      if (fullEnd >= c1) parts.push(fullEnd === c1 ? "całego bloku " + c1 : "całych bloków " + c1 + " do " + fullEnd);
+      if (last < 64) parts.push(last === 1 ? "pierwszego bajtu bloku " + c2 : "pierwszych " + last + " bajtów bloku " + c2);
+      return "Wiadomość używa " + (n === 1 ? "bajtu 0" : "bajtów 0 do " + (n - 1)) + " keystreamu: " + parts.join(" i ") + "."; },
+    more: k => "… i jeszcze " + k + " " + plN(k, "bajt", "bajty", "bajtów") + ".", typeMsg: "Wpisz wiadomość, żeby ją zaszyfrować.",
+    errKey: "Klucz musi mieć dokładnie 32 bajty (64 cyfry hex). ", errNonce: "Nonce musi mieć dokładnie 12 bajtów (24 cyfry hex).",
+    startTable: c => "tabela startowa S (licznik " + c + ")", rounds20: "20 rund",
+    afterRounds: "X: po 20 rundach", cardOpen: "Wnętrze pudełka ChaCha20", bypass: "S jeszcze raz, obok rund",
+    outTitle: c => "keystream Z, blok " + c, outSub: "64 bajty, wychodzą z pudełka",
+    addRule: "Słowo po słowie: każde słowo X plus słowo S z tego samego miejsca. Zwykłe dodawanie 32-bitowe, jak na uint32_t w C: przeniesienie poza 32 bity przepada (mod 2³²). To dodawanie, nie XOR.",
+    addHint: "Najedź na słowo, żeby zobaczyć jego dodawanie.",
+    addWord: (i, x, s, o, c) => "słowo " + i + ":  " + x + " + " + s + " = " + o + (c ? "   (przeniesienie poza 32 bity przepada)" : ""),
+    whyAdd: "<b>Po co dodawać S?</b> Same 20 rund da się puścić od tyłu: każdy krok ma odwrotność. Bez tego kroku każdy, kto zna jeden blok keystreamu (np. ze znanej wiadomości), cofnąłby rundy, dostałby S i odczytał z niej klucz. Z tym krokiem musiałby najpierw odjąć S, a w S jest klucz.",
+    zoomIn_s: "kliknij, żeby wejść głębiej",
+    legConst: "stałe", legKey: "klucz", legCtr: "licznik", legNonce: "nonce",
+    pipNote: "20 rund = 10 × (runda kolumn, potem runda przekątnych). Wybierz dowolną.",
+    rN: (r, col) => "runda " + r + " z 20: mieszamy 4 " + (col ? "kolumny" : "przekątne"),
+    gGen: ["niebieskiej", "zielonej", "czerwonej", "żółtej"],
+    cardRound: r => "Runda " + r + ": tabela przechodzi przez 4 ćwiartki rundy",
+    beforeR: r => r === 1 ? "przed rundą 1 (tabela startowa S)" : "po rundzie " + (r - 1),
+    afterR1: r => r === 20 ? "po rundzie 20 (tabela X)" : "po rundzie " + r,
+    qrName: "ćwiartka rundy", wordsOf: w => "słowa " + w,
+    afterN: i => "po rundzie " + i, roundLbl: (i, col) => "runda " + i + " · " + (col ? "kolumny" : "przekątne"),
+    colNote: "Runda nieparzysta: każda ćwiartka bierze jedną kolumnę (z góry na dół). Kliknij grupę albo słowo, żeby ją wybrać.",
+    diagNote: "Runda parzysta: każda ćwiartka bierze jedną przekątną, więc spotykają się słowa z różnych kolumn. Kliknij grupę albo słowo, żeby ją wybrać.",
+    cardLadder: (g, idx) => "Wnętrze " + g + " ćwiartki rundy: słowa " + idx + " wchodzą jako a, b, c, d",
+    wordN: i => "słowo " + i, ladCode: "w C", ladAfter: "wynik", nowLbl: "teraz",
+    ladLegend: "Każda linia to jedno słowo. ⊞ dodaje słowo ze strzałki (mod 2³²), ⊕ xoruje je, &lt;&lt;&lt;n obraca słowo w lewo o n bitów. Kliknij dowolny krok, żeby zobaczyć go bit po bicie.",
+    bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶",
+    stepK: k => "krok " + k + " / 12",
+    tabAdd: "dodawanie", tabXor: "XOR", tabRot: "rotacja", rotBy: "rotacja o",
+    origin: (k, txt) => "Z ćwiartki rundy: krok " + k + " z 12, " + txt + " (a, b, c, d sprzed tego kroku).",
+    carry: "przen.", cardOp: "Operacja",
+    exAdd: W => "Dodawanie jak w szkole, tylko dwójkowo. Przeniesienie, które wypada poza najstarszy bit, jest odrzucane (liczymy modulo 2<sup>" + W + "</sup>).",
+    exAddDrop: "Tutaj przeniesienie wypadło poza najstarszy bit.",
+    exXor: "XOR daje 1 tam, gdzie bity się różnią, i 0 tam, gdzie są takie same. Zrób go dwa razy z tym samym b, a wrócisz do a.",
+    exRot: n => "Rotacja w lewo o " + n + ": każdy bit przesuwa się o " + n + " " + plN(n, "miejsce", "miejsca", "miejsc") + " w lewo. Bity, które wypadają z lewej (w ramkach), wracają z prawej. Nic nie ginie.",
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+/* one language setting for all the simulators on the site */
+try { const s = localStorage.getItem("cryptoSimLang") || localStorage.getItem("chachaExplorerLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+function roleOf(i) { return i < 4 ? "const" : i < 12 ? "key" : i === 12 ? "ctr" : "nonce"; }
+
+const app = {
+  level: 0,
+  keyText: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  nonceText: "000000000000004a00000000",
+  key: null, nonce: null, counter: 1, keyErr: false, nonceErr: false,
+  msg: "Be strong enough to be gentle. (Peter Cullen)",
+  round: 1, group: 0,
+  qrStep: 0,
+  opType: "add", opA: 0x11111111, opB: 0x01020304, opN: 7, opOrigin: null,
+};
+app.key = parseHex(app.keyText, 32);
+app.nonce = parseHex(app.nonceText, 12);
+
+const hex8 = w => (w >>> 0).toString(16).padStart(8, "0");
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function curInit() { return initState(app.key, app.counter, app.nonce); }
+const badInputs = () => app.keyErr || app.nonceErr;
+
+function gridHTML(s, opt) {
+  opt = opt || {};
+  let h = '<div class="grid' + (opt.small ? " sm" : "") + (opt.xs ? " xs" : "") + '">';
+  for (let i = 0; i < 16; i++) {
+    let cls = "cell";
+    if (opt.roles) cls += " role-" + roleOf(i);
+    if (opt.groups) {
+      const g = opt.groups.findIndex(gr => gr.includes(i));
+      cls += " g" + g;
+      if (g === opt.sel) cls += " sel";
+    }
+    if (opt.click) cls += " click";
+    if (opt.cls) cls += " " + opt.cls;
+    if (opt.hot === i) cls += " hotw";
+    h += '<div class="' + cls + '"' + (opt.click ? ' data-action="cell" data-i="' + i + '"' : "") + (opt.word ? ' data-w="' + i + '"' : "") + ">" + hex8(s[i]) + "</div>";
+  }
+  return h + "</div>";
+}
+function bitsHTML(v, W, clsFn) {
+  let h = '<span class="bits">';
+  for (let p = W - 1; p >= 0; p--) {
+    const bit = (v >>> p) & 1;
+    let c = "bit" + (bit ? " one" : "");
+    const extra = clsFn ? clsFn(p, bit) : "";
+    if (extra) c += " " + extra;
+    h += '<span class="' + c + '">' + bit + "</span>";
+    if (p % 8 === 0 && p !== 0) h += '<span class="bitgap"></span>';
+  }
+  return h + "</span>";
+}
+function bytesTable(rows) {
+  return '<table class="btable">' + rows + "</table>";
+}
+
+/* ---------- arrows: key yellow, nonce blue, counter green (same in steps 1 and 2) ---------- */
+const mk = (id, c) => '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="' + c + '"/></marker>';
+const ln = (pts, c, m) => '<polyline fill="none" stroke="' + c + '" stroke-width="2.4" marker-end="url(#' + m + ')" points="' + pts + '"/>';
+const IN_MARKERS = mk("mk_k", "var(--key-b)") + mk("mk_n", "var(--non-b)") + mk("mk_c", "var(--ctr-b)");
+const inArrows = (k, n, c) => ln(k, "var(--key-b)", "mk_k") + ln(n, "var(--non-b)", "mk_n") + ln(c, "var(--ctr-b)", "mk_c");
+
+/* ---------- random key / nonce ---------- */
+const DICE_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/></svg>';
+const rndBtn = f => '<button class="rnd" data-action="rand-' + f + '" title="' + esc(f === "key" ? L().randKey : L().randNonce) + '" aria-label="' + esc(f === "key" ? L().randKey : L().randNonce) + '">' + DICE_SVG + "</button>";
+function randomize(f) {
+  const b = new Uint8Array(f === "key" ? 32 : 12);
+  crypto.getRandomValues(b);
+  const hex = bytesHex(b);
+  if (f === "key") { app.key = b; app.keyText = hex; app.keyErr = false; }
+  else { app.nonce = b; app.nonceText = hex; app.nonceErr = false; }
+  const inp = view.querySelector('input[data-field="' + f + '"]');
+  if (inp) inp.value = hex;
+  inputsChanged();
+}
+
+/* ---------- step 1: black box ---------- */
+const TB_W = 150, TB_GAP = 8, TB_N = 6;
+let L0DATA = null;
+const KEY_SVG = '<svg viewBox="0 0 40 20" width="34" height="17" aria-hidden="true"><circle cx="9" cy="10" r="7.5" fill="currentColor"/><circle cx="9" cy="10" r="2.8" fill="var(--key-bg)"/><path d="M15 7.5h22v5h-3v3h-3v-3h-3v3h-3v-3h-10z" fill="currentColor"/></svg>';
+function render0() {
+  const t = L();
+  return '<div class="card"><h3>' + t.cardMsg + '</h3><div class="schwrap"><div class="sch">' +
+      '<svg class="arrows" width="1045" height="445" aria-hidden="true"><defs>' + IN_MARKERS + '<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>' +
+        '<g stroke="currentColor" stroke-width="2.2" marker-end="url(#ah)">' +
+        '' +
+        '<line x1="240" y1="203" x2="296" y2="203"/><line x1="570" y1="203" x2="614" y2="203"/>' +
+        '<line x1="684" y1="203" x2="746" y2="203"/><line x1="650" y1="298" x2="650" y2="240"/></g>' +
+        inArrows("100,74 100,160", "640,74 640,118 160,118 160,160", "920,74 920,132 220,132 220,160") + '</svg>' +
+      '<div class="sg-top role-nonce" title="' + esc(t.nonce_s) + '">' + rndBtn("nonce") + '<label>' + t.nonceShort + '<input class="mid" data-field="nonce" spellcheck="false" value="' + esc(app.nonceText) + '"></label>' +
+        "</div>" +
+      '<div class="sg-ctr role-ctr" title="' + esc(t.counter_s) + '"><span>' + t.counterShort + '</span><span class="ctrline"><button data-action="ctr-dec">&minus;</button>' +
+        '<input data-field="counter" type="number" min="0" value="' + app.counter + '"><button data-action="ctr-inc">+</button></span></div>' +
+      '<button class="box sg-box" data-action="zoom">ChaCha20<small>' + t.boxCC_s + "</small></button>" +
+      '<div class="sg-key role-key" title="' + esc(t.key_s) + '">' + rndBtn("key") + '<label>' + t.keyShort + '<input class="keyin" data-field="key" spellcheck="false" value="' + esc(app.keyText) + '"></label></div>' +
+      '<div class="node sg-ks"><div class="nh">' + KEY_SVG + " " + t.nodeKs + '</div><div class="nb mono" id="ksbytes"></div><small id="kscap"></small></div>' +
+      '<div class="sg-xor" aria-label="XOR">&#8853;</div>' +
+      '<div class="node sg-ct"><div class="nh">' + t.nodeCt + '</div><div class="nb mono" id="ctbytes"></div><small id="ctcap"></small></div>' +
+      '<div class="node sg-pt"><div class="nh">' + t.nodePt + '</div><textarea data-field="msg" rows="3" spellcheck="false">' + esc(app.msg) + "</textarea></div>" +
+    "</div></div></div>" +
+    '<div class="card"><h3>' + t.cardDetails + '</h3>' +
+      '<div class="flowlbl">' + t.streamLabel + '</div><div class="tape"><div class="tblocks" id="tblocks"></div>' +
+      '<div class="twin" id="twin"><span id="twinlbl"></span></div></div><p class="note" style="margin:0 0 4px">' + t.streamNote + "</p>" +
+      '<div id="l0out"></div></div>';
+}
+
+function updateL0() {
+  const out = document.getElementById("l0out"), tb = document.getElementById("tblocks"), tw = document.getElementById("twin");
+  if (!out || !tb) return;
+  const t = L();
+  L0DATA = null;
+  if (badInputs()) {
+    tb.innerHTML = ""; tw.style.display = "none"; ["ksbytes", "ctbytes", "kscap", "ctcap"].forEach(id => { document.getElementById(id).textContent = ""; });
+    out.innerHTML = '<p class="err">' + (app.keyErr ? t.errKey : "") + (app.nonceErr ? t.errNonce : "") + "</p>";
+    return;
+  }
+  const p = new TextEncoder().encode(app.msg);
+  const n = p.length;
+  const nb = Math.max(1, Math.ceil(n / 64));
+  const c1 = app.counter, c2 = c1 + nb - 1;
+  const lastBytes = n - 64 * (nb - 1);
+  const start = c1 <= 4 ? 0 : c1 - 1;
+  const hx2 = x => x.toString(16).padStart(2, "0");
+  // the keystream tape: fixed blocks for this key and nonce; the used ones are highlighted
+  let h = "";
+  for (let k = 0; k < TB_N; k++) {
+    const b = start + k;
+    if (b > 0xffffffff) break;
+    const bytes = wordsToBytes(blockWords(initState(app.key, b >>> 0, app.nonce)));
+    const used = n > 0 && b >= c1 && b <= c2;
+    const cnt = used ? (b === c2 ? lastBytes : 64) : 0;
+    h += '<div class="tblock' + (used ? " in" : " unused") + '" title="' + esc(t.blockN(b)) + ": " + Array.from(bytes, hx2).join(" ") + '"><b>' + t.blockN(b) + "</b>" +
+      Array.from(bytes.slice(0, 5), hx2).join(" ") + " …" +
+      (used ? '<div class="fill"><span style="width:' + (cnt / 64 * 100) + '%"></span></div><small>' + (cnt === 64 ? t.usedAll : t.usedPart(cnt)) + "</small>" : "") + "</div>";
+  }
+  tb.innerHTML = h;
+  if (n === 0) tw.style.display = "none";
+  else {
+    tw.style.display = "";
+    const i0 = c1 - start, i1 = Math.min(TB_N - 1, c2 - start);
+    tw.style.left = (i0 * (TB_W + TB_GAP)) + "px";
+    tw.style.width = ((i1 - i0 + 1) * (TB_W + TB_GAP) - TB_GAP) + "px";
+    document.getElementById("twinlbl").textContent = t.winLabel(c1, c2) + (c2 - start > TB_N - 1 ? " →" : "");
+  }
+  if (n === 0) { ["ksbytes", "ctbytes", "kscap", "ctcap"].forEach(id => { document.getElementById(id).textContent = ""; }); out.innerHTML = '<p class="note">' + t.typeMsg + "</p>"; return; }
+  // the bytes that really go into the XOR, cut into pieces by block
+  const z = keystream(app.key, app.nonce, c1, n);
+  const c = p.map((x, i) => x ^ z[i]);
+  const firstBytes = arr => Array.from(arr.slice(0, 16), hx2).join(" ").replace(/^((?:\S+ ){7}\S+) /, "$1<br>") + (arr.length > 16 ? " …" : "");
+  document.getElementById("ksbytes").innerHTML = firstBytes(z);
+  document.getElementById("kscap").textContent = t.ksCap(c1, c2);
+  document.getElementById("ctbytes").innerHTML = firstBytes(c);
+  document.getElementById("ctcap").textContent = t.ctCap(n);
+  const ch = x => x === 32 ? "␣" : (x > 32 && x < 127 ? esc(String.fromCharCode(x)) : "·");
+  const SEG_MAX = 3;
+  const segs = [];
+  for (let k = 0; k < Math.min(nb, SEG_MAX); k++) {
+    const s = 64 * k, e = Math.min(n, s + 64);
+    let idx = [];
+    if (e - s <= 10) { for (let i = s; i < e; i++) idx.push(i); }
+    else { for (let i = s; i < s + 6; i++) idx.push(i); idx.push(-1); for (let i = e - 3; i < e; i++) idx.push(i); }
+    segs.push({ b: c1 + k, cnt: e - s, idx: idx });
+  }
+  const totalCols = segs.reduce((a, s) => a + s.idx.length + 1, 0);
+  const rowOf = (cls, lbl, fn) => '<tr class="' + cls + '"><td class="lbl">' + lbl + "</td>" +
+    segs.map(s => s.idx.map(i => i < 0 ? '<td class="ell">…</td>' : '<td class="b" data-i="' + i + '">' + fn(i) + "</td>").join("") + '<td class="sep"></td>').join("") + "</tr>";
+  let rows = '<tr><td class="lbl"></td>' + segs.map(s => '<td class="seghead" colspan="' + s.idx.length + '">' + t.segHead(s.b, s.cnt) + '</td><td class="sep"></td>').join("") + "</tr>";
+  rows += rowOf("rt", t.rowText, i => ch(p[i])) + rowOf("rp", t.rowP, i => hx2(p[i])) + rowOf("rz zrow", t.rowZ, i => hx2(z[i])) +
+    '<tr class="xorrow"><td class="lbl"></td><td colspan="' + totalCols + '">↓ ' + t.xorRow + " ↓</td></tr>" +
+    rowOf("rc", t.rowC, i => hx2(c[i]));
+  out.innerHTML = '<p class="uses">' + t.usesLine(n, c1, c2) + '</p><div class="tablewrap">' + bytesTable(rows) + "</div>" +
+    (nb > SEG_MAX ? '<p class="note">' + t.moreSeg(nb - SEG_MAX) + "</p>" : "") +
+    '<p class="xorline" id="xorline">' + t.xorHint + "</p>";
+  L0DATA = { p: p, z: z, c: c, c1: c1 };
+}
+
+/* ---------- step 2: inside ---------- */
+let L1DATA = null;
+function render1() {
+  const t = L();
+  return '<div class="card"><h3>' + t.cardOpen + '</h3><div class="schwrap"><div class="sch2">' +
+      '<div class="ccframe"><span class="cctab">ChaCha20</span></div>' +
+      '<svg class="arrows" width="1045" height="600" aria-hidden="true"><defs>' + IN_MARKERS +
+        mk("a1i", "var(--ink)") + mk("a1o", "var(--chg)") + "</defs>" +
+        inArrows("200,74 200,144", "640,74 640,124 262,124 262,144", "920,74 920,134 300,134 300,144") +
+        ln("348,232 396,232", "var(--ink)", "a1i") + ln("582,232 606,232", "var(--ink)", "a1i") +
+        ln("755,314 755,336", "var(--ink)", "a1i") +
+        '<polyline fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#a1i)" points="185,308 185,360 729,360"/>' +
+        ln("755,384 755,466", "var(--chg)", "a1o") + "</svg>" +
+      '<div class="inbox role-key" style="left:8px;width:455px" title="' + esc(t.key_s) + '">' + rndBtn("key") + '<label>' + t.keyShort + '<input class="keyin" data-field="key" spellcheck="false" value="' + esc(app.keyText) + '"></label></div>' +
+      '<div class="inbox role-nonce" style="left:473px;width:320px" title="' + esc(t.nonce_s) + '">' + rndBtn("nonce") + '<label>' + t.nonceShort + '<input class="mid" data-field="nonce" spellcheck="false" value="' + esc(app.nonceText) + '"></label></div>' +
+      '<div class="inbox role-ctr" style="left:802px;width:236px" title="' + esc(t.counter_s) + '"><span>' + t.counterShort + '</span><span class="ctrline"><button data-action="ctr-dec">&minus;</button>' +
+        '<input data-field="counter" type="number" min="0" value="' + app.counter + '"><button data-action="ctr-inc">+</button></span></div>' +
+      '<div class="sbox"><div class="stitle" id="l1St"></div><div id="l1S"></div></div>' +
+      '<button class="box rbox" data-action="zoom">' + t.rounds20 + "<small>" + t.zoomIn_s + "</small></button>" +
+      '<figure class="pos" style="left:610px;top:172px" id="l1X"></figure>' +
+      '<div class="addc">+</div><div class="bylbl">' + t.bypass + "</div>" +
+      '<div class="outlbl" id="l1Olbl"></div>' +
+      '<figure class="pos" style="left:610px;top:470px" id="l1O"></figure>' +
+    '</div></div>' +
+    '<div class="legend"><span class="role-const">' + t.legConst + '</span><span class="role-key">' + t.legKey + "</span>" +
+      '<span class="role-ctr">' + t.legCtr + '</span><span class="role-nonce">' + t.legNonce + "</span></div>" +
+    '<p class="note">' + t.addRule + "</p>" +
+    '<p class="addline" id="addline">' + t.addHint + "</p>" +
+    '<div class="why">' + t.whyAdd + "</div></div>";
+}
+function renderL1Body() {
+  const S = document.getElementById("l1S"), X = document.getElementById("l1X"), O = document.getElementById("l1O"), OL = document.getElementById("l1Olbl");
+  if (!S) return;
+  const t = L();
+  L1DATA = null;
+  if (badInputs()) { [S, X, O].forEach(e => { e.innerHTML = ""; }); document.getElementById("l1St").textContent = ""; OL.innerHTML = '<span class="err">' + t.fixFirst + "</span>"; return; }
+  const init = curInit();
+  const mixed = roundStates(init)[20];
+  const end = blockWords(init);
+  L1DATA = { x: mixed, s: init, o: end };
+  S.innerHTML = gridHTML(init, { roles: true, xs: true, word: true });
+  document.getElementById("l1St").textContent = t.startTable(app.counter);
+  X.innerHTML = gridHTML(mixed, { xs: true, word: true }) + "<figcaption>" + t.afterRounds + "</figcaption>";
+  O.innerHTML = gridHTML(end, { xs: true, word: true, cls: "ks" });
+  OL.innerHTML = "<b>" + t.outTitle(app.counter) + "</b>" + t.outSub;
+}
+function inputsChanged() { if (app.level === 0) updateL0(); else if (app.level === 1) renderL1Body(); }
+
+/* ---------- step 3: one round ---------- */
+function qrSource() {
+  const t = L();
+  const r = app.round;
+  const idx = groupsOfRound(r)[app.group];
+  const st = roundStates(curInit());
+  return { words: idx.map(i => st[r - 1][i]), idx: idx, before: st[r - 1], after: st[r] };
+}
+function render2() {
+  const t = L();
+  STRIP_R = 0;
+  if (badInputs()) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  return '<div class="card"><div class="controls">' +
+      '<button data-action="round-dec" aria-label="−">&minus;</button><span class="pips" id="pips"></span>' +
+      '<button data-action="round-inc" aria-label="+">+</button></div>' +
+      '<div class="rlabel" id="rlabel"></div><p class="note" style="margin:2px 0 0">' + t.pipNote + "</p></div>" +
+    '<div class="card"><h3 id="rhead"></h3><div class="rview" id="rview"><div class="rstrip" id="rstrip"></div></div>' +
+    '<p class="note" id="rnote"></p></div>' +
+    '<div id="l2body"></div>';
+}
+function ladderSVG(src, tr, k) {
+  const t = L();
+  const X = [110, 250, 390, 530], Y0 = 96, DY = 38, NM = ["a", "b", "c", "d"];
+  const yk = i => Y0 + i * DY;
+  const yEnd = yk(11) + 34, H = yEnd + 66;
+  const gc = "var(--g" + app.group + ")";
+  let s = '<svg class="ladder" width="1000" height="' + H + '" viewBox="0 0 1000 ' + H + '" role="img" aria-label="quarter round">' +
+    '<defs><marker id="lah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>';
+  if (k > 0) s += '<rect class="band" x="40" y="' + (yk(k - 1) - 17) + '" width="940" height="34" rx="6"/>';
+  for (let j = 0; j < 4; j++) {
+    s += '<text class="lname" x="' + X[j] + '" y="22" text-anchor="middle">' + NM[j] + "</text>" +
+      '<text class="lsub" x="' + X[j] + '" y="40" text-anchor="middle">' + t.wordN(src.idx[j]) + "</text>" +
+      '<text class="lval" x="' + X[j] + '" y="60" text-anchor="middle">' + hex8(tr[0][j]) + "</text>" +
+      '<line class="lane" x1="' + X[j] + '" y1="70" x2="' + X[j] + '" y2="' + yEnd + '" style="stroke:' + gc + '"/>';
+  }
+  s += '<text class="lsub" x="700" y="40">' + t.ladCode + '</text><text class="lsub" x="830" y="40">' + t.ladAfter + "</text>";
+  QR_OPS.forEach((op, i) => {
+    const y = yk(i), xd = X[op.d];
+    const st = i < k - 1 ? "done" : i === k - 1 ? "cur" : i === k ? "next" : "todo";
+    s += '<g class="lop ' + st + '" data-action="op-line" data-k="' + i + '"><rect class="hit" x="40" y="' + (y - 17) + '" width="940" height="34"/>';
+    if (op.t !== "rot") {
+      const xs = X[op.s], dir = xs < xd ? 1 : -1;
+      s += '<line class="halo" x1="' + xs + '" y1="' + y + '" x2="' + (xd - dir * 13) + '" y2="' + y + '"/>' +
+        '<line class="wire" x1="' + xs + '" y1="' + y + '" x2="' + (xd - dir * 13) + '" y2="' + y + '" marker-end="url(#lah)"/>' +
+        '<circle class="dot" cx="' + xs + '" cy="' + y + '" r="3.5"/>' +
+        (op.t === "add"
+          ? '<rect class="node" x="' + (xd - 11) + '" y="' + (y - 11) + '" width="22" height="22" rx="3"/><path class="glyph" d="M' + (xd - 6) + " " + y + "h12M" + xd + " " + (y - 6) + "v12" + '"/>'
+          : '<circle class="node" cx="' + xd + '" cy="' + y + '" r="12"/><path class="glyph" d="M' + (xd - 12) + " " + y + "h24M" + xd + " " + (y - 12) + "v24" + '"/>');
+    } else {
+      s += '<rect class="node" x="' + (xd - 28) + '" y="' + (y - 12) + '" width="56" height="24" rx="6"/>' +
+        '<text class="rtxt" x="' + xd + '" y="' + (y + 4.5) + '" text-anchor="middle">&lt;&lt;&lt;' + op.n + "</text>";
+    }
+    s += '<text class="ctxt" x="700" y="' + (y + 5) + '">' + op.txt + ";</text>";
+    if (i < k) s += '<text class="vtxt" x="830" y="' + (y + 5) + '">' + NM[op.d] + " = " + hex8(tr[i + 1][op.d]) + "</text>";
+    s += "</g>";
+  });
+  const chg = k > 0 ? QR_OPS[k - 1].d : -1;
+  for (let j = 0; j < 4; j++)
+    s += '<text class="lval' + (j === chg ? " now" : "") + '" x="' + X[j] + '" y="' + (yEnd + 22) + '" text-anchor="middle">' + hex8(tr[k][j]) + "</text>" +
+      '<text class="lsub" x="' + X[j] + '" y="' + (yEnd + 42) + '" text-anchor="middle">' + (k === 12 ? NM[j] + "′" : t.nowLbl) + "</text>";
+  return s + "</svg>";
+}
+function renderL2Body() {
+  const body = document.getElementById("l2body");
+  if (!body) return;
+  const t = L();
+  const r = app.round, col = r % 2 === 1;
+  let pips = "";
+  for (let i = 1; i <= 20; i++)
+    pips += '<button class="pip' + (i % 2 ? " c" : " d") + (i === r ? " on" : "") + '" data-action="round-set" data-r="' + i + '" title="' + esc(t.rN(i, i % 2 === 1)) + '">' + i + "</button>";
+  document.getElementById("pips").innerHTML = pips;
+  document.getElementById("rlabel").textContent = t.rN(r, col);
+  const src = qrSource();
+  const tr = qrTrace(src.words);
+  const k = app.qrStep;
+  const hot = k > 0 ? src.idx[QR_OPS[k - 1].d] : -1;
+  renderStrip(hot);
+  document.getElementById("rhead").textContent = t.cardRound(r);
+  document.getElementById("rnote").textContent = col ? t.colNote : t.diagNote;
+  const opNow = k > 0 ? QR_OPS[k - 1] : null;
+  body.innerHTML =
+    '<div class="card"><h3>' + t.cardLadder(t.gGen[app.group], src.idx.join(", ")) + "</h3>" +
+      '<div class="btns" style="margin:0 0 6px"><button data-action="qr-reset">' + t.bReset + '</button><button data-action="qr-prev">' + t.bPrev + "</button>" +
+      '<button class="dark" data-action="qr-next">' + t.bNext + "</button> <b>" + t.stepK(k) + "</b>" +
+      (opNow ? ' <span class="opnow">' + opNow.txt + ";</span>" : "") + "</div>" +
+      '<div class="schwrap">' + ladderSVG(src, tr, k) + "</div>" +
+      '<p class="note">' + t.ladLegend + "</p></div>";
+}
+/* the film strip: table 0 -> round 1 -> table 1 -> round 2 -> ... -> table 20; the current round slides to the middle.
+   Only the rounds near the current one are drawn, each at a fixed place, so the strip stays small for the GPU. */
+const SG = { tbl: 300, arr: 30, qr: 210, gap: 12 };
+SG.pitch = SG.tbl + SG.arr + SG.qr + SG.arr + 4 * SG.gap;
+let STRIP_R = 0;
+function renderStrip(hot) {
+  const strip = document.getElementById("rstrip"), vw = document.getElementById("rview");
+  if (!strip) return;
+  const t = L(), r = app.round, groups = groupsOfRound(r);
+  const st = roundStates(curInit());
+  const at = (x, w, cls, attrs, inner) => '<div class="seg ' + cls + '" style="left:' + x + "px;width:" + w + 'px"' + attrs + ">" + inner + "</div>";
+  const lo = Math.max(0, r - 3), hi = Math.min(20, r + 2);
+  let h = "";
+  for (let i = lo; i <= hi; i++) {
+    const x0 = i * SG.pitch;
+    const on = i === r - 1 || i === r;
+    const cap = i === 0 ? t.beforeR(1) : i === 20 ? t.afterR1(20) : t.afterN(i);
+    h += at(x0, SG.tbl, "tbl" + (on ? "" : " off"), on ? "" : ' data-action="round-set" data-r="' + Math.max(1, Math.min(20, i + (i < r ? 1 : 0))) + '"',
+      "<figure>" + gridHTML(st[i], on ? { groups: groups, sel: app.group, click: true, xs: true, hot: hot } : { xs: true }) + "<figcaption>" + cap + "</figcaption></figure>");
+    if (i === 20) break;
+    const ri = i + 1, ron = ri === r, gs = groupsOfRound(ri), off = ron ? "" : " off";
+    let stack = '<div class="qrhead">' + t.roundLbl(ri, ri % 2 === 1) + '</div><div class="qrstack">';
+    gs.forEach((g, gi) => {
+      stack += '<button class="qrbtn g' + gi + (ron && gi === app.group ? " on" : "") + '"' + (ron ? ' data-action="group" data-g="' + gi + '"' : ' tabindex="-1"') + ">" +
+        "<b>" + t.qrName + "</b><small>" + t.wordsOf(g.join(", ")) + "</small></button>";
+    });
+    stack += "</div>";
+    const xa = x0 + SG.tbl + SG.gap, xq = xa + SG.arr + SG.gap, xb = xq + SG.qr + SG.gap;
+    h += at(xa, SG.arr, "arrow" + off, "", "&#8594;") +
+      at(xq, SG.qr, "qrcol" + off, ron ? "" : ' data-action="round-set" data-r="' + ri + '"', stack) +
+      at(xb, SG.arr, "arrow" + off, "", "&#8594;");
+  }
+  strip.innerHTML = h;
+  const center = (r - 1) * SG.pitch + (SG.pitch + SG.tbl) / 2;
+  const x = Math.round(vw.clientWidth / 2 - center);
+  const slide = STRIP_R !== 0 && Math.abs(r - STRIP_R) <= 2;
+  if (!slide) { strip.style.transition = "none"; strip.style.transform = "translateX(" + x + "px)"; void strip.offsetWidth; strip.style.transition = ""; }
+  else strip.style.transform = "translateX(" + x + "px)";
+  STRIP_R = r;
+}
+function chg(k) { return k > 0 ? QR_OPS[k - 1].d : -1; }
+function qrGo(k) {
+  app.qrStep = Math.max(0, Math.min(12, k));
+  renderL2Body();
+}
+function setRound(r) { app.round = Math.max(1, Math.min(20, r)); app.qrStep = 0; renderL2Body(); }
+
+/* ---------- step 4: one operation ---------- */
+function render4() {
+  const t = L();
+  const pressed = c => ' aria-pressed="' + (c ? "true" : "false") + '"';
+  let h = '<div class="card">';
+  if (app.opOrigin) h += '<p class="note" style="margin:0 0 8px">' + t.origin(app.opOrigin.k, app.opOrigin.txt) + "</p>";
+  h += '<div class="opctl"><span class="tabs">' +
+    '<button data-action="tab" data-t="add"' + pressed(app.opType === "add") + ">" + t.tabAdd + "</button>" +
+    '<button data-action="tab" data-t="xor"' + pressed(app.opType === "xor") + ">" + t.tabXor + "</button>" +
+    '<button data-action="tab" data-t="rot"' + pressed(app.opType === "rot") + ">" + t.tabRot + "</button></span></div>";
+  h += '<div class="opctl"><label>a = 0x<input type="text" data-field="opA" value="' + (app.opA >>> 0).toString(16).padStart(8, "0") + '"></label>';
+  if (app.opType === "rot")
+    h += "<label>" + t.rotBy + ' <input type="range" min="1" max="31" value="' + app.opN + '" data-field="opN"> <b id="nval">' + app.opN + "</b></label>";
+  else
+    h += '<label>b = 0x<input type="text" data-field="opB" value="' + (app.opB >>> 0).toString(16).padStart(8, "0") + '"></label>';
+  h += "</div></div>";
+  return h + '<div class="card"><h3>' + t.cardOp + '</h3><div id="l4body"></div></div>';
+}
+function renderL4Body() {
+  const body = document.getElementById("l4body");
+  if (!body) return;
+  const t = L();
+  const W = 32;
+  const fix = v => v >>> 0;
+  const hx = v => "0x" + hex8(v);
+  const A = fix(app.opA), B = fix(app.opB);
+  const row = (lbl, v, clsFn) => '<div class="oprow"><span class="lbl">' + lbl + "</span>" + bitsHTML(v, W, clsFn) + ' <span class="hx">' + hx(v) + "</span></div>";
+  const ruler = '<div class="ruler" style="width:600px"></div>';
+  let h = "", text = "";
+  if (app.opType === "add") {
+    let c = 0, carries = 0;
+    for (let p = 0; p < W; p++) { if (c) carries |= (1 << p); const s = ((A >>> p) & 1) + ((B >>> p) & 1) + c; c = s >> 1; }
+    h = '<div class="oprow carryrow"><span class="lbl">' + t.carry + "</span>" + bitsHTML(carries >>> 0, W).replace(/>0</g, ">&nbsp;<") + "</div>" +
+      row("a", A) + row("+ b", B) + ruler + row("=", fix(A + B));
+    text = t.exAdd(W) + (c ? ' <b class="badline">' + t.exAddDrop + "</b>" : "");
+  } else if (app.opType === "xor") {
+    h = row("a", A) + row("xor b", B) + ruler + row("=", fix(A ^ B), (p, b) => b ? "chg" : "");
+    text = t.exXor;
+  } else {
+    const n = app.opN;
+    const R = rotl(A, n);
+    h = row("a", A, p => p >= W - n ? "wrap" : "") + row("<<< " + n, R, p => p < n ? "wrap" : "");
+    text = t.exRot(n);
+  }
+  body.innerHTML = h + '<p style="margin:12px 0 0">' + text + "</p>";
+}
+function setOpFromQR(k) {
+  const tr = qrTrace(qrSource().words);
+  const op = QR_OPS[k];
+  const before = tr[k];
+  app.opType = op.t;
+  app.opA = before[op.d];
+  if (op.t === "rot") app.opN = op.n; else app.opB = before[op.s];
+  app.opOrigin = { k: k + 1, txt: op.txt };
+}
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  const view = document.getElementById("view");
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
+    [render0, render1, render2, render4][app.level]() + "</div>";
+  if (app.level === 0) updateL0();
+  if (app.level === 1) renderL1Body();
+  if (app.level === 2) renderL2Body();
+  if (app.level === 3) renderL4Body();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+}
+function goTo(level) {
+  if (app.round < 1) app.round = 1;
+  app.level = level;
+  render();
+  document.getElementById("view").scrollTop = 0;
+}
+function zoomIn() {
+  if (app.level === 1) { if (app.round < 1) app.round = 1; app.qrStep = 0; }
+  if (app.level === 2) setOpFromQR(Math.max(0, Math.min(11, app.qrStep > 0 ? app.qrStep - 1 : 0)));
+  if (app.level < 3) goTo(app.level + 1);
+}
+function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "zoom") zoomIn();
+  else if (a === "rand-key" || a === "rand-nonce") randomize(a.slice(5));
+  else if (a === "ctr-dec" || a === "ctr-inc") {
+    app.counter = Math.max(0, Math.min(0xffffffff, app.counter + (a === "ctr-inc" ? 1 : -1)));
+    const inp = view.querySelector('input[data-field="counter"]'); if (inp) inp.value = app.counter;
+    inputsChanged();
+  }
+  else if (a === "round-dec" || a === "round-inc") setRound(app.round + (a === "round-inc" ? 1 : -1));
+  else if (a === "round-set") setRound(+el.dataset.r);
+  else if (a === "cell" || a === "group") {
+      app.group = a === "group" ? +el.dataset.g : groupsOfRound(app.round).findIndex(g => g.includes(+el.dataset.i));
+    app.qrStep = 0;
+    renderL2Body();
+  }
+  else if (a === "qr-reset") qrGo(0);
+  else if (a === "qr-prev") qrGo(app.qrStep - 1);
+  else if (a === "qr-next") qrGo(app.qrStep + 1);
+  else if (a === "op-line") { setOpFromQR(+el.dataset.k); goTo(3); }
+  else if (a === "tab") { app.opType = el.dataset.t; app.opOrigin = null; render(); }
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  const v = e.target.value;
+  if (f === "key") { const b = parseHex(v, 32); app.keyText = v; app.keyErr = !b; if (b) app.key = b; inputsChanged(); }
+  else if (f === "nonce") { const b = parseHex(v, 12); app.nonceText = v; app.nonceErr = !b; if (b) app.nonce = b; inputsChanged(); }
+  else if (f === "counter") { const n = parseInt(v, 10); if (!isNaN(n) && n >= 0 && n <= 0xffffffff) { app.counter = n; inputsChanged(); } }
+  else if (f === "msg") { app.msg = v; updateL0(); }
+  else if (f === "opN") { app.opN = +v; const nv = document.getElementById("nval"); if (nv) nv.textContent = v; renderL4Body(); }
+});
+view.addEventListener("mouseover", e => {
+  const w = e.target.closest(".cell[data-w]");
+  if (w && L1DATA && app.level === 1) {
+    const i = +w.dataset.w;
+    view.querySelectorAll(".cell.hotw").forEach(x => x.classList.remove("hotw"));
+    view.querySelectorAll('.cell[data-w="' + i + '"]').forEach(x => x.classList.add("hotw"));
+    const al = document.getElementById("addline");
+    const x = L1DATA.x[i], sv = L1DATA.s[i], o = L1DATA.o[i];
+    if (al) al.textContent = L().addWord(i, hex8(x), hex8(sv), hex8(o), x + sv > 0xffffffff);
+    return;
+  }
+  const td = e.target.closest("td[data-i]");
+  if (!td || !L0DATA) return;
+  const i = +td.dataset.i;
+  view.querySelectorAll("td.hot").forEach(x => x.classList.remove("hot"));
+  view.querySelectorAll('td[data-i="' + i + '"]').forEach(x => x.classList.add("hot"));
+  const h2 = x => x.toString(16).padStart(2, "0");
+  const xl = document.getElementById("xorline");
+  if (xl) xl.textContent = L().xorByte(i, h2(L0DATA.p[i]), h2(L0DATA.z[i]), h2(L0DATA.c[i]), L0DATA.c1 + (i >> 6), i & 63);
+});
+view.addEventListener("change", e => {
+  const f = e.target.dataset.field;
+  if (f === "opA" || f === "opB") {
+    const s = e.target.value.trim().replace(/^0x/i, "");
+    if (/^[0-9a-fA-F]{1,8}$/.test(s)) { app[f] = parseInt(s, 16) >>> 0; app.opOrigin = null; render(); }
+  }
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Enter" && tag === "BUTTON") return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
+  else if (app.level === 2 && (e.key === "+" || e.key === "=")) setRound(app.round + 1);
+  else if (app.level === 2 && e.key === "-") setRound(app.round - 1);
+  else if (app.level === 2 && (e.key === "n" || e.key === " ")) { e.preventDefault(); qrGo(app.qrStep + 1); }
+  else if (app.level === 2 && e.key === "p") qrGo(app.qrStep - 1);
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+const startStep = parseInt(location.hash.slice(1), 10);
+if (startStep >= 1 && startStep <= 4) {
+  app.level = startStep - 1;
+  if (app.level === 3) setOpFromQR(0);
+}
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Certificates and PKI</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --see:#2F6FDB; --see-bg:#E3ECFA;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --see:#7FA8F0; --see-bg:#1A2840;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --see:#7FA8F0; --see-bg:#1A2840;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* frame: the same as the simulators */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:2px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:10px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:8px}
+.sidefoot .legend{display:flex;flex-direction:column;gap:4px}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* the intro box and the list of sections */
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px;max-width:980px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.explain p{margin:6px 0 0}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:4px 18px;margin-bottom:14px;max-width:980px}
+.secs{list-style:none;margin:0;padding:0}
+.sec{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-top:1px solid var(--rule)}
+.sec:first-child{border-top:0}
+.sec .num{flex:none;width:34px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.sec .stext{flex:1 1 auto;padding-top:3px}
+.sec a.stext{color:inherit}
+.sec .tags{flex:none;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;align-items:center;padding-top:4px;max-width:400px}
+.opt{color:var(--muted);font-style:italic}
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.tag.see{background:var(--see-bg);color:var(--see);font-weight:500;border:1px solid var(--see)}
+.sidefoot .tag{display:inline-block;margin-right:4px}
+.tag.soon{border:1px dashed var(--muted);color:var(--muted)}
+.next{display:flex;gap:8px;max-width:980px}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+  .sec{flex-wrap:wrap}
+  .sec .tags{max-width:none;justify-content:flex-start;padding-left:48px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Chapters">
+      <div id="steps"></div>
+      <div class="sidefoot"><div class="legend" id="legend"></div><div id="status"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* The contents of the Certificates and PKI course: one entry per chapter, in learning order. Every
+   chapter has en and pl texts (title, sub = the one-line subtitle, intro = the box at the top) and
+   a list of sections. Sections are numbered 1, 2, 3, ... across all chapters, in the order of this
+   array, so the numbers are not stored.
+
+   A section: { en: "...", pl: "..." } plus optional fields
+     see: ["hash", ...]  other topics of this site that the section builds on (keys of TOPICS
+                         below); each gets a "see also: <topic>" tag;
+     href: "..."         the section's own page, relative to this file (for example "x509/index.html").
+   A text that starts with "(optional)" / "(opcjonalnie)" gets that mark in grey.
+   Without href the section shows a grey "coming soon" badge. When a section is written, add its
+   href here: the title becomes a link and the badge disappears. Nothing else needs to change. */
+const TOPICS = {
+  dh:   { en: "Diffie-Hellman",            pl: "Diffie-Hellman" },
+  sig:  { en: "Digital signatures",        pl: "Podpisy cyfrowe" },
+  hash: { en: "Hash functions",            pl: "Funkcje skrótu" },
+  rand: { en: "Randomness",                pl: "Losowość" },
+  tls:  { en: "TLS 1.3",                   pl: "TLS 1.3" },
+  rsa:  { en: "RSA",                       pl: "RSA" },
+  ec:   { en: "Elliptic curves",           pl: "Krzywe eliptyczne" },
+  pq:   { en: "Post-quantum cryptography", pl: "Kryptografia postkwantowa" },
+};
+
+const CHAPTERS = [
+  { en: { title: "Why PKI", sub: "who owns this public key?",
+          intro: "A public key is just a number: nothing in it says whose it is. A public key infrastructure (PKI) binds names to keys. It builds on digital signatures, which have their own topic on this site." },
+    pl: { title: "Po co PKI", sub: "do kogo należy ten klucz publiczny?",
+          intro: "Klucz publiczny to tylko liczba: nic w nim nie mówi, czyj jest. Infrastruktura klucza publicznego (PKI) wiąże nazwy z kluczami. Opiera się na podpisach cyfrowych, które mają na tej stronie własny temat." },
+    sections: [
+      { see: ["dh"],
+        en: "The problem: a public key alone does not say whose it is (the man in the middle).",
+        pl: "Problem: sam klucz publiczny nie mówi, czyj jest (człowiek pośrodku)." },
+      { see: ["sig"],
+        en: "Digital signatures as the tool that binds a name to a key.",
+        pl: "Podpisy cyfrowe jako narzędzie, które wiąże nazwę z kluczem." },
+      { see: ["hash"],
+        en: "Hash functions inside signatures, and why a weak hash breaks certificates.",
+        pl: "Funkcje skrótu wewnątrz podpisów i dlaczego słaba funkcja skrótu psuje certyfikaty." },
+      { en: "Trust models: a hierarchy of CAs, the web of trust (PGP), trust on first use (SSH).",
+        pl: "Modele zaufania: hierarchia urzędów certyfikacji (CA), sieć zaufania (PGP), zaufanie przy pierwszym użyciu (SSH)." },
+    ] },
+  { en: { title: "X.509 certificates", sub: "what is inside a certificate, byte by byte",
+          intro: "A certificate is a signed document in a fixed format called X.509. This chapter opens one: the encoding, the fields, the names and the extensions that say what the key may be used for." },
+    pl: { title: "Certyfikaty X.509", sub: "co jest w środku certyfikatu, bajt po bajcie",
+          intro: "Certyfikat to podpisany dokument w ustalonym formacie X.509. Ten rozdział go otwiera: kodowanie, pola, nazwy i rozszerzenia, które mówią, do czego wolno użyć klucza." },
+    sections: [
+      { en: "Encoding: ASN.1, DER and PEM; reading a certificate byte by byte.",
+        pl: "Kodowanie: ASN.1, DER i PEM; czytanie certyfikatu bajt po bajcie." },
+      { en: "The structure: version, serial number, signature algorithm, issuer, validity, subject, public key, the issuer's signature.",
+        pl: "Budowa: wersja, numer seryjny, algorytm podpisu, wystawca, okres ważności, podmiot, klucz publiczny, podpis wystawcy." },
+      { en: "Names: Subject Alternative Name (SAN) instead of the Common Name, wildcard certificates.",
+        pl: "Nazwy: Subject Alternative Name (SAN) zamiast Common Name, certyfikaty wieloznaczne (wildcard)." },
+      { en: "Extensions that limit a certificate: Basic Constraints, Key Usage, Extended Key Usage, Name Constraints.",
+        pl: "Rozszerzenia, które ograniczają certyfikat: Basic Constraints, Key Usage, Extended Key Usage, Name Constraints." },
+      { en: "Extensions that link certificates: Authority and Subject Key Identifier, CRL distribution points, Authority Information Access, the list of SCTs.",
+        pl: "Rozszerzenia, które łączą certyfikaty: Authority i Subject Key Identifier, punkty dystrybucji CRL, Authority Information Access, lista SCT." },
+      { en: "Self-signed certificates and what they can and cannot prove.",
+        pl: "Certyfikaty samopodpisane: czego mogą dowieść, a czego nie." },
+    ] },
+  { en: { title: "Certificate authorities and chains of trust", sub: "who signs certificates, and why we trust them",
+          intro: "Browsers and operating systems trust a short list of root certificates. Every other certificate must lead back to one of them through a chain of signatures. This chapter covers the chain, the trust stores and the rules a CA must follow." },
+    pl: { title: "Urzędy certyfikacji i łańcuchy zaufania", sub: "kto podpisuje certyfikaty i dlaczego im ufamy",
+          intro: "Przeglądarki i systemy operacyjne ufają krótkiej liście certyfikatów głównych. Każdy inny certyfikat musi do jednego z nich prowadzić przez łańcuch podpisów. Ten rozdział omawia łańcuch, magazyny zaufanych certyfikatów i zasady, których musi przestrzegać CA." },
+    sections: [
+      { en: "Root, intermediate and end-entity certificates.",
+        pl: "Certyfikaty główne (root), pośrednie i końcowe." },
+      { en: "Trust stores: operating systems and browsers (root programs).",
+        pl: "Magazyny zaufanych certyfikatów: systemy operacyjne i przeglądarki (programy root)." },
+      { en: "Building a path: several possible chains, cross-signing, the missing intermediate.",
+        pl: "Budowanie ścieżki: kilka możliwych łańcuchów, podpisywanie krzyżowe, brakujący certyfikat pośredni." },
+      { en: "Rules for CAs: the CA/Browser Forum Baseline Requirements; DV, OV and EV certificates.",
+        pl: "Zasady dla CA: Baseline Requirements CA/Browser Forum; certyfikaty DV, OV i EV." },
+      { en: "CAA records in DNS: who may issue for a domain.",
+        pl: "Rekordy CAA w DNS: kto może wystawiać certyfikaty dla domeny." },
+      { en: "Protecting a CA's key: HSMs, offline roots, key ceremonies.",
+        pl: "Ochrona klucza CA: moduły HSM, certyfikaty główne trzymane offline, ceremonie kluczy." },
+    ] },
+  { en: { title: "The certificate lifecycle", sub: "from a fresh key pair to an expired certificate",
+          intro: "A certificate is requested, issued, used, renewed and finally expires. This chapter follows those steps: the key, the request, the proof of control of a domain, issuance, renewal and expiry." },
+    pl: { title: "Cykl życia certyfikatu", sub: "od nowej pary kluczy do wygasłego certyfikatu",
+          intro: "Certyfikat jest zamawiany, wystawiany, używany, odnawiany i w końcu wygasa. Ten rozdział idzie po kolei przez te kroki: klucz, żądanie, dowód kontroli nad domeną, wystawienie, odnowienie i wygaśnięcie." },
+    sections: [
+      { see: ["rand"],
+        en: "Generating the key pair, and where the private key lives.",
+        pl: "Generowanie pary kluczy i miejsce, w którym przechowywany jest klucz prywatny." },
+      { en: "The certificate signing request (CSR, PKCS#10).",
+        pl: "Żądanie podpisania certyfikatu (CSR, PKCS#10)." },
+      { en: "Proving control of a domain: ACME and its HTTP-01, DNS-01 and TLS-ALPN-01 challenges.",
+        pl: "Dowód kontroli nad domeną: ACME i jego wyzwania HTTP-01, DNS-01 i TLS-ALPN-01." },
+      { en: "Issuance and logging in Certificate Transparency.",
+        pl: "Wystawienie i wpis do dzienników Certificate Transparency." },
+      { en: "Renewal, automation and key rotation.",
+        pl: "Odnawianie, automatyzacja i wymiana kluczy." },
+      { en: "Expiry and shorter validity periods (the CA/Browser Forum plan to reach 47 days by 2029).",
+        pl: "Wygaśnięcie i coraz krótsze okresy ważności (plan CA/Browser Forum: 47 dni do 2029 roku)." },
+    ] },
+  { en: { title: "Validation and revocation", sub: "how a client checks a certificate, and how a CA takes one back",
+          intro: "Before a client trusts a certificate, it checks the whole chain and the name. When a key is stolen, its certificate must be revoked, and that turns out to be hard. Certificate Transparency makes every issued certificate public, so mistakes can be caught." },
+    pl: { title: "Walidacja i unieważnianie", sub: "jak klient sprawdza certyfikat i jak CA go odwołuje",
+          intro: "Zanim klient zaufa certyfikatowi, sprawdza cały łańcuch i nazwę. Gdy klucz zostanie skradziony, jego certyfikat trzeba unieważnić, a to okazuje się trudne. Certificate Transparency upublicznia każdy wystawiony certyfikat, więc błędy da się wyłapać." },
+    sections: [
+      { en: "Path validation step by step (RFC 5280): signatures, validity dates, constraints, key usage.",
+        pl: "Walidacja ścieżki krok po kroku (RFC 5280): podpisy, daty ważności, ograniczenia, przeznaczenie klucza." },
+      { en: "Checking the name: the host name against the SAN, wildcard rules.",
+        pl: "Sprawdzanie nazwy: nazwa hosta a SAN, zasady dla certyfikatów wieloznacznych." },
+      { en: "Revocation lists (CRL).",
+        pl: "Listy unieważnionych certyfikatów (CRL)." },
+      { en: "OCSP, OCSP stapling and Must-Staple.",
+        pl: "OCSP, OCSP stapling i Must-Staple." },
+      { en: "Why revocation is hard: soft fail, privacy, browsers' own revocation lists, short-lived certificates instead.",
+        pl: "Dlaczego unieważnianie jest trudne: soft fail, prywatność, własne listy unieważnień przeglądarek, zamiast tego certyfikaty krótkoterminowe." },
+      { see: ["hash"],
+        en: "Certificate Transparency: append-only logs as Merkle trees, SCTs, monitors that catch misissued certificates.",
+        pl: "Certificate Transparency: dzienniki tylko do dopisywania jako drzewa Merkle'a, SCT, monitory wyłapujące błędnie wystawione certyfikaty." },
+    ] },
+  { en: { title: "Certificates in TLS and in apps", sub: "where certificates meet the network",
+          intro: "Most certificates are used in TLS. This chapter shows where they appear in the handshake, how a client can present its own certificate, and how an app can insist on the certificate it expects." },
+    pl: { title: "Certyfikaty w TLS i w aplikacjach", sub: "gdzie certyfikaty spotykają się z siecią",
+          intro: "Większość certyfikatów służy w TLS. Ten rozdział pokazuje, gdzie pojawiają się w uzgadnianiu połączenia, jak klient może przedstawić własny certyfikat i jak aplikacja może wymagać certyfikatu, którego się spodziewa." },
+    sections: [
+      { see: ["tls"],
+        en: "Where the certificate appears in the TLS 1.3 handshake: Certificate and CertificateVerify, SNI.",
+        pl: "Gdzie certyfikat pojawia się w uzgadnianiu TLS 1.3: Certificate i CertificateVerify, SNI." },
+      { en: "Mutual TLS (mTLS): client certificates.",
+        pl: "Wzajemne uwierzytelnianie w TLS (mTLS): certyfikaty klienta." },
+      { en: "Certificate pinning: in mobile apps, and the lesson of the abandoned HPKP.",
+        pl: "Przypinanie certyfikatów (pinning): w aplikacjach mobilnych i lekcja porzuconego HPKP." },
+      { en: "(optional) DANE and TLSA records.",
+        pl: "(opcjonalnie) DANE i rekordy TLSA." },
+    ] },
+  { en: { title: "PKI in practice", sub: "the web, software, documents, e-mail and devices",
+          intro: "The same idea, a CA signing a name together with a key, appears in many places: HTTPS, signed software, signed documents, e-mail, smart cards and devices." },
+    pl: { title: "PKI w praktyce", sub: "sieć, oprogramowanie, dokumenty, poczta i urządzenia",
+          intro: "Ten sam pomysł, czyli CA podpisujące nazwę razem z kluczem, pojawia się w wielu miejscach: HTTPS, podpisane oprogramowanie, podpisane dokumenty, poczta, karty inteligentne i urządzenia." },
+    sections: [
+      { en: "HTTPS and the Web PKI.",
+        pl: "HTTPS i Web PKI." },
+      { en: "Code signing: Windows Authenticode, Apple notarisation, Sigstore.",
+        pl: "Podpisywanie kodu: Windows Authenticode, notaryzacja Apple, Sigstore." },
+      { en: "Document signing and qualified signatures (eIDAS, PAdES).",
+        pl: "Podpisywanie dokumentów i podpisy kwalifikowane (eIDAS, PAdES)." },
+      { en: "Secure e-mail: S/MIME.",
+        pl: "Bezpieczna poczta: S/MIME." },
+      { en: "Client authentication: smart cards, company PKI, device and IoT certificates.",
+        pl: "Uwierzytelnianie klientów: karty inteligentne, firmowa PKI, certyfikaty urządzeń i IoT." },
+      { en: "(optional) Certificates between services: service meshes and SPIFFE.",
+        pl: "(opcjonalnie) Certyfikaty między usługami: service mesh i SPIFFE." },
+    ] },
+  { en: { title: "Good practices and common mistakes", sub: "keeping keys safe and validation correct",
+          intro: "Most real failures come not from broken maths but from mistakes: a leaked key, verification switched off, a certificate nobody renewed." },
+    pl: { title: "Dobre praktyki i typowe błędy", sub: "bezpieczne klucze i poprawna walidacja",
+          intro: "Większość prawdziwych awarii nie wynika ze złamanej matematyki, tylko z błędów: wyciekły klucz, wyłączona weryfikacja, certyfikat, którego nikt nie odnowił." },
+    sections: [
+      { en: "Protecting private keys: file permissions, HSMs, never in the repository.",
+        pl: "Ochrona kluczy prywatnych: uprawnienia plików, HSM, nigdy w repozytorium." },
+      { en: "Validation mistakes: turning verification off, skipping the host name check, trusting any CA.",
+        pl: "Błędy walidacji: wyłączanie weryfikacji, pomijanie sprawdzenia nazwy hosta, ufanie dowolnemu CA." },
+      { en: "Validity, renewal and outages caused by an expired certificate.",
+        pl: "Ważność, odnawianie i awarie spowodowane wygasłym certyfikatem." },
+      { see: ["rsa", "ec"],
+        en: "Choosing algorithms: key sizes, RSA or ECDSA, SHA-256 and newer.",
+        pl: "Wybór algorytmów: długości kluczy, RSA czy ECDSA, SHA-256 i nowsze." },
+    ] },
+  { en: { title: "Incidents and what they teach", sub: "real failures of keys, CAs and hash functions",
+          intro: "Real cases where PKI failed: weak keys, compromised CAs, a forged certificate, and CAs that browsers stopped trusting." },
+    pl: { title: "Incydenty i czego uczą", sub: "prawdziwe awarie kluczy, CA i funkcji skrótu",
+          intro: "Prawdziwe przypadki, w których PKI zawiodła: słabe klucze, przejęte CA, podrobiony certyfikat i CA, którym przeglądarki przestały ufać." },
+    sections: [
+      { see: ["rand"],
+        en: "Weak keys: the Debian OpenSSL bug (2008).",
+        pl: "Słabe klucze: błąd OpenSSL w Debianie (2008)." },
+      { see: ["hash"],
+        en: "Broken CAs: Comodo and DigiNotar (2011), the MD5 collision in Flame (2012).",
+        pl: "Złamane CA: Comodo i DigiNotar (2011), kolizja MD5 we Flame (2012)." },
+      { en: "CAs that lost trust: Symantec (2017 to 2018), Entrust (2024); mass revocation after the Let's Encrypt CAA bug (2020).",
+        pl: "CA, które straciły zaufanie: Symantec (2017 do 2018), Entrust (2024); masowe unieważnienie po błędzie CAA w Let's Encrypt (2020)." },
+    ] },
+  { en: { title: "PKI after quantum computers", sub: "new signatures and larger certificates",
+          intro: "A large quantum computer would break today's RSA and elliptic curve signatures. Certificates will need post-quantum signatures, which are much larger." },
+    pl: { title: "PKI po komputerach kwantowych", sub: "nowe podpisy i większe certyfikaty",
+          intro: "Duży komputer kwantowy złamałby dzisiejsze podpisy RSA i podpisy na krzywych eliptycznych. Certyfikaty będą potrzebować podpisów postkwantowych, które są dużo większe." },
+    sections: [
+      { see: ["pq"],
+        en: "Post-quantum signatures in certificates (ML-DSA, SLH-DSA), larger chains in TLS, hybrid and composite certificates, migration plans.",
+        pl: "Podpisy postkwantowe w certyfikatach (ML-DSA, SLH-DSA), większe łańcuchy w TLS, certyfikaty hybrydowe i złożone (composite), plany migracji." },
+    ] },
+];
+
+const T = {
+  en: {
+    title: "Certificates and PKI", home: "All simulators",
+    intro: "Who owns this public key? How the internet answers it: certificates, chains of trust and what goes wrong.",
+    chapterOf: n => "Chapter " + n + " of " + CHAPTERS.length + " · PKI",
+    range: (a, b) => a === b ? "section " + a : "sections " + a + " to " + b,
+    order: "The chapters follow the life of a certificate: what it is, who issues it, how it is checked and where it goes wrong.",
+    soon: "coming soon", see: "see also", optional: "(optional)",
+    legend: ["another topic of this site that the section builds on.",
+             "(optional): can be skipped on a first reading."],
+    status: "Contents only: the sections will be added one by one.",
+    prev: "← Previous chapter", next: "Next chapter →",
+    moreBelow: "More below", keys: "← / →: previous / next chapter",
+  },
+  pl: {
+    title: "Certyfikaty i PKI", home: "Wszystkie symulatory",
+    intro: "Do kogo należy ten klucz publiczny? Jak odpowiada na to internet: certyfikaty, łańcuchy zaufania i to, co może pójść źle.",
+    chapterOf: n => "Rozdział " + n + " z " + CHAPTERS.length + " · PKI",
+    range: (a, b) => a === b ? "punkt " + a : "punkty " + a + " do " + b,
+    order: "Rozdziały idą za życiem certyfikatu: czym jest, kto go wystawia, jak się go sprawdza i co może pójść źle.",
+    soon: "wkrótce", see: "zobacz też", optional: "(opcjonalnie)",
+    legend: ["inny temat tej strony, na którym opiera się punkt.",
+             "(opcjonalnie): można pominąć przy pierwszym czytaniu."],
+    status: "Na razie tylko spis treści: punkty będą dodawane po kolei.",
+    prev: "← Poprzedni rozdział", next: "Następny rozdział →",
+    moreBelow: "Niżej jest więcej", keys: "← / →: poprzedni / następny rozdział",
+  },
+};
+
+
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const app = { ch: 0 };
+const L = () => T[lang];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// the global number of the first section of each chapter
+const FIRST = [];
+CHAPTERS.reduce((n, c, i) => { FIRST[i] = n; return n + c.sections.length; }, 1);
+
+// a section title: the "(optional)" mark in grey
+function fmtTitle(s) {
+  return esc(s).replace(/^\((optional|opcjonalnie)\)/, '<span class="opt">($1)</span>');
+}
+// the "see also: <topic>" tag
+const seeTag = (t, k) => '<span class="tag see">' + esc(t.see + ": " + TOPICS[k][lang]) + "</span>";
+
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = CHAPTERS.map((c, i) => {
+    const a = FIRST[i], b = a + c.sections.length - 1;
+    return '<button class="step" data-step="' + i + '" aria-pressed="' + (i === app.ch) + '">' +
+      '<span class="gnum">' + (i + 1) + "</span><span><b>" + esc(c[lang].title) + "</b><small>" + t.range(a, b) + "</small></span></button>";
+  }).join("");
+}
+function renderChapter() {
+  const t = L(), c = CHAPTERS[app.ch], x = c[lang];
+  const rows = c.sections.map((s, k) => {
+    const n = FIRST[app.ch] + k;
+    const text = s.href ? '<a class="stext" href="' + esc(s.href) + '">' + fmtTitle(s[lang]) + "</a>"
+                        : '<span class="stext">' + fmtTitle(s[lang]) + "</span>";
+    const tags = (s.see || []).map(k => seeTag(t, k)).join("") +
+                 (s.href ? "" : '<span class="tag soon">' + esc(t.soon) + "</span>");
+    return '<li class="sec"><span class="num">' + n + "</span>" + text +
+           '<span class="tags">' + tags + "</span></li>";
+  }).join("");
+  const nav = '<div class="next">' +
+    (app.ch > 0 ? '<button data-go="' + (app.ch - 1) + '">' + esc(t.prev) + "</button>" : "") +
+    (app.ch < CHAPTERS.length - 1 ? '<button data-go="' + (app.ch + 1) + '">' + esc(t.next) + "</button>" : "") + "</div>";
+  return '<div class="fade"><div class="explain"><b>' + esc(x.title) + "</b>" + esc(x.intro) +
+    (app.ch === 0 ? "<p>" + esc(t.order) + "</p>" : "") + "</div>" +
+    '<div class="card"><ol class="secs" start="' + FIRST[app.ch] + '">' + rows + "</ol></div>" + nav + "</div>";
+}
+function render() {
+  const t = L(), x = CHAPTERS[app.ch][lang];
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.getElementById("status").textContent = t.status;
+  document.getElementById("legend").innerHTML = "<div>" + '<span class="tag see">' + esc(t.see) + "</span>" + esc(t.legend[0]) + "</div>" +
+                                                "<div>" + fmtTitle(t.legend[1]) + "</div>";
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.chapterOf(app.ch + 1);
+  document.getElementById("mhTitle").textContent = x.title;
+  document.getElementById("mhSub").textContent = x.sub;
+  document.getElementById("view").innerHTML = renderChapter();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  if (location.hash !== "#" + (app.ch + 1)) { try { history.replaceState(null, "", "#" + (app.ch + 1)); } catch (e) {} }
+}
+function goTo(ch) {
+  if (ch < 0 || ch >= CHAPTERS.length) return;
+  app.ch = ch;
+  render();
+  document.getElementById("view").scrollTop = 0;
+}
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+view.addEventListener("click", e => {
+  const b = e.target.closest("[data-go]");
+  if (b) goTo(+b.dataset.go);
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); goTo(app.ch + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); goTo(app.ch - 1); }
+});
+function chapterFromHash() {
+  const n = parseInt(location.hash.slice(1), 10);
+  return n >= 1 && n <= CHAPTERS.length ? n - 1 : null;
+}
+window.addEventListener("hashchange", () => {
+  const ch = chapterFromHash();
+  if (ch !== null && ch !== app.ch) goTo(ch);
+});
+
+/* ---------- start ---------- */
+const startCh = chapterFromHash();
+if (startCh !== null) app.ch = startCh;
+render();
+</script>
+</body>
+</html>

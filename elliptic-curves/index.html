@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Elliptic-curve explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  --key-b:#E2A60E;   --key-bg:#FDF3DC;
+  --ctr-b:#2FA84F;   --ctr-bg:#E3F4E8;
+  --non-b:#2F6FDB;   --non-bg:#E5EDFB;
+  --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
+  --eve-b:#E5484D;  --eve-bg:#FDE9E9;
+  --cip-b:#A8642A;  --cip-bg:#F7ECE0;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+    --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+    --ct-b:#B596F5; --ct-bg:#2A2142;
+    --eve-b:#FF6B6F; --eve-bg:#3A1A1C; --cip-b:#D99A5E; --cip-bg:#33241A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+  --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+  --ct-b:#B596F5; --ct-bg:#2A2142;
+  --eve-b:#FF6B6F; --eve-bg:#3A1A1C; --cip-b:#D99A5E; --cip-bg:#33241A;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea,select{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+.mono{font-family:var(--mono)}
+
+/* frame: the same as the ChaCha20 explorer */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+.row>.card{flex:1 1 auto}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.schwrap{overflow-x:auto}
+
+/* roles: one colour per role, the same in every step */
+.role-priv{border-color:var(--key-b);background:var(--key-bg)}
+.role-pub{border-color:var(--ct-b);background:var(--ct-bg)}
+.role-ali{border-color:var(--non-b);background:var(--non-bg)}
+.role-bob{border-color:var(--ctr-b);background:var(--ctr-bg)}
+.role-eve{border-color:var(--eve-b);background:var(--eve-bg)}
+.role-cip{border-color:var(--cip-b);background:var(--cip-bg)}
+.role-msg{border-color:var(--const-b);background:var(--const-bg)}
+.role-chg{border-color:var(--chg);background:var(--chg-bg)}
+
+/* step 1: the schematic */
+.sch{position:relative;width:900px;color:var(--ink);margin:0 auto}
+.sch .arrows{position:absolute;left:0;top:0;overflow:visible}
+.sch .abs{position:absolute}
+.who{position:absolute;top:0;width:250px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:17px}
+.who svg{width:22px;height:22px}
+.chip{position:absolute;border-radius:8px;padding:6px 10px;border:1.5px solid;font-weight:600;font-size:13px}
+.chip small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.chip .val{display:block;font-family:var(--mono);font-size:20px;font-weight:600;line-height:1.3}
+.chip select{margin-top:4px;font-size:15px}
+.ctrline{display:flex;gap:5px;align-items:center;margin-top:4px}
+.ctrline button{padding:3px 10px}
+.ctrline input[type=number]{width:5.2em;font-size:15px}
+.icon-btn{padding:3px 6px;line-height:0}
+.box{background:var(--ink);color:var(--surface);border:0;border-radius:10px;padding:8px 14px;font-size:19px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-family:var(--mono)}
+.box:hover{background:var(--ink);box-shadow:0 0 0 3px var(--chg)}
+.box small{font-size:11.5px;font-weight:400;opacity:.8;font-family:var(--sans)}
+.box.abs{position:absolute}
+.pubbox{position:absolute;left:310px;top:0;width:280px;border:1.5px solid;border-radius:8px;padding:6px 12px;text-align:center}
+.pubbox b{display:block;font-size:13px}
+.pubbox .mono{font-size:14.5px;display:block}
+.evebox{position:absolute;border:1.5px solid;border-radius:8px;padding:6px 10px;font-size:13px;text-align:center}
+.evebox .nh{display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700}
+.evebox .nh svg{width:20px;height:20px;color:var(--eve-b)}
+.evebox .mono{font-size:13.5px}
+.eqc{position:absolute;width:46px;height:46px;border-radius:50%;color:#fff;font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.eqc.ok{background:var(--ok)} .eqc.bad{background:var(--bad)}
+.alab{position:absolute;font-size:12.5px;font-weight:600;white-space:nowrap}
+.tries{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.try{font-family:var(--mono);font-size:12.5px;padding:3px 7px;border-radius:5px;border:1.5px solid var(--rule);background:var(--sunken)}
+.try.hit{border-color:var(--eve-b);background:var(--eve-bg);font-weight:700}
+.calc{font-family:var(--mono);font-size:14.5px;line-height:2}
+.calc .c{padding:1px 6px;border-radius:4px;border:1.5px solid}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bigc{border:1.5px solid;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;min-width:0}
+.bigc input{width:100%;font-size:12px;margin-top:3px}
+.hexv{font-family:var(--mono);font-size:12.5px;font-weight:400;word-break:break-all;line-height:1.45;margin-top:2px}
+.hexv i{font-style:normal;color:var(--muted);font-family:var(--sans);font-size:12px}
+.bigout{grid-column:1 / span 2}
+
+/* step 2: the real curve */
+.row>.plotwrap{flex:0 1 600px;min-width:0}
+.plotwrap svg{display:block;width:100%;height:auto;max-width:560px;touch-action:none;user-select:none}
+.plot .axis{stroke:var(--muted);stroke-width:1.2}
+.plot .gl{stroke:var(--rule);stroke-width:1}
+.plot .tick{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.plot .curve{fill:none;stroke:var(--ink);stroke-width:2.6}
+.plot .ln{stroke:var(--muted);stroke-width:2}
+.plot .refl{stroke:var(--chg);stroke-width:2;stroke-dasharray:6 4}
+.plot .h{cursor:grab}
+.plot .h:active{cursor:grabbing}
+.plot .lbl{font-family:var(--sans);font-size:15px;font-weight:700;fill:var(--ink)}
+.plot .lblc{font-family:var(--sans);font-size:13px;font-weight:600;fill:var(--chg)}
+.plot .lblr{font-family:var(--sans);font-size:15px;font-weight:700;fill:var(--ct-b)}
+.plot .num{font-family:var(--sans);font-size:12px;font-weight:700;fill:#fff}
+.row>.readout{flex:1 1 300px;min-width:280px}
+.rd{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px;margin:6px 0 4px}
+.rd .k{color:var(--muted)}
+.rd .v{font-family:var(--mono)}
+.nums{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.nums li{display:flex;gap:8px;align-items:center}
+.nb{flex:none;width:22px;height:22px;border-radius:50%;background:var(--chg);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+
+/* step 3 and 4: the grid of dots */
+.grid17 .gd{fill:var(--rule)}
+.grid17 .tick{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
+.grid17 .pt{fill:var(--ink)}
+.grid17 .hit{fill:transparent;cursor:pointer}
+.grid17 .hit:hover{fill:var(--sunken)}
+.grid17 .sel{fill:none;stroke:var(--focus);stroke-width:2}
+.grid17 .mlab{font-family:var(--sans);font-size:12px;font-weight:700}
+.grid17 .halo{stroke:var(--surface);stroke-width:4;paint-order:stroke}
+.chk{font-size:14px;margin:8px 0 0;min-height:3em}
+.mchips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
+.mchip{display:flex;flex-direction:column;align-items:center;padding:3px 7px;border-radius:6px;font-family:var(--mono);font-size:12.5px;line-height:1.3;min-width:58px}
+.mchip b{font-family:var(--sans);font-size:12px}
+.mchip.fut{opacity:.4}
+.mchip.cur{background:var(--chg);border-color:var(--chg);color:#fff}
+.bigline{font-family:var(--mono);font-size:22px;font-weight:600;margin:6px 0}
+.bits{display:inline-flex;gap:2px;align-items:center;vertical-align:middle}
+.bit{display:inline-block;width:20px;height:26px;line-height:26px;text-align:center;font-family:var(--mono);font-size:13px;border-radius:3px;background:var(--sunken);color:var(--muted)}
+.bit.one{background:var(--ink);color:var(--surface)}
+.bit.chg{box-shadow:inset 0 0 0 2.5px var(--chg)}
+.dtable{border-collapse:collapse;font-size:13.5px;margin-top:8px}
+.dtable th{font-size:12px;color:var(--muted);font-weight:600;text-align:left;padding:2px 8px;border-bottom:1px solid var(--rule)}
+.dtable td{padding:3px 8px;font-family:var(--mono);border-bottom:1px solid var(--rule)}
+.dtable td.op{cursor:pointer;border-radius:4px}
+.dtable td.op:hover{background:var(--sunken)}
+.dtable td.cur{outline:2.5px solid var(--chg);outline-offset:-2px;background:var(--chg-bg)}
+.dtable td.done{color:var(--ink)}
+.dtable td.todo{color:var(--muted);opacity:.45}
+.dtable td.bit1{font-weight:700}
+.opnow{font-family:var(--mono);background:var(--chg);color:#fff;border-radius:5px;padding:2px 8px}
+.opline{margin:10px 0 0;font-size:14px}
+.sm-in{width:8em;font-size:15px}
+
+/* step 4: the formulas */
+.formbox{display:inline-grid;grid-template-columns:auto auto;gap:4px 18px;font-family:var(--mono);font-size:15px;padding:10px 16px;border:1.5px solid var(--rule);border-radius:8px;background:var(--sunken)}
+.formbox .hl{background:var(--chg-bg);outline:2px solid var(--chg);border-radius:4px;padding:0 4px}
+.formbox .lb{font-family:var(--sans);font-weight:600;font-size:13.5px}
+.stepsf{display:grid;grid-template-columns:34px auto;gap:2px 10px;align-items:start;margin-top:6px}
+.stepsf .mk{width:26px;height:26px;border-radius:50%;background:var(--sunken);color:var(--muted);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:5px}
+.stepsf .mk.on{background:var(--chg);color:#fff}
+.stepsf .lines{font-family:var(--mono);font-size:15px;line-height:1.9;padding:2px 0 8px}
+.stepsf .lines .t{font-family:var(--sans);font-weight:600;font-size:14px}
+.stepsf .later{visibility:hidden}
+.res{font-weight:700;color:var(--chg)}
+.invrow{border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin:4px 0 2px}
+.invrow td{border:1px solid var(--rule);padding:2px 5px;text-align:center;min-width:2.1em}
+.invrow td.h{font-family:var(--sans);font-weight:600;color:var(--muted);text-align:right;border:0;padding-right:8px}
+.invrow td.one{background:var(--chg);color:#fff;font-weight:700;border-color:var(--chg)}
+.pick{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.pick label{font-weight:600;font-size:14px}
+.pick select{font-size:14px;margin-left:4px}
+.calcwrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.calcwrap .left{flex:1 1 460px;min-width:0}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== elliptic-curve core ===================== */
+// CORE-BEGIN
+// Points are {x, y} with BigInt coordinates; the point at infinity O is null.
+// A curve is y^2 = x^3 + a x + b mod p, with a base point G of order n.
+
+function mod(v, p) { const r = v % p; return r < 0n ? r + p : r; }
+
+// the modular inverse by the extended Euclid algorithm: v * inv(v) = 1 mod p
+function inv(v, p) {
+  let r0 = p, r1 = mod(v, p), t0 = 0n, t1 = 1n;
+  if (r1 === 0n) throw new Error("0 has no inverse");
+  while (r1 !== 0n) {
+    const q = r0 / r1;
+    const r2 = r0 - q * r1; r0 = r1; r1 = r2;
+    const t2 = t0 - q * t1; t0 = t1; t1 = t2;
+  }
+  if (r0 !== 1n) throw new Error("no inverse");
+  return mod(t0, p);
+}
+
+// the small curve of the slides: y^2 = x^3 + 2x + 2 mod 17, G = (5, 1), 19 points with O
+const TOY = { a: 2n, b: 2n, p: 17n, n: 19n, G: { x: 5n, y: 1n } };
+
+// P-256 (FIPS 186-4, appendix D.1.2.3; SEC 2: secp256r1)
+const P256 = {
+  p: 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffffn,
+  a: 0xffffffff00000001000000000000000000000000fffffffffffffffffffffffcn,   // a = -3 mod p
+  b: 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604bn,
+  n: 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n,
+  G: { x: 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296n,
+       y: 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5n },
+};
+
+function onCurve(C, P) {
+  if (P === null) return true;
+  return mod(P.y * P.y - (P.x * P.x * P.x + C.a * P.x + C.b), C.p) === 0n;
+}
+function samePoint(P, Q) {
+  if (P === null || Q === null) return P === Q;
+  return P.x === Q.x && P.y === Q.y;
+}
+function neg(C, P) { return P === null ? null : { x: P.x, y: mod(-P.y, C.p) }; }
+
+// P + Q with every intermediate number, so the page can show the formulas
+function addInfo(C, P, Q) {
+  const p = C.p;
+  if (P === null) return { kind: "leftO", R: Q };
+  if (Q === null) return { kind: "rightO", R: P };
+  if (P.x === Q.x && mod(P.y + Q.y, p) === 0n) return { kind: "opposite", R: null };
+  let kind, num, den;
+  if (P.x === Q.x && P.y === Q.y) { kind = "double"; num = 3n * P.x * P.x + C.a; den = 2n * P.y; }   // the tangent
+  else { kind = "chord"; num = Q.y - P.y; den = Q.x - P.x; }                                         // the line through P and Q
+  const numM = mod(num, p), denM = mod(den, p), denInv = inv(denM, p);
+  const sRaw = numM * denInv, s = mod(sRaw, p);
+  const x3Raw = s * s - P.x - Q.x, x3 = mod(x3Raw, p);
+  const y3Raw = s * (P.x - x3) - P.y, y3 = mod(y3Raw, p);
+  return { kind, num, den, numM, denM, denInv, sRaw, s, x3Raw, x3, y3Raw, y3, R: { x: x3, y: y3 } };
+}
+function add(C, P, Q) { return addInfo(C, P, Q).R; }
+
+// k * P by doubling and adding, from the lowest bit up (as on the slide: 100G = 4G + 32G + 64G).
+// ops lists every step: "double" (D -> 2D), "add" (R + D), "take" (R was O, so R = D).
+function mulTrace(C, k, P) {
+  const ops = [];
+  let R = null, D = P, i = 0;
+  while (k > 0n) {
+    if ((k & 1n) === 1n) {
+      const before = R;
+      R = add(C, R, D);
+      ops.push({ t: before === null ? "take" : "add", i: i, P: before, Q: D, R: R });
+    }
+    k = k >> 1n;
+    if (k > 0n) {
+      const D2 = add(C, D, D);
+      ops.push({ t: "double", i: i, P: D, Q: D, R: D2 });
+      D = D2;
+    }
+    i++;
+  }
+  return { R: R, ops: ops };
+}
+function mul(C, k, P) { return mulTrace(C, k, P).R; }
+
+// k * P by adding P again and again (only for the small curve)
+function mulSlow(C, k, P) {
+  let R = null;
+  for (let i = 0; i < k; i++) R = add(C, R, P);
+  return R;
+}
+
+// all points of a small curve (without O)
+function curvePoints(C) {
+  const pts = [];
+  for (let x = 0n; x < C.p; x++)
+    for (let y = 0n; y < C.p; y++)
+      if (onCurve(C, { x: x, y: y })) pts.push({ x: x, y: y });
+  return pts;
+}
+
+// ECDH: A = aG, B = bG, Alice computes aB, Bob computes bA
+function ecdh(C, a, b) {
+  const A = mul(C, a, C.G), B = mul(C, b, C.G);
+  return { A: A, B: B, SA: mul(C, a, B), SB: mul(C, b, A) };
+}
+
+// ElGamal on a curve: C1 = kG, C2 = M + kQ; decrypt: M = C2 - d C1
+function egEncrypt(C, M, Q, k) {
+  const kQ = mul(C, k, Q);
+  return { C1: mul(C, k, C.G), kQ: kQ, C2: add(C, M, kQ) };
+}
+function egDecrypt(C, C1, C2, d) {
+  const S = mul(C, d, C1);
+  return { S: S, negS: neg(C, S), M: add(C, C2, neg(C, S)) };
+}
+
+// the same curve over the real numbers (only for the picture in step 2): y^2 = x^3 + 2x + 2
+function realF(x) { return x * x * x + 2 * x + 2; }
+function realRoot() {          // the only real x with y = 0, by halving the interval
+  let lo = -2, hi = 0;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (realF(m) < 0) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+function realAdd(P, Q) {
+  if (Math.abs(P.x - Q.x) < 1e-9) {
+    if (Math.abs(P.y + Q.y) < 1e-9) return { kind: "opposite", R: null };
+    const s = (3 * P.x * P.x + 2) / (2 * P.y);                     // the tangent
+    const x3 = s * s - 2 * P.x, y3 = s * (P.x - x3) - P.y;
+    return { kind: "double", s: s, third: { x: x3, y: -y3 }, R: { x: x3, y: y3 } };
+  }
+  const s = (Q.y - P.y) / (Q.x - P.x);
+  const x3 = s * s - P.x - Q.x, y3 = s * (P.x - x3) - P.y;
+  return { kind: "chord", s: s, third: { x: x3, y: -y3 }, R: { x: x3, y: y3 } };
+}
+
+/* Test values and their sources.
+   Slides (Lecture5/main.tex, % CHECKED lines) and Paar and Pelzl, "Understanding Cryptography" (2010),
+   chapter 9.2, the same example curve y^2 = x^3 + 2x + 2 mod 17 with G = (5, 1), 19 points, 2G = (6, 3).
+   The full list of multiples is from the lecture plan (section 7.1) and was recomputed independently
+   in Python 3 for this page. 100G = (9, 16) (slide "double and add") was computed in Python 3.
+   P-256: RFC 5903, section 8.1 (ECDH test vector for the 256-bit random ECP group): private keys i and r,
+   public points g^i and g^r, the shared point g^ir. The same numbers were recomputed with OpenSSL 3.0.13
+   (Python "cryptography" package). 2G and 3G of P-256 were also taken from OpenSSL. */
+const SLIDE_MULT = [[5, 1], [6, 3], [10, 6], [3, 1], [9, 16], [16, 13], [0, 6], [13, 7], [7, 6], [7, 11],
+                    [13, 10], [0, 11], [16, 4], [9, 1], [3, 16], [10, 11], [6, 14], [5, 16]];   // 1G .. 18G, then 19G = O
+const SLIDE_POINTS = "0,6 0,11 3,1 3,16 5,1 5,16 6,3 6,14 7,6 7,11 9,1 9,16 10,6 10,11 13,7 13,10 16,4 16,13";
+const RFC5903 = {
+  i:   0xc88f01f510d9ac3f70a292daa2316de544e9aab8afe84049c62a9c57862d1433n,
+  gix: 0xdad0b65394221cf9b051e1feca5787d098dfe637fc90b9ef945d0c3772581180n,
+  giy: 0x5271a0461cdb8252d61f1c456fa3e59ab1f45b33accf5f58389e0577b8990bb3n,
+  r:   0xc6ef9c5d78ae012a011164acb397ce2088685d8f06bf9be0b283ab46476bee53n,
+  grx: 0xd12dfb5289c8d4f81208b70270398c342296970a0bccb74c736fc7554494bf63n,
+  gry: 0x56fbf3ca366cc23e8157854c13c58d6aac23f046ada30f8353e74f33039872abn,
+  girx: 0xd6840f6b42f6edafd13116e0e12565202fef8e9ece7dce03812464d04b9442den,
+  giry: 0x522bde0af0d8585b8def9c183b5ae38f50235206a8674ecb5d98edb20eb153a2n,
+};
+const P256_2G = { x: 0x7cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978n,
+                  y: 0x07775510db8ed040293d9ac69f7430dbba7dade63ce982299e04b79d227873d1n };
+const P256_3G = { x: 0x5ecbe4d1a6330a44c8f7ef951d4bf165e6c6b721efada985fb41661bc6e7fd6cn,
+                  y: 0x8734640c4998ff7e374b06ce1a64a2ecd82ab036384fb83d9a79b127a27d5032n };
+
+function selfTest() {
+  const fails = [];
+  const pt = (x, y) => ({ x: BigInt(x), y: BigInt(y) });
+  const C = TOY;
+  // the 18 points of the slide "All the points"
+  const pts = curvePoints(C).map(P => P.x + "," + P.y).join(" ");
+  if (pts !== SLIDE_POINTS) fails.push("the 18 points");
+  // 1G .. 19G, step by step and by double and add
+  let R = null;
+  for (let k = 1; k <= 19; k++) {
+    R = add(C, R, C.G);
+    const want = k === 19 ? null : pt(SLIDE_MULT[k - 1][0], SLIDE_MULT[k - 1][1]);
+    if (!samePoint(R, want)) { fails.push(k + "G"); break; }
+    if (!samePoint(mul(C, BigInt(k), C.G), want)) { fails.push("double and add " + k + "G"); break; }
+  }
+  // doubling G on the slides: s = 13, 2G = (6, 3); Task 1: G + 2G = (10, 6) with s = 2
+  const d = addInfo(C, C.G, C.G);
+  if (d.numM !== 9n || d.denInv !== 9n || d.s !== 13n || d.x3Raw !== 159n || d.y3Raw !== -14n || !samePoint(d.R, pt(6, 3))) fails.push("2G step by step");
+  const t = addInfo(C, C.G, pt(6, 3));
+  if (t.s !== 2n || !samePoint(t.R, pt(10, 6))) fails.push("G + 2G");
+  // the slide "double and add": 100G = 4G + 32G + 64G = (9, 16), 6 doublings and 2 additions
+  const tr = mulTrace(C, 100n, C.G);
+  if (!samePoint(tr.R, pt(9, 16)) || tr.ops.filter(o => o.t === "double").length !== 6 || tr.ops.filter(o => o.t === "add").length !== 2) fails.push("100G");
+  // ECDH on the slide: a = 3, b = 10: A = (10, 6), B = (7, 11), shared (13, 10)
+  const e = ecdh(C, 3n, 10n);
+  if (!samePoint(e.A, pt(10, 6)) || !samePoint(e.B, pt(7, 11)) || !samePoint(e.SA, pt(13, 10)) || !samePoint(e.SB, pt(13, 10))) fails.push("ECDH a = 3, b = 10");
+  // ElGamal on the slide: d = 7, Q = (0, 6), M = (13, 10), k = 4: C1 = (3, 1), C2 = (5, 1), dC1 = (7, 6)
+  const Q = mul(C, 7n, C.G), en = egEncrypt(C, pt(13, 10), Q, 4n), de = egDecrypt(C, en.C1, en.C2, 7n);
+  if (!samePoint(Q, pt(0, 6)) || !samePoint(en.C1, pt(3, 1)) || !samePoint(en.C2, pt(5, 1)) || !samePoint(de.S, pt(7, 6)) || !samePoint(de.M, pt(13, 10))) fails.push("ElGamal example");
+  // invariants on the small curve: every sum is on the curve, P + Q = Q + P, all ECDH pairs agree
+  const all = curvePoints(C).concat([null]);
+  outer: for (const P1 of all) for (const P2 of all) {
+    const s1 = add(C, P1, P2);
+    if (!onCurve(C, s1) || !samePoint(s1, add(C, P2, P1))) { fails.push("a sum off the curve"); break outer; }
+  }
+  for (let a = 1n; a < 19n; a++) for (let b = 1n; b < 19n; b++) {
+    const x = ecdh(C, a, b);
+    if (!samePoint(x.SA, x.SB) || x.SA === null) { fails.push("ECDH " + a + ", " + b); a = 19n; break; }
+  }
+  // the real curve of the slides: P = (-0.7, ...), Q = (0.2, ...): third point (1.848, 3.465)
+  const rp = x => ({ x: x, y: Math.sqrt(realF(x)) });
+  const ra = realAdd(rp(-0.7), rp(0.2));
+  if (Math.abs(ra.third.x - 1.848) > 0.001 || Math.abs(ra.third.y - 3.465) > 0.001) fails.push("the real curve");
+  // P-256: G on the curve, 2G and 3G from OpenSSL, nG = O, RFC 5903 section 8.1
+  const P = P256;
+  if (!onCurve(P, P.G)) fails.push("P-256 G");
+  if (!samePoint(mul(P, 2n, P.G), P256_2G) || !samePoint(mul(P, 3n, P.G), P256_3G)) fails.push("P-256 2G, 3G");
+  if (mul(P, P.n, P.G) !== null) fails.push("P-256 nG = O");
+  const gi = mul(P, RFC5903.i, P.G), gr = mul(P, RFC5903.r, P.G);
+  if (!samePoint(gi, { x: RFC5903.gix, y: RFC5903.giy }) || !samePoint(gr, { x: RFC5903.grx, y: RFC5903.gry })) fails.push("RFC 5903 public keys");
+  const gir = { x: RFC5903.girx, y: RFC5903.giry };
+  if (!samePoint(mul(P, RFC5903.i, gr), gir) || !samePoint(mul(P, RFC5903.r, gi), gir)) fails.push("RFC 5903 shared point");
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const T = {
+  en: {
+    title: "Elliptic-curve explorer", home: "All simulators",
+    intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
+    stepOf: n => "Step " + n + " of 4 · ECC",
+    steps: [["Black box", "two secrets in, one shared point out"], ["Adding points", "chord and tangent on the real curve"],
+            ["Modulo 17", "dots, multiples of G, double and add"], ["One addition", "slope s, x₃ and y₃ modulo 17"]],
+    explain: {
+      ecdh: ["Diffie-Hellman with points", "Alice and Bob each pick a secret number and publish a point: A = aG and B = bG. Each multiplies the other's point by their own secret, and both get the same point abG. Eve sees the curve, G, A and B. Change the secrets. Click an a × G box to see what multiplying a point means."],
+      elg: ["ElGamal with points", "Bob publishes Q = dG. Alice's message is a point M. She picks a random k and sends C₁ = kG and C₂ = M + kQ. Bob subtracts dC₁ = kQ and gets M back. Eve sees Q, C₁ and C₂. Click a box to see how points are added."],
+      add: ["P + Q: draw a line, find the third point, reflect it", "Over the real numbers the curve y² = x³ + 2x + 2 is one smooth line. The line through P and Q meets the curve in exactly one more point. Its mirror image in the x-axis is P + Q. For P + P the line is the tangent. Drag P and Q."],
+      mod: ["The same curve modulo 17", "Computers need exact numbers, so x and y are whole numbers from 0 to 16 and every result is taken mod 17. The line becomes 18 dots, plus the point at infinity O. Adding G again and again visits all of them. Double and add gets to kG fast. Click a step to see its numbers."],
+      one: ["One addition, number by number", "The picture of step 2 becomes three formulas: the slope s, then x₃ and y₃, all mod 17. Dividing means multiplying by the modular inverse. Pick two points, or come here from step 3."],
+    },
+    selfOk: "✓ checked against the slides, Paar and Pelzl (ch. 9) and RFC 5903 (P-256)", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
+    tabEcdh: "ECDH: agree on a point", tabElg: "ElGamal: encrypt a point",
+    pubT: "public", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1), order 19",
+    alice: "Alice", bob: "Bob", eve: "Eve", rand: "random number",
+    secA: "secret a (1 to 18)", secB: "secret b (1 to 18)", box_s: "click to look inside",
+    ptA: "public A = aG", ptB: "public B = bG", toBob: "A to Bob", toAlice: "B to Alice",
+    sharedA: "shared point aB", sharedB: "shared point bA", eveListens: "Eve listens", eveSees: "sees",
+    cardCurve1: "On the curve", cardEve: "Eve's attack on this small curve",
+    eveTry: (n, a) => "Eve adds G again and again until she reaches A. After " + n + " " + (n === 1 ? "try" : "tries") + " she knows a = " + a + ", and a × B gives her the shared point.",
+    eveReal: "Here there are only 19 multiples. On P-256 there are about 2²⁵⁶, and the best known attack needs about 2¹²⁸ steps. Small numbers are only for learning.",
+    cardBig: "The same on a real curve: P-256",
+    bigNote: "The same steps with 256-bit numbers. The starting secrets are the test vector of RFC 5903, section 8.1; the dice picks new ones.",
+    bigSecA: "Alice's secret a (hex)", bigSecB: "Bob's secret b (hex)",
+    bigErr: "A secret must be a hex number from 1 to n − 1 (at most 64 hex digits).",
+    bigShared: "the shared point abG", bigEq: "Alice's aB and Bob's bA are the same point ✓", bigNe: "different points ✗",
+    legPriv: "secret (number or point)", legPub: "public point", legCip: "ciphertext", legMsg: "message", legEve: "what Eve sees",
+    msgM: "message M (a point)", rk: "random k (1 to 18)", privD: "private key d (1 to 18)", pubQ: "public key Q = dG",
+    encBox: "encrypt", encSub: "C₁ = kG, C₂ = M + kQ", decBox: "decrypt", decSub: "M = C₂ − dC₁",
+    ctLbl: "ciphertext C₁, C₂", decLbl: "decrypted", decOk: "the same as M ✓", decBad: "not M ✗",
+    toBobC: "C₁, C₂ to Bob", toAliceQ: "Q to Alice", cardNums: "The numbers",
+    whyElg: "<b>Why it works:</b> dC₁ = d × kG = k × dG = kQ, so Bob subtracts exactly what Alice added. Subtracting a point means adding its mirror image: −S has the same x and the opposite y.",
+    // step 2
+    modeAdd: "P + Q", modeDbl: "P + P (doubling)", modeNeg: "P + (−P)",
+    cardPlot: "y² = x³ + 2x + 2 over the real numbers", dragQ: "Drag P and Q along the curve.", dragP: "Drag P along the curve.",
+    n1: { chord: "draw the line through P and Q", double: "draw the tangent at P", opposite: "the line through P and −P is vertical" },
+    n2: { chord: "it meets the curve in one more point", double: "it meets the curve in one more point", opposite: "it never meets the curve again" },
+    n3: { chord: "reflect it in the x-axis: P + Q", double: "reflect it in the x-axis: 2P", opposite: "we say it meets the curve at O, the point at infinity" },
+    rdTitle: "The numbers", slope: "slope s", tangentS: "slope s of the tangent", thirdPt: "third point", sumPt: "P + Q", dblPt: "2P = P + P",
+    oNote: "P + (−P) = O, and P + O = P: O works like zero.", offPic: "The third point is outside the picture: drag P or Q closer.",
+    decimals: "These coordinates have endless decimals: at x = 1, y = √5 = 2.2360679774997896964… Computers need exact numbers, so the next step works modulo 17.",
+    goMod: "The same rules modulo 17", checkRow: "check on the curve",
+    // step 3
+    cardGrid: "y² = x³ + 2x + 2 mod 17: 18 dots and O", gridNote: "Click any square: is it a point of the curve?",
+    mirror: "dashed line y = 8.5: (x, y) and (x, 17 − y) are mirror images",
+    isOn: (x, y, l, lr, r, rr, on) => "(" + x + ", " + y + "): left side y² = " + l + " → " + lr + " mod 17; right side x³ + 2x + 2 = " + r + " → " + rr + " mod 17. " + (on ? "Both are " + lr + ": on the curve ✓" : "Different: not on the curve ✗"),
+    tabMult: "Multiples of G", tabDbl: "kG: double and add",
+    multNote: "Each next point is the previous one plus G. Click a point to jump there.",
+    multO: "19G = O: back to the start. The order of G is 19: G visited all 18 dots, then O.",
+    multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
+    seeAdd: "see this addition in step 4 →",
+    bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bAll: "show all",
+    kLbl: "k (1 to 1 048 575)", inBin: "in binary", sumPow: (k, parts) => k + " = " + parts.join(" + "),
+    colI: "i", colD: "2ⁱG (doubling)", colBit: "bit", colR: "R: the sum so far",
+    opTake: (i, d) => "bit " + i + " is 1, R was O: R = " + d,
+    opAdd: (i, r, d, s) => "bit " + i + " is 1: R = " + r + " + " + d + " = " + s,
+    opDbl: (d, d2) => "double: " + d + " + " + d + " = " + d2,
+    opOf: (j, n) => "step " + j + " / " + n,
+    opsCount: (d, a, k) => d + " " + (d === 1 ? "doubling" : "doublings") + " and " + a + " " + (a === 1 ? "addition" : "additions") + " instead of " + (k - 1) + " " + (k - 1 === 1 ? "addition" : "additions") + ". For a 256-bit k: about 256 doublings, not 2²⁵⁶ additions.",
+    reduce: (k, q, r) => "19G = O, so only k mod 19 matters: " + k + " = " + q + " × 19 + " + r + ", so " + k + "G = " + r + "G.",
+    resultIs: (k, pt) => k + "G = " + pt,
+    // step 4
+    cardPick: "Pick two points", presets: "examples:", prDbl: "G + G (slides)", prTask: "G + 2G (Task 1)", prNeg: "G + (−G)",
+    cardForm: "The formulas (mod 17)", fChord: "for P + Q:", fDbl: "for P + P:", fRes: "result:",
+    divNote: "“/ v mod 17” means: multiply by v⁻¹, the number with v × v⁻¹ = 1 mod 17.",
+    cardCalc: (P, Q, R) => P + " + " + Q + " = " + R + ", step by step",
+    stSlope: "the slope", stX: "x₃", stY: "y₃", stCheck: "check",
+    because: "because", so: "so", isOnOk: pt => pt + " is on the curve ✓",
+    invQ: v => "Which number times " + v + " gives 1 mod 17?",
+    leftO: "P is O: O + Q = Q. O works like zero.", rightO: "Q is O: P + O = P. O works like zero.",
+    opp: (y1, y2) => "x₁ = x₂ and y₁ + y₂ = " + y1 + " + " + y2 + " = 17 = 0 mod 17: Q = −P. The line is vertical, so P + Q = O.",
+    origin: (txt) => "From step 3: " + txt + ".",
+    bothSides: v => "both sides are " + v,
+  },
+  pl: {
+    title: "Eksplorator krzywych eliptycznych", home: "Wszystkie symulatory",
+    intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
+    stepOf: n => "Krok " + n + " z 4 · ECC",
+    steps: [["Czarna skrzynka", "dwa sekrety na wejściu, jeden wspólny punkt"], ["Dodawanie punktów", "sieczna i styczna na krzywej rzeczywistej"],
+            ["Modulo 17", "kropki, wielokrotności G, podwajanie i dodawanie"], ["Jedno dodawanie", "nachylenie s, x₃ i y₃ modulo 17"]],
+    explain: {
+      ecdh: ["Diffie-Hellman na punktach", "Alice i Bob wybierają po tajnej liczbie i publikują punkt: A = aG oraz B = bG. Każde mnoży punkt drugiej strony przez swój sekret i oboje dostają ten sam punkt abG. Eve widzi krzywą, G, A i B. Zmień sekrety. Kliknij pole a × G, żeby zobaczyć, co znaczy mnożenie punktu."],
+      elg: ["ElGamal na punktach", "Bob publikuje Q = dG. Wiadomość Alice to punkt M. Alice losuje k i wysyła C₁ = kG oraz C₂ = M + kQ. Bob odejmuje dC₁ = kQ i odzyskuje M. Eve widzi Q, C₁ i C₂. Kliknij pole, żeby zobaczyć, jak dodaje się punkty."],
+      add: ["P + Q: prosta, trzeci punkt, odbicie", "Nad liczbami rzeczywistymi krzywa y² = x³ + 2x + 2 to jedna gładka linia. Prosta przez P i Q przecina krzywą w dokładnie jednym kolejnym punkcie. Jego odbicie względem osi x to P + Q. Dla P + P prosta jest styczną. Przeciągnij P i Q."],
+      mod: ["Ta sama krzywa modulo 17", "Komputer potrzebuje dokładnych liczb, więc x i y to liczby całkowite od 0 do 16, a każdy wynik bierzemy mod 17. Linia zmienia się w 18 kropek i punkt w nieskończoności O. Dodawanie G raz za razem odwiedza je wszystkie. Podwajanie i dodawanie szybko prowadzi do kG. Kliknij krok, żeby zobaczyć jego liczby."],
+      one: ["Jedno dodawanie, liczba po liczbie", "Rysunek z kroku 2 zamienia się w trzy wzory: nachylenie s, potem x₃ i y₃, wszystko mod 17. Dzielenie to mnożenie przez odwrotność modularną. Wybierz dwa punkty albo przyjdź tu z kroku 3."],
+    },
+    selfOk: "✓ sprawdzone ze slajdami, z Paarem i Pelzlem (rozdz. 9) i z RFC 5903 (P-256)", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
+    tabEcdh: "ECDH: wspólny punkt", tabElg: "ElGamal: szyfrowanie punktu",
+    pubT: "jawne", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1), rząd 19",
+    alice: "Alice", bob: "Bob", eve: "Eve", rand: "losowa liczba",
+    secA: "sekret a (od 1 do 18)", secB: "sekret b (od 1 do 18)", box_s: "kliknij, by zajrzeć",
+    ptA: "jawny punkt A = aG", ptB: "jawny punkt B = bG", toBob: "A do Boba", toAlice: "B do Alice",
+    sharedA: "wspólny punkt aB", sharedB: "wspólny punkt bA", eveListens: "Eve podsłuchuje", eveSees: "widzi",
+    cardCurve1: "Na krzywej", cardEve: "Atak Eve na tę małą krzywą",
+    eveTry: (n, a) => "Eve dodaje G raz za razem, aż dojdzie do A. Po " + n + " " + plN(n, "próbie", "próbach", "próbach") + " zna a = " + a + ", a a × B daje jej wspólny punkt.",
+    eveReal: "Tutaj jest tylko 19 wielokrotności. Na P-256 jest ich około 2²⁵⁶, a najlepszy znany atak potrzebuje około 2¹²⁸ kroków. Małe liczby służą tylko do nauki.",
+    cardBig: "To samo na prawdziwej krzywej: P-256",
+    bigNote: "Te same kroki na liczbach 256-bitowych. Początkowe sekrety to wektor testowy z RFC 5903, punkt 8.1; kostka losuje nowe.",
+    bigSecA: "sekret Alice a (hex)", bigSecB: "sekret Boba b (hex)",
+    bigErr: "Sekret musi być liczbą szesnastkową od 1 do n − 1 (najwyżej 64 cyfry hex).",
+    bigShared: "wspólny punkt abG", bigEq: "aB u Alice i bA u Boba to ten sam punkt ✓", bigNe: "różne punkty ✗",
+    legPriv: "sekret (liczba albo punkt)", legPub: "jawny punkt", legCip: "szyfrogram", legMsg: "wiadomość", legEve: "to, co widzi Eve",
+    msgM: "wiadomość M (punkt)", rk: "losowe k (od 1 do 18)", privD: "klucz prywatny d (od 1 do 18)", pubQ: "klucz publiczny Q = dG",
+    encBox: "szyfruj", encSub: "C₁ = kG, C₂ = M + kQ", decBox: "odszyfruj", decSub: "M = C₂ − dC₁",
+    ctLbl: "szyfrogram C₁, C₂", decLbl: "odszyfrowane", decOk: "to samo co M ✓", decBad: "to nie M ✗",
+    toBobC: "C₁, C₂ do Boba", toAliceQ: "Q do Alice", cardNums: "Liczby",
+    whyElg: "<b>Dlaczego to działa:</b> dC₁ = d × kG = k × dG = kQ, więc Bob odejmuje dokładnie to, co Alice dodała. Odjęcie punktu to dodanie jego odbicia: −S ma ten sam x i przeciwny y.",
+    modeAdd: "P + Q", modeDbl: "P + P (podwojenie)", modeNeg: "P + (−P)",
+    cardPlot: "y² = x³ + 2x + 2 nad liczbami rzeczywistymi", dragQ: "Przeciągnij P i Q wzdłuż krzywej.", dragP: "Przeciągnij P wzdłuż krzywej.",
+    n1: { chord: "poprowadź prostą przez P i Q", double: "poprowadź styczną w P", opposite: "prosta przez P i −P jest pionowa" },
+    n2: { chord: "przecina krzywą w jeszcze jednym punkcie", double: "przecina krzywą w jeszcze jednym punkcie", opposite: "nie przecina już krzywej" },
+    n3: { chord: "odbij go względem osi x: P + Q", double: "odbij go względem osi x: 2P", opposite: "mówimy, że spotyka krzywą w O, punkcie w nieskończoności" },
+    rdTitle: "Liczby", slope: "nachylenie s", tangentS: "nachylenie s stycznej", thirdPt: "trzeci punkt", sumPt: "P + Q", dblPt: "2P = P + P",
+    oNote: "P + (−P) = O oraz P + O = P: O działa jak zero.", offPic: "Trzeci punkt jest poza rysunkiem: przysuń P albo Q.",
+    decimals: "Te współrzędne mają nieskończone rozwinięcia: dla x = 1 mamy y = √5 = 2,2360679774997896964… Komputer potrzebuje dokładnych liczb, więc następny krok liczy modulo 17.",
+    goMod: "Te same zasady modulo 17", checkRow: "sprawdzenie na krzywej",
+    cardGrid: "y² = x³ + 2x + 2 mod 17: 18 kropek i O", gridNote: "Kliknij dowolne pole: czy to punkt krzywej?",
+    mirror: "przerywana linia y = 8,5: (x, y) i (x, 17 − y) to odbicia",
+    isOn: (x, y, l, lr, r, rr, on) => "(" + x + ", " + y + "): lewa strona y² = " + l + " → " + lr + " mod 17; prawa strona x³ + 2x + 2 = " + r + " → " + rr + " mod 17. " + (on ? "Obie to " + lr + ": punkt leży na krzywej ✓" : "Różne: punkt nie leży na krzywej ✗"),
+    tabMult: "Wielokrotności G", tabDbl: "kG: podwajanie i dodawanie",
+    multNote: "Każdy kolejny punkt to poprzedni plus G. Kliknij punkt, żeby do niego przejść.",
+    multO: "19G = O: powrót do początku. Rząd G to 19: G odwiedził wszystkie 18 kropek, a potem O.",
+    multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
+    seeAdd: "zobacz to dodawanie w kroku 4 →",
+    bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bAll: "pokaż wszystko",
+    kLbl: "k (od 1 do 1 048 575)", inBin: "dwójkowo", sumPow: (k, parts) => k + " = " + parts.join(" + "),
+    colI: "i", colD: "2ⁱG (podwajanie)", colBit: "bit", colR: "R: dotychczasowa suma",
+    opTake: (i, d) => "bit " + i + " to 1, R było O: R = " + d,
+    opAdd: (i, r, d, s) => "bit " + i + " to 1: R = " + r + " + " + d + " = " + s,
+    opDbl: (d, d2) => "podwojenie: " + d + " + " + d + " = " + d2,
+    opOf: (j, n) => "krok " + j + " / " + n,
+    opsCount: (d, a, k) => d + " " + plN(d, "podwojenie", "podwojenia", "podwojeń") + " i " + a + " " + plN(a, "dodawanie", "dodawania", "dodawań") + " zamiast " + (k - 1) + " " + plN(k - 1, "dodawania", "dodawań", "dodawań") + ". Dla 256-bitowego k: około 256 podwojeń, a nie 2²⁵⁶ dodawań.",
+    reduce: (k, q, r) => "19G = O, więc liczy się tylko k mod 19: " + k + " = " + q + " × 19 + " + r + ", czyli " + k + "G = " + r + "G.",
+    resultIs: (k, pt) => k + "G = " + pt,
+    cardPick: "Wybierz dwa punkty", presets: "przykłady:", prDbl: "G + G (slajdy)", prTask: "G + 2G (zadanie 1)", prNeg: "G + (−G)",
+    cardForm: "Wzory (mod 17)", fChord: "dla P + Q:", fDbl: "dla P + P:", fRes: "wynik:",
+    divNote: "„/ v mod 17” oznacza mnożenie przez v⁻¹, czyli liczbę, dla której v × v⁻¹ = 1 mod 17.",
+    cardCalc: (P, Q, R) => P + " + " + Q + " = " + R + ", krok po kroku",
+    stSlope: "nachylenie", stX: "x₃", stY: "y₃", stCheck: "sprawdzenie",
+    because: "bo", so: "więc", isOnOk: pt => pt + " leży na krzywej ✓",
+    invQ: v => "Przez co pomnożyć " + v + ", żeby dostać 1 mod 17?",
+    leftO: "P to O: O + Q = Q. O działa jak zero.", rightO: "Q to O: P + O = P. O działa jak zero.",
+    opp: (y1, y2) => "x₁ = x₂ oraz y₁ + y₂ = " + y1 + " + " + y2 + " = 17 = 0 mod 17: Q = −P. Prosta jest pionowa, więc P + Q = O.",
+    origin: (txt) => "Z kroku 3: " + txt + ".",
+    bothSides: v => "obie strony to " + v,
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+/* one language setting for all the simulators on the site */
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+
+// the multiples of G on the small curve: MULT[k] = kG for k = 1..19 (MULT[19] = O)
+const MULT = [null];
+for (let k = 1; k <= 19; k++) MULT.push(mulSlow(TOY, k, TOY.G));
+const multOf = P => { for (let k = 1; k <= 19; k++) if (samePoint(MULT[k], P)) return k; return -1; };
+
+const app = {
+  level: 0, tab1: "ecdh",
+  a: 3, b: 10, d: 7, m: 11, k: 4,
+  bigA: RFC5903.i.toString(16), bigB: RFC5903.r.toString(16),
+  rmode: "add", rP: { x: -0.7, up: true }, rQ: { x: 0.2, up: true },
+  mode3: "mult", mk: 3, dk: 100, dstep: 0, cell: { x: 5, y: 1 },
+  p4: 1, q4: 1, s4: 1, origin4: null,
+};
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+const MINUS = "−";
+const fmt = v => (v < 0 ? MINUS + String(-v) : String(v));               // numbers with a real minus sign
+const ps = P => P === null ? "O" : "(" + P.x + ", " + P.y + ")";          // a point as text
+const psH = P => P === null ? '<span style="font-family:var(--sans);font-weight:700">O</span>' : ps(P);   // the same in HTML (O is not a zero)
+const fr = v => (v < 0 ? MINUS : "") + Math.abs(v).toFixed(3);            // a real number
+const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/* ---------- small pictures ---------- */
+const mk = (id, c) => '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="' + c + '"/></marker>';
+const ln = (pts, c, m, dash) => '<polyline fill="none" stroke="' + c + '" stroke-width="2.4"' + (dash ? ' stroke-dasharray="' + dash + '"' : "") + (m ? ' marker-end="url(#' + m + ')"' : "") + ' points="' + pts + '"/>';
+const MARKERS = mk("m_priv", "var(--key-b)") + mk("m_pub", "var(--ct-b)") + mk("m_cip", "var(--cip-b)") + mk("m_msg", "var(--const-b)") + mk("m_ink", "var(--ink)") + mk("m_chg", "var(--chg)");
+const PERSON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="4.5" fill="currentColor"/><path d="M3 22c0-5 4-8.5 9-8.5s9 3.5 9 8.5z" fill="currentColor"/></svg>';
+const EAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9a5 5 0 0 1 10 0c0 3-3 4-3 7a3 3 0 0 1-6 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M10 9.5a2 2 0 0 1 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const DICE = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/></svg>';
+
+const numCtl = f => '<span class="ctrline"><button data-action="dec" data-f="' + f + '" aria-label="−">&minus;</button>' +
+  '<input type="number" min="1" max="18" data-field="' + f + '" value="' + app[f] + '"><button data-action="inc" data-f="' + f + '" aria-label="+">+</button>' +
+  '<button class="icon-btn" data-action="rand" data-f="' + f + '" title="' + esc(L().rand) + '" aria-label="' + esc(L().rand) + '">' + DICE + "</button></span>";
+
+/* the 17 x 17 grid of the small curve. o: { c: cell size, marks: [{P, col, label, big}], path: [points], vline: x, mirror, click, sel } */
+function gridSVG(o) {
+  const c = o.c, ML = 26, MT = 12, MR = 12, MB = 24;
+  const W = ML + 16 * c + MR, H = MT + 16 * c + MB;
+  const gx = x => ML + Number(x) * c, gy = y => MT + (16 - Number(y)) * c;
+  let s = '<svg class="grid17" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="y^2 = x^3 + 2x + 2 mod 17">' +
+    "<defs>" + mk("gm_chg", "var(--chg)") + "</defs>";
+  for (let i = 0; i <= 16; i++) {
+    if (c >= 20 || i % 2 === 0) {
+      s += '<text class="tick" x="' + gx(i) + '" y="' + (H - 6) + '" text-anchor="middle">' + i + "</text>";
+      s += '<text class="tick" x="' + (ML - 9) + '" y="' + (gy(i) + 3.5) + '" text-anchor="end">' + i + "</text>";
+    }
+  }
+  if (o.click) for (let x = 0; x <= 16; x++) for (let y = 0; y <= 16; y++)
+    s += '<rect class="hit" data-action="cell" data-x="' + x + '" data-y="' + y + '" x="' + (gx(x) - c / 2) + '" y="' + (gy(y) - c / 2) + '" width="' + c + '" height="' + c + '" rx="3"/>';
+  if (o.sel) s += '<rect class="sel" x="' + (gx(o.sel.x) - c / 2 + 1) + '" y="' + (gy(o.sel.y) - c / 2 + 1) + '" width="' + (c - 2) + '" height="' + (c - 2) + '" rx="3"/>';
+  for (let x = 0; x <= 16; x++) for (let y = 0; y <= 16; y++)
+    s += '<circle class="gd" cx="' + gx(x) + '" cy="' + gy(y) + '" r="1.5" pointer-events="none"/>';
+  if (o.mirror) s += '<line x1="' + (gx(0) - 6) + '" y1="' + (MT + 7.5 * c) + '" x2="' + (gx(16) + 6) + '" y2="' + (MT + 7.5 * c) + '" stroke="var(--chg)" stroke-width="1.6" stroke-dasharray="6 4" pointer-events="none"/>';
+  if (o.vline !== undefined) s += '<line x1="' + gx(o.vline) + '" y1="' + (MT - 4) + '" x2="' + gx(o.vline) + '" y2="' + (gy(0) + 6) + '" stroke="var(--chg)" stroke-width="2" stroke-dasharray="5 4" pointer-events="none"/>';
+  if (o.path && o.path.length > 1) {
+    for (let i = 1; i < o.path.length; i++) {
+      const A = o.path[i - 1], B = o.path[i], last = i === o.path.length - 1;
+      s += '<line x1="' + gx(A.x) + '" y1="' + gy(A.y) + '" x2="' + gx(B.x) + '" y2="' + gy(B.y) + '" stroke="var(--chg)" stroke-width="' + (last ? 2.6 : 1.4) + '" opacity="' + (last ? 1 : 0.55) + '"' + (last ? ' marker-end="url(#gm_chg)"' : "") + ' pointer-events="none"/>';
+    }
+  }
+  for (const P of curvePoints(TOY)) s += '<circle class="pt" cx="' + gx(P.x) + '" cy="' + gy(P.y) + '" r="' + (c * 0.24) + '" pointer-events="none"/>';
+  for (const m of (o.marks || [])) {
+    if (m.P === null) continue;
+    const r = c * (m.big ? 0.42 : 0.34);
+    s += '<circle cx="' + gx(m.P.x) + '" cy="' + gy(m.P.y) + '" r="' + r + '" fill="' + (m.fill || "var(--surface)") + '" stroke="' + m.col + '" stroke-width="' + (m.big ? 3 : 2.4) + '" pointer-events="none"/>';
+    if (m.label) {
+      const right = Number(m.P.x) < 12, up = m.up !== undefined ? m.up : true;
+      s += '<text class="mlab halo" x="' + (gx(m.P.x) + (right ? r + 3 : -r - 3)) + '" y="' + (gy(m.P.y) + (up ? -r + 1 : r + 10)) + '" text-anchor="' + (right ? "start" : "end") + '" fill="' + m.col + '" pointer-events="none">' + esc(m.label) + "</text>";
+    }
+  }
+  return s + "</svg>";
+}
+
+/* ---------- step 1: black box ---------- */
+function render0() {
+  const t = L();
+  const tabs = '<span class="tabs" style="margin-bottom:10px">' +
+    '<button data-action="tab1" data-t="ecdh" aria-pressed="' + (app.tab1 === "ecdh") + '">' + t.tabEcdh + "</button>" +
+    '<button data-action="tab1" data-t="elg" aria-pressed="' + (app.tab1 === "elg") + '">' + t.tabElg + "</button></span>";
+  const legend = '<div class="legend"><span class="role-priv">' + t.legPriv + '</span><span class="role-pub">' + t.legPub + "</span>" +
+    (app.tab1 === "elg" ? '<span class="role-msg">' + t.legMsg + '</span><span class="role-cip">' + t.legCip + "</span>" : "") +
+    '<span class="role-eve">' + t.legEve + "</span></div>";
+  const pub = '<div class="pubbox role-pub"><b>' + t.pubT + '</b><span class="mono">' + t.curveEq + '</span><span class="mono">' + t.gLine + "</span></div>";
+  const who = (x, name, col) => '<div class="who" style="left:' + x + "px;color:" + col + '">' + PERSON + name + "</div>";
+  if (app.tab1 === "ecdh") {
+    const svg = '<svg class="arrows" width="900" height="550" aria-hidden="true"><defs>' + MARKERS + "</defs>" +
+      ln("135,108 135,146", "var(--key-b)", "m_priv") + ln("765,108 765,146", "var(--key-b)", "m_priv") +
+      ln("330,92 330,181 224,181", "var(--ct-b)", "m_pub") + ln("570,92 570,181 676,181", "var(--ct-b)", "m_pub") +
+      ln("135,212 135,246", "var(--ct-b)", "m_pub") + ln("765,212 765,246", "var(--ct-b)", "m_pub") +
+      ln("250,282 700,376", "var(--ct-b)", "m_pub") + ln("650,282 200,376", "var(--ct-b)", "m_pub") +
+      ln("14,108 14,411 46,411", "var(--key-b)", "m_priv") + ln("886,108 886,411 854,411", "var(--key-b)", "m_priv") +
+      ln("135,442 135,474", "var(--key-b)", "m_priv") + ln("765,442 765,474", "var(--key-b)", "m_priv") +
+      ln("250,507 424,507", "var(--key-b)") + ln("650,507 476,507", "var(--key-b)") +
+      '<polyline fill="none" stroke="var(--eve-b)" stroke-width="2" stroke-dasharray="3 4" points="450,370 450,328"/>' + "</svg>";
+    return '<div class="card" style="padding:14px 10px">' + tabs + '<div class="schwrap"><div class="sch" style="height:550px">' + svg + pub +
+        who(0, t.alice, "var(--non-b)") + who(650, t.bob, "var(--ctr-b)") +
+        '<div class="chip role-priv" style="left:0;top:36px;width:250px;height:72px">' + t.secA + numCtl("a") + "</div>" +
+        '<div class="chip role-priv" style="left:650px;top:36px;width:250px;height:72px">' + t.secB + numCtl("b") + "</div>" +
+        '<button class="box abs" style="left:50px;top:150px;width:170px;height:62px" data-action="zoom">a × G<small>' + t.box_s + "</small></button>" +
+        '<button class="box abs" style="left:680px;top:150px;width:170px;height:62px" data-action="zoom">b × G<small>' + t.box_s + "</small></button>" +
+        '<div class="chip role-pub" style="left:40px;top:250px;width:210px">' + t.ptA + '<span class="val" id="vA"></span></div>' +
+        '<div class="chip role-pub" style="left:650px;top:250px;width:210px">' + t.ptB + '<span class="val" id="vB"></span></div>' +
+        '<div class="alab" style="left:262px;top:252px;color:var(--ct-b)">' + t.toBob + " →</div>" +
+        '<div class="alab" style="left:540px;top:252px;color:var(--ct-b)">← ' + t.toAlice + "</div>" +
+        '<button class="box abs" style="left:50px;top:380px;width:170px;height:62px" data-action="zoom">a × B<small>' + t.box_s + "</small></button>" +
+        '<button class="box abs" style="left:680px;top:380px;width:170px;height:62px" data-action="zoom">b × A<small>' + t.box_s + "</small></button>" +
+        '<div class="evebox role-eve" style="left:345px;top:374px;width:210px"><div class="nh">' + EAR + t.eveListens + '</div><span class="mono" id="vEve"></span></div>' +
+        '<div class="chip role-priv" style="left:40px;top:478px;width:210px">' + t.sharedA + '<span class="val" id="vSA"></span></div>' +
+        '<div class="chip role-priv" style="left:650px;top:478px;width:210px">' + t.sharedB + '<span class="val" id="vSB"></span></div>' +
+        '<div class="eqc" id="eqc" style="left:427px;top:484px"></div>' +
+      "</div></div>" + legend + "</div>" +
+      '<div class="row"><div class="card" style="flex:0 0 auto"><h3>' + t.cardCurve1 + '</h3><div id="g1"></div></div>' +
+        '<div class="card" style="flex:1 1 340px"><h3>' + t.cardEve + '</h3><div id="eveAtk"></div></div></div>' +
+      '<div class="card"><h3>' + t.cardBig + '</h3><p class="note" style="margin:0 0 8px">' + t.bigNote + '</p><div class="big">' +
+        '<div class="bigc role-priv"><span style="display:flex;justify-content:space-between;align-items:center">' + t.bigSecA + '<button class="icon-btn" data-action="bigrand" data-f="bigA" title="' + esc(t.rand) + '" aria-label="' + esc(t.rand) + '">' + DICE + '</button></span><input data-field="bigA" spellcheck="false" value="' + esc(app.bigA) + '"></div>' +
+        '<div class="bigc role-priv"><span style="display:flex;justify-content:space-between;align-items:center">' + t.bigSecB + '<button class="icon-btn" data-action="bigrand" data-f="bigB" title="' + esc(t.rand) + '" aria-label="' + esc(t.rand) + '">' + DICE + '</button></span><input data-field="bigB" spellcheck="false" value="' + esc(app.bigB) + '"></div>' +
+        '<div class="bigc role-pub" id="bigAo"></div><div class="bigc role-pub" id="bigBo"></div>' +
+        '<div class="bigc role-priv bigout" id="bigS"></div></div></div>';
+  }
+  // ElGamal
+  const opts = Array.from({ length: 18 }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === app.m ? " selected" : "") + ">" + ps(MULT[i + 1]) + "</option>").join("");
+  const svg = '<svg class="arrows" width="900" height="500" aria-hidden="true"><defs>' + MARKERS + "</defs>" +
+    ln("135,102 135,146", "var(--const-b)", "m_msg") + ln("270,186 234,186", "var(--key-b)", "m_priv") +
+    ln("765,102 765,126", "var(--key-b)", "m_priv") + ln("570,92 570,158 676,158", "var(--ct-b)", "m_pub") +
+    ln("330,92 330,120 210,120 210,146", "var(--ct-b)", "m_pub") +
+    ln("765,186 765,210", "var(--ct-b)", "m_pub") + ln("650,242 190,242 190,226", "var(--ct-b)", "m_pub") +
+    ln("120,222 120,286", "var(--cip-b)", "m_cip") + ln("250,330 676,330", "var(--cip-b)", "m_cip") +
+    ln("890,102 890,350 854,350", "var(--key-b)", "m_priv") + ln("765,372 765,406", "var(--const-b)", "m_msg") +
+    '<polyline fill="none" stroke="var(--eve-b)" stroke-width="2" stroke-dasharray="3 4" points="450,384 450,334"/>' +
+    '<polyline fill="none" stroke="var(--eve-b)" stroke-width="2" stroke-dasharray="3 4" points="560,392 600,392 600,246"/>' + "</svg>";
+  return '<div class="card" style="padding:14px 10px">' + tabs + '<div class="schwrap"><div class="sch" style="height:500px">' + svg + pub +
+      who(0, t.alice, "var(--non-b)") + who(650, t.bob, "var(--ctr-b)") +
+      '<div class="chip role-msg" style="left:0;top:36px;width:250px;height:66px">' + t.msgM + '<br><select data-field="m">' + opts + "</select></div>" +
+      '<div class="chip role-priv" style="left:270px;top:150px;width:200px;height:72px">' + t.rk + numCtl("k") + "</div>" +
+      '<div class="chip role-priv" style="left:650px;top:36px;width:250px;height:66px">' + t.privD + numCtl("d") + "</div>" +
+      '<button class="box abs" style="left:680px;top:130px;width:170px;height:56px" data-action="zoom">d × G<small>' + t.box_s + "</small></button>" +
+      '<div class="chip role-pub" style="left:650px;top:214px;width:225px">' + t.pubQ + '<span class="val" id="vQ"></span></div>' +
+      '<div class="alab" style="left:420px;top:218px;color:var(--ct-b)">← ' + t.toAliceQ + "</div>" +
+      '<button class="box abs" style="left:20px;top:150px;width:210px;height:72px" data-action="zoom">' + t.encBox + "<small>" + t.encSub + "</small></button>" +
+      '<div class="chip role-cip" style="left:0;top:290px;width:250px">' + t.ctLbl + '<span class="val" id="vC"></span></div>' +
+      '<div class="alab" style="left:272px;top:306px;color:var(--cip-b)">' + t.toBobC + " →</div>" +
+      '<button class="box abs" style="left:680px;top:300px;width:170px;height:72px" data-action="zoom">' + t.decBox + "<small>" + t.decSub + "</small></button>" +
+      '<div class="evebox role-eve" style="left:340px;top:388px;width:220px"><div class="nh">' + EAR + t.eveListens + '</div><span class="mono" id="vEve"></span></div>' +
+      '<div class="chip role-msg" style="left:650px;top:410px;width:250px">' + t.decLbl + '<span class="val" id="vM"></span><small id="vMok"></small></div>' +
+    "</div></div>" + legend + "</div>" +
+    '<div class="row"><div class="card" style="flex:0 0 auto"><h3>' + t.cardCurve1 + '</h3><div id="g1"></div></div>' +
+      '<div class="card" style="flex:1 1 380px"><h3>' + t.cardNums + '</h3><div class="calc" id="elgNums"></div><div class="why">' + t.whyElg + "</div></div></div>";
+}
+
+function updateL0() {
+  const t = L(), C = TOY;
+  const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
+  const G = { P: C.G, col: "var(--ct-b)", label: "G", up: false };
+  if (app.tab1 === "ecdh") {
+    const e = ecdh(C, BigInt(app.a), BigInt(app.b));
+    set("vA", ps(e.A)); set("vB", ps(e.B)); set("vSA", ps(e.SA)); set("vSB", ps(e.SB));
+    set("vEve", t.eveSees + ": G, A = " + ps(e.A) + ",<br>B = " + ps(e.B));
+    const eq = samePoint(e.SA, e.SB), q = document.getElementById("eqc");
+    if (q) { q.className = "eqc " + (eq ? "ok" : "bad"); q.textContent = eq ? "=" : "≠"; }
+    set("g1", gridSVG({ c: 17, marks: [G, { P: e.A, col: "var(--ct-b)", label: "A" }, { P: e.B, col: "var(--ct-b)", label: "B" },
+      { P: e.SA, col: "var(--key-b)", fill: "var(--key-bg)", label: "aB = bA", big: true }] }));
+    // Eve's attack: G, 2G, 3G, ... until she reaches A
+    let tries = "", R = null, n = 0;
+    do { R = add(C, R, C.G); n++; tries += '<span class="try' + (samePoint(R, e.A) ? " hit" : "") + '">' + n + "G = " + ps(R) + (samePoint(R, e.A) ? " = A" : "") + "</span>"; }
+    while (!samePoint(R, e.A) && n < 19);
+    set("eveAtk", '<div class="tries">' + tries + "</div><p style=\"margin:4px 0\">" + t.eveTry(n, n) + '</p><p class="note" style="margin:0">' + t.eveReal + "</p>");
+    updateBig();
+  } else {
+    const M = MULT[app.m], Q = mul(C, BigInt(app.d), C.G);
+    const en = egEncrypt(C, M, Q, BigInt(app.k)), de = egDecrypt(C, en.C1, en.C2, BigInt(app.d));
+    set("vQ", ps(Q)); set("vC", ps(en.C1) + ", " + ps(en.C2)); set("vM", ps(de.M));
+    set("vMok", samePoint(de.M, M) ? '<span class="okline">' + t.decOk + "</span>" : '<span class="badline">' + t.decBad + "</span>");
+    set("vEve", t.eveSees + ": Q = " + ps(Q) + ",<br>C₁ = " + ps(en.C1) + ", C₂ = " + ps(en.C2));
+    set("g1", gridSVG({ c: 17, marks: [G, { P: Q, col: "var(--ct-b)", label: "Q" }, { P: M, col: "var(--muted)", label: "M", big: true },
+      { P: en.C1, col: "var(--cip-b)", label: "C₁" }, { P: en.C2, col: "var(--cip-b)", label: "C₂" }] }));
+    const c = (cls, s) => '<span class="c ' + cls + '">' + s + "</span>";
+    set("elgNums",
+      c("role-cip", "C₁") + " = kG = " + app.k + "G = " + c("role-cip", ps(en.C1)) + "<br>" +
+      "kQ = " + app.k + " × " + ps(Q) + " = " + ps(en.kQ) + "<br>" +
+      c("role-cip", "C₂") + " = M + kQ = " + ps(M) + " + " + ps(en.kQ) + " = " + c("role-cip", ps(en.C2)) + "<br>" +
+      c("role-priv", "S") + " = dC₁ = " + app.d + " × " + ps(en.C1) + " = " + c("role-priv", ps(de.S)) + "<br>" +
+      "M = C₂ − S = " + ps(en.C2) + " + " + ps(de.negS) + " = <b>" + ps(de.M) + "</b>");
+  }
+}
+
+/* P-256: the same ECDH with 256-bit numbers */
+function parseBig(s) {
+  s = s.trim().replace(/^0x/i, "").replace(/\s/g, "");
+  if (!/^[0-9a-fA-F]{1,64}$/.test(s)) return null;
+  const v = BigInt("0x" + s);
+  return v >= 1n && v < P256.n ? v : null;
+}
+const hex64 = v => v.toString(16).padStart(64, "0").replace(/(.{8})(?=.)/g, "$1 ").replace(/^((?:\S+ ){3}\S+) /, "$1<br>");
+function updateBig() {
+  const t = L(), ao = document.getElementById("bigAo");
+  if (!ao) return;
+  const bo = document.getElementById("bigBo"), so = document.getElementById("bigS");
+  const a = parseBig(app.bigA), b = parseBig(app.bigB);
+  if (a === null || b === null) { ao.innerHTML = ""; bo.innerHTML = ""; so.innerHTML = '<span class="err">' + t.bigErr + "</span>"; return; }
+  const e = ecdh(P256, a, b);
+  const pt = (lbl, P) => lbl + '<div class="hexv"><i>x</i> ' + hex64(P.x).replace("<br>", "<br><i>&nbsp;&nbsp;</i>") + '</div><div class="hexv"><i>y</i> ' + hex64(P.y).replace("<br>", "<br><i>&nbsp;&nbsp;</i>") + "</div>";
+  ao.innerHTML = pt("A = aG", e.A);
+  bo.innerHTML = pt("B = bG", e.B);
+  so.innerHTML = pt(t.bigShared, e.SA) + '<div style="margin-top:4px" class="' + (samePoint(e.SA, e.SB) ? "okline" : "badline") + '">' + (samePoint(e.SA, e.SB) ? t.bigEq : t.bigNe) + "</div>";
+}
+
+/* ---------- step 2: the real curve ---------- */
+const RW = 560, RH = 440, X0 = -2, X1 = 4, Y0 = -9, Y1 = 9;
+const ROOT = realRoot();
+const sx = x => (x - X0) / (X1 - X0) * RW, sy = y => RH - (y - Y0) / (Y1 - Y0) * RH;
+const rpt = h => { const x = Math.max(ROOT, h.x); const y = Math.sqrt(Math.max(0, realF(x))); return { x: x, y: h.up ? y : -y }; };
+const MODE_START = { add: [{ x: -0.7, up: true }, { x: 0.2, up: true }], double: [{ x: -0.4, up: true }, null], neg: [{ x: 0.5, up: true }, null] };
+
+function realPoints() {
+  const P = rpt(app.rP);
+  const Q = app.rmode === "add" ? rpt(app.rQ) : app.rmode === "double" ? P : { x: P.x, y: -P.y };
+  return { P: P, Q: Q, r: realAdd(P, Q) };
+}
+function render1() {
+  const t = L();
+  const pr = m => ' aria-pressed="' + (app.rmode === m) + '"';
+  return '<div class="row"><div class="card plotwrap"><h3>' + t.cardPlot + '</h3>' +
+      '<svg class="plot" id="rsvg" viewBox="0 0 ' + RW + " " + RH + '" width="' + RW + '" height="' + RH + '" role="img" aria-label="real curve"></svg>' +
+      '<p class="note" style="margin:6px 0 0" id="dragNote"></p></div>' +
+    '<div class="card readout"><span class="tabs"><button data-action="rmode" data-m="add"' + pr("add") + ">" + t.modeAdd + "</button>" +
+      '<button data-action="rmode" data-m="double"' + pr("double") + ">" + t.modeDbl + "</button>" +
+      '<button data-action="rmode" data-m="neg"' + pr("neg") + ">" + t.modeNeg + "</button></span>" +
+      '<ol class="nums" id="rsteps"></ol><h3 style="margin:12px 0 0">' + t.rdTitle + '</h3><div class="rd" id="rnums"></div>' +
+      '<p class="note">' + t.decimals + '</p><button class="dark" data-action="zoom">' + t.goMod + " →</button></div></div>";
+}
+function drawReal() {
+  const svg = document.getElementById("rsvg");
+  if (!svg) return;
+  const t = L(), d = realPoints(), P = d.P, Q = d.Q, r = d.r, kind = r.kind;
+  let s = "<defs>" + mk("rm_chg", "var(--chg)") + mk("rm_ink", "var(--muted)") + '<clipPath id="rclip"><rect x="0" y="0" width="' + RW + '" height="' + RH + '"/></clipPath></defs>';
+  for (let x = Math.ceil(X0); x <= X1; x++) s += '<line class="gl" x1="' + sx(x) + '" y1="0" x2="' + sx(x) + '" y2="' + RH + '"/>';
+  for (let y = -8; y <= 8; y += 2) s += '<line class="gl" x1="0" y1="' + sy(y) + '" x2="' + RW + '" y2="' + sy(y) + '"/>';
+  s += '<line class="axis" x1="0" y1="' + sy(0) + '" x2="' + RW + '" y2="' + sy(0) + '"/><line class="axis" x1="' + sx(0) + '" y1="0" x2="' + sx(0) + '" y2="' + RH + '"/>';
+  for (let x = Math.ceil(X0); x <= X1; x++) if (x !== 0) s += '<text class="tick" x="' + (sx(x) + 3) + '" y="' + (sy(0) + 14) + '">' + fmt(x) + "</text>";
+  for (let y = -8; y <= 8; y += 2) if (y !== 0) s += '<text class="tick" x="' + (sx(0) + 4) + '" y="' + (sy(y) + 4) + '">' + fmt(y) + "</text>";
+  // the curve: lower branch from the right to the root, then the upper branch back to the right
+  const N = 240, up = [], lo = [];
+  for (let i = 0; i <= N; i++) { const x = ROOT + (i / N) * (i / N) * (X1 - ROOT); const y = Math.sqrt(Math.max(0, realF(x))); up.push(sx(x).toFixed(1) + "," + sy(y).toFixed(1)); lo.push(sx(x).toFixed(1) + "," + sy(-y).toFixed(1)); }
+  s += '<polyline class="curve" points="' + lo.reverse().concat(up).join(" ") + '" clip-path="url(#rclip)"/>';
+  const badge = (x, y, n) => '<circle cx="' + x + '" cy="' + y + '" r="10" fill="var(--chg)"/><text class="num" x="' + x + '" y="' + (y + 4) + '" text-anchor="middle">' + n + "</text>";
+  let note = "";
+  if (kind === "opposite") {
+    s += '<line class="ln" x1="' + sx(P.x) + '" y1="' + RH + '" x2="' + sx(P.x) + '" y2="18" marker-end="url(#rm_ink)"/>';
+    s += '<rect x="' + (sx(P.x) - 14) + '" y="2" width="28" height="22" rx="5" fill="var(--chg)"/><text class="num" style="font-size:14px" x="' + sx(P.x) + '" y="18" text-anchor="middle">O</text>';
+    s += badge(sx(P.x) + 18, sy(0) + 40, 1) + badge(sx(P.x) + 34, 30, 3);
+  } else {
+    const yAt = x => P.y + r.s * (x - P.x);
+    s += '<line class="ln" x1="' + sx(X0) + '" y1="' + sy(yAt(X0)) + '" x2="' + sx(X1) + '" y2="' + sy(yAt(X1)) + '" clip-path="url(#rclip)"/>';
+    const inPic = r.third.x >= X0 && r.third.x <= X1 && Math.abs(r.third.y) <= Y1 - 0.2;
+    // badge 1 on the line, half way between P and the edge
+    const bx = Math.min(X1 - 0.3, Math.max(X0 + 0.3, (P.x + Math.min(X1, r.third.x)) / 2 + 0.25));
+    if (Math.abs(yAt(bx)) < Y1 - 0.5) s += badge(sx(bx), sy(yAt(bx)) - 16, 1);
+    if (inPic) {
+      s += '<line class="refl" x1="' + sx(r.third.x) + '" y1="' + sy(r.third.y) + '" x2="' + sx(r.R.x) + '" y2="' + (sy(r.R.y) + (r.R.y > 0 ? 10 : -10)) + '" marker-end="url(#rm_chg)"/>';
+      s += '<circle cx="' + sx(r.third.x) + '" cy="' + sy(r.third.y) + '" r="7" fill="var(--chg)"/>' + badge(sx(r.third.x) - 22, sy(r.third.y) + (r.third.y > 0 ? -12 : 12), 2);
+      s += badge(sx(r.R.x) + 18, sy(0) + (r.R.y < 0 ? -14 : 14), 3);
+      s += '<circle cx="' + sx(r.R.x) + '" cy="' + sy(r.R.y) + '" r="8" fill="var(--ct-b)"/>';
+      const rx = sx(r.R.x) > RW - 70;
+      s += '<text class="lblr" x="' + (sx(r.R.x) + (rx ? -12 : 12)) + '" y="' + (sy(r.R.y) + 5) + '" text-anchor="' + (rx ? "end" : "start") + '">' + (kind === "double" ? "2P" : "P + Q") + "</text>";
+    } else note = t.offPic;
+  }
+  // P and Q last, so they stay on top and can be dragged
+  const handle = (A, name, h) => '<g class="h" data-h="' + h + '"><circle cx="' + sx(A.x) + '" cy="' + sy(A.y) + '" r="16" fill="var(--ink)" opacity="0.08"/>' +
+    '<circle cx="' + sx(A.x) + '" cy="' + sy(A.y) + '" r="7.5" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>' +
+    '<text class="lbl halo" x="' + (sx(A.x) - 12) + '" y="' + (sy(A.y) - 10) + '" text-anchor="end" style="stroke:var(--surface);stroke-width:4;paint-order:stroke">' + name + "</text></g>";
+  if (app.rmode === "add") s += handle(Q, "Q", "Q");
+  if (app.rmode === "neg") s += '<circle cx="' + sx(Q.x) + '" cy="' + sy(Q.y) + '" r="7.5" fill="var(--ink)"/><text class="lbl" x="' + (sx(Q.x) - 12) + '" y="' + (sy(Q.y) + 18) + '" text-anchor="end">−P</text>';
+  s += handle(P, "P", "P");
+  svg.innerHTML = s;
+  // the numbered steps and the numbers
+  document.getElementById("rsteps").innerHTML = [t.n1[kind], t.n2[kind], t.n3[kind]].map((x, i) => '<li><span class="nb">' + (i + 1) + "</span>" + x + "</li>").join("");
+  const row = (k, v) => '<span class="k">' + k + '</span><span class="v">' + v + "</span>";
+  const pt = A => "(" + fr(A.x) + ", " + fr(A.y) + ")";
+  let h = row("P", pt(P)) + row(app.rmode === "neg" ? "−P" : "Q", pt(Q));
+  if (kind === "opposite") h += row(app.rmode === "neg" ? "P + (−P)" : "P + Q", '<b style="font-family:var(--sans)">O</b>');
+  else {
+    h += row(kind === "double" ? t.tangentS : t.slope, fr(r.s) + "  " + (kind === "double" ? "= (3x₁² + 2) / (2y₁)" : "= (y₂ − y₁) / (x₂ − x₁)")) +
+      row(t.thirdPt, pt(r.third)) + row(kind === "double" ? t.dblPt : t.sumPt, "<b>" + pt(r.R) + "</b>") +
+      row(t.checkRow, "y² = " + fr(r.R.y * r.R.y) + ", x³ + 2x + 2 = " + fr(realF(r.R.x)));
+  }
+  document.getElementById("rnums").innerHTML = h;
+  document.getElementById("dragNote").textContent = (kind === "opposite" ? t.oNote + " " : "") + (note ? note + " " : "") + (app.rmode === "add" ? t.dragQ : t.dragP);
+}
+let DRAG = null;
+function realPointer(e) {
+  const svg = document.getElementById("rsvg"), b = svg.getBoundingClientRect();
+  const x = X0 + (e.clientX - b.left) / b.width * (X1 - X0);
+  const y = Y1 - (e.clientY - b.top) / b.height * (Y1 - Y0);
+  return { x: Math.min(X1 - 0.05, Math.max(ROOT, x)), up: y >= 0 };
+}
+function hookReal() {
+  const svg = document.getElementById("rsvg");
+  if (!svg) return;
+  svg.addEventListener("pointerdown", e => {
+    const g = e.target.closest("[data-h]");
+    if (g) DRAG = g.dataset.h;
+    else {   // a click elsewhere moves the nearer point
+      const p = realPointer(e);
+      if (app.rmode !== "add") DRAG = "P";
+      else DRAG = Math.abs(p.x - rpt(app.rP).x) <= Math.abs(p.x - rpt(app.rQ).x) ? "P" : "Q";
+      app["r" + DRAG] = p; drawReal();
+    }
+    svg.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  svg.addEventListener("pointermove", e => { if (!DRAG) return; app["r" + DRAG] = realPointer(e); drawReal(); });
+  const stop = () => { DRAG = null; };
+  svg.addEventListener("pointerup", stop);
+  svg.addEventListener("pointercancel", stop);
+}
+
+/* ---------- step 3: modulo 17 ---------- */
+function render2() {
+  const t = L();
+  const pr = m => ' aria-pressed="' + (app.mode3 === m) + '"';
+  let right = '<span class="tabs"><button data-action="mode3" data-m="mult"' + pr("mult") + ">" + t.tabMult + "</button>" +
+    '<button data-action="mode3" data-m="dbl"' + pr("dbl") + ">" + t.tabDbl + "</button></span>";
+  if (app.mode3 === "mult") right += '<div class="btns"><button data-action="mk-reset">' + t.bReset + '</button><button data-action="mk-prev">' + t.bPrev + "</button>" +
+    '<button class="dark" data-action="mk-next">' + t.bNext + '</button></div><div id="multBody"></div>';
+  else right += '<div class="btns"><label style="font-weight:600;font-size:14px">' + t.kLbl + ' <input class="sm-in" type="number" min="1" max="1048575" data-field="dk" value="' + app.dk + '"></label></div>' +
+    '<div class="btns"><button data-action="ds-reset">' + t.bReset + '</button><button data-action="ds-prev">' + t.bPrev + "</button>" +
+    '<button class="dark" data-action="ds-next">' + t.bNext + '</button><button data-action="ds-all">' + t.bAll + '</button></div><div id="dblBody"></div>';
+  return '<div class="row"><div class="card" style="flex:0 0 auto"><h3>' + t.cardGrid + '</h3><div id="g3"></div>' +
+      '<p class="note" style="margin:4px 0 0;max-width:420px">' + t.mirror + "<br>" + t.gridNote + '</p><p class="chk" id="chk" style="max-width:420px"></p></div>' +
+    '<div class="card" style="flex:1 1 360px;min-width:0">' + right + "</div></div>";
+}
+function cellCheck() {
+  const t = L(), x = app.cell.x, y = app.cell.y;
+  const l = y * y, r = x * x * x + 2 * x + 2;
+  return t.isOn(x, y, l, l % 17, r, r % 17, l % 17 === r % 17);
+}
+function renderL2Body() {
+  const t = L(), G = { P: TOY.G, col: "var(--ct-b)", label: "G", up: false };
+  document.getElementById("chk").textContent = cellCheck();
+  const g3 = document.getElementById("g3");
+  if (app.mode3 === "mult") {
+    const k = app.mk, path = [];
+    for (let i = 1; i <= Math.min(k, 18); i++) path.push(MULT[i]);
+    const marks = [G];
+    if (k >= 2 && k <= 18) marks.push({ P: MULT[k], col: "var(--chg)", fill: "var(--chg-bg)", label: k + "G", big: true });
+    g3.innerHTML = gridSVG({ c: 22, marks: marks, path: path, mirror: true, click: true, sel: app.cell });
+    let chips = "";
+    for (let i = 1; i <= 19; i++)
+      chips += '<button class="mchip' + (i === k ? " cur" : i > k ? " fut" : "") + '" data-action="mk-set" data-k="' + i + '"><b>' + i + "G</b>" + psH(MULT[i]) + "</button>";
+    document.getElementById("multBody").innerHTML =
+      '<div class="bigline">' + k + "G = " + psH(MULT[k]) + '</div><p class="note" style="margin:0">' + t.multLine(k) + "</p>" +
+      '<div class="mchips">' + chips + "</div>" +
+      (k === 19 ? '<div class="why">' + t.multO + "</div>" : '<p class="note" style="margin:0">' + t.multNote + "</p>") +
+      (k >= 2 ? '<div class="btns"><button data-action="zoom">' + t.seeAdd + "</button></div>" : "");
+    return;
+  }
+  // double and add
+  const k = app.dk, tr = mulTrace(TOY, BigInt(k), TOY.G), ops = tr.ops, j = app.dstep;
+  const cur = j > 0 ? ops[j - 1] : null;
+  const nb = k.toString(2).length;
+  const lab = i => (2n ** BigInt(i)).toString() + "G";
+  const marks = [G];
+  // the doubling chain known so far and the running sum
+  const known = new Map();
+  let Rnow = null, Rlab = "";
+  for (let q = 0; q < j; q++) {
+    const o = ops[q];
+    if (o.t === "double") known.set(o.i + 1, o.R);
+    else { Rnow = o.R; Rlab = "R"; }
+  }
+  known.set(0, TOY.G);
+  for (const [i, P] of known) if (i > 0 && P !== null) marks.push({ P: P, col: "var(--muted)", label: lab(i) });
+  if (cur) {
+    marks.push({ P: cur.Q, col: "var(--chg)", label: lab(cur.i) });
+    if (cur.t === "double") marks.push({ P: cur.R, col: "var(--chg)", fill: "var(--chg-bg)", label: lab(cur.i + 1), big: true });
+    if (cur.P !== null && cur.t === "add") marks.push({ P: cur.P, col: "var(--chg)", label: "R", up: false });
+  }
+  if (Rnow !== null) marks.push({ P: Rnow, col: "var(--ct-b)", fill: "var(--ct-bg)", label: Rlab, big: true, up: false });
+  g3.innerHTML = gridSVG({ c: 22, marks: marks, mirror: true, click: true, sel: app.cell });
+  // bits, most significant first
+  let bits = "";
+  for (let p = nb - 1; p >= 0; p--) {
+    const b = (k >> p) & 1;   // k < 2^20, so plain numbers are fine here
+    bits += '<span class="bit' + (b ? " one" : "") + (cur && cur.i === p ? " chg" : "") + '" title="bit ' + p + '">' + b + "</span>";
+  }
+  const parts = [];
+  for (let p = nb - 1; p >= 0; p--) if ((k >> p) & 1) parts.push(String(2 ** p));
+  // the table: one row per bit, from bit 0 up
+  const D = [TOY.G];
+  for (const o of ops) if (o.t === "double") D[o.i + 1] = o.R;
+  const opIdx = (type, i) => ops.findIndex(o => (type === "double" ? o.t === "double" : o.t !== "double") && o.i === i);
+  const state = q => q < 0 ? "" : q < j - 1 ? " done" : q === j - 1 ? " cur" : " todo";
+  let rows = "";
+  let Rrun = null;
+  for (let i = 0; i < nb; i++) {
+    const b = (k >> i) & 1;
+    const qd = i === 0 ? -1 : opIdx("double", i - 1), qa = b ? opIdx("add", i) : -1;
+    if (b) Rrun = ops[qa].R;
+    rows += "<tr><td>" + i + '</td><td class="op' + (i === 0 ? " done" : state(qd)) + '"' + (qd >= 0 ? ' data-action="dop" data-q="' + qd + '"' : "") + ">" + lab(i) + " = " + ps(D[i]) + "</td>" +
+      '<td class="' + (b ? "bit1" : "") + '">' + b + '</td><td class="op' + (b ? state(qa) : " todo") + '"' + (qa >= 0 ? ' data-action="dop" data-q="' + qa + '"' : "") + ">" +
+      (b ? "R = " + ps(Rrun) : "") + "</td></tr>";
+  }
+  const nD = ops.filter(o => o.t === "double").length, nA = ops.filter(o => o.t === "add").length;
+  let line = "";
+  if (cur) {
+    const txt = cur.t === "double" ? t.opDbl(lab(cur.i), lab(cur.i + 1)) : cur.t === "take" ? t.opTake(cur.i, lab(cur.i)) : t.opAdd(cur.i, "R", lab(cur.i), ps(cur.R));
+    line = '<p class="opline"><b>' + t.opOf(j, ops.length) + '</b> <span class="opnow">' + esc(txt) + "</span>" +
+      (cur.t !== "take" ? ' <button data-action="zoom">' + t.seeAdd + "</button>" : "") + "</p>";
+  }
+  const red = k % 19;
+  document.getElementById("dblBody").innerHTML =
+    '<p style="margin:10px 0 4px">' + k + " " + t.inBin + ": " + '<span class="bits">' + bits + "</span></p>" +
+    '<p class="mono" style="margin:0 0 4px">' + t.sumPow(k, parts) + "</p>" + line +
+    '<div class="schwrap"><table class="dtable"><tr><th>' + t.colI + "</th><th>" + t.colD + "</th><th>" + t.colBit + "</th><th>" + t.colR + "</th></tr>" + rows + "</table></div>" +
+    '<div class="bigline" style="font-size:18px">' + t.resultIs(k, psH(tr.R)) + "</div>" +
+    '<p class="note" style="margin:0">' + t.opsCount(nD, nA, k) + "</p>" +
+    (k >= 19 ? '<p class="note" style="margin:4px 0 0">' + t.reduce(k, Math.floor(k / 19), red) + "</p>" : "");
+}
+function setDk(v) {
+  if (!Number.isFinite(v)) return;
+  app.dk = clampInt(Math.round(v), 1, 1048575); app.dstep = 0;
+  renderL2Body();
+}
+
+/* ---------- step 4: one addition ---------- */
+function render3() {
+  const t = L();
+  const opts = sel => Array.from({ length: 19 }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === sel ? " selected" : "") + ">" + (i + 1 === 19 ? "O" : ps(MULT[i + 1])) + " = " + (i + 1 === 1 ? "G" : (i + 1) + "G") + "</option>").join("");
+  return '<div class="card"><h3>' + t.cardPick + "</h3>" + (app.origin4 ? '<p class="note" style="margin:0 0 8px">' + esc(t.origin(app.origin4)) + "</p>" : "") +
+      '<div class="pick"><label>P <select data-field="p4">' + opts(app.p4) + "</select></label><label>Q <select data-field=\"q4\">" + opts(app.q4) + "</select></label>" +
+      '<span class="note">' + t.presets + '</span><button data-action="pre" data-p="1" data-q="1">' + t.prDbl + '</button><button data-action="pre" data-p="1" data-q="2">' + t.prTask + "</button>" +
+      '<button data-action="pre" data-p="1" data-q="18">' + t.prNeg + "</button></div></div>" +
+    '<div class="card"><h3>' + t.cardForm + '</h3><div id="formbox"></div><p class="note" style="margin:8px 0 0">' + t.divNote + "</p></div>" +
+    '<div class="card"><h3 id="calcHead"></h3><div class="btns" style="margin:0 0 6px" id="s4btns"><button data-action="s4-reset">' + t.bReset + '</button><button data-action="s4-prev">' + t.bPrev + "</button>" +
+      '<button class="dark" data-action="s4-next">' + t.bNext + '</button><button data-action="s4-all">' + t.bAll + "</button></div>" +
+      '<div class="calcwrap"><div class="left" id="calc"></div><div id="g4"></div></div></div>';
+}
+function modLine(v, p) {   // "159 = 9 × 17 + 6"
+  const r = mod(v, p), q = (v - r) / p;
+  return fmt(v) + " = " + fmt(q) + " × " + p + " + " + r;
+}
+function renderL3Body() {
+  const t = L(), C = TOY, p = C.p;
+  const P = MULT[app.p4], Q = MULT[app.q4];
+  const I = addInfo(C, P, Q), kind = I.kind;
+  const rk = multOf(I.R);
+  document.getElementById("calcHead").textContent = t.cardCalc(ps(P), ps(Q), app.s4 >= 3 || kind === "leftO" || kind === "rightO" || kind === "opposite" ? ps(I.R) : "?");
+  const hl = c => c ? ' class="hl"' : "";
+  document.getElementById("formbox").innerHTML = '<div class="formbox">' +
+    '<span class="lb">' + t.fChord + "</span><span" + hl(kind === "chord") + ">s = (y₂ − y₁) / (x₂ − x₁)</span>" +
+    '<span class="lb">' + t.fDbl + "</span><span" + hl(kind === "double") + ">s = (3x₁² + a) / (2y₁)</span>" +
+    '<span class="lb">' + t.fRes + "</span><span>x₃ = s² − x₁ − x₂</span>" +
+    "<span></span><span>y₃ = s × (x₁ − x₃) − y₁</span></div>";
+  const btns = document.getElementById("s4btns");
+  const g4 = document.getElementById("g4");
+  const baseMarks = [];
+  if (P !== null) baseMarks.push({ P: P, col: "var(--ink)", label: "P", up: true });
+  if (Q !== null && !samePoint(P, Q)) baseMarks.push({ P: Q, col: "var(--ink)", label: "Q", up: false });
+  if (P !== null && samePoint(P, Q)) baseMarks[0].label = "P = Q";
+  if (kind === "leftO" || kind === "rightO" || kind === "opposite") {
+    btns.style.display = "none";
+    document.getElementById("calc").innerHTML = '<div class="why" style="margin-top:0">' + (kind === "leftO" ? t.leftO : kind === "rightO" ? t.rightO : t.opp(P.y, Q.y)) + "</div>" +
+      '<div class="bigline">P + Q = ' + psH(I.R) + "</div>";
+    g4.innerHTML = gridSVG({ c: 16, marks: baseMarks.concat(I.R ? [{ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: "P + Q", big: true }] : []), vline: kind === "opposite" ? P.x : undefined });
+    return;
+  }
+  btns.style.display = "";
+  const s4 = app.s4;
+  const x1 = P.x, y1 = P.y, x2 = Q.x, y2 = Q.y;
+  const par = v => v < 0 ? "(" + fmt(v) + ")" : String(v);
+  let L1;
+  if (kind === "double") L1 = "s = (3 × " + x1 + "² + 2) / (2 × " + y1 + ") = " + fmt(I.num) + " / " + fmt(I.den) + " mod 17";
+  else L1 = "s = (" + y2 + " − " + y1 + ") / (" + x2 + " − " + x1 + ") = " + fmt(I.num) + " / " + fmt(I.den) + " mod 17";
+  const reds = [];
+  if (I.num !== I.numM) reds.push(fmt(I.num) + " mod 17 = " + I.numM);
+  if (I.den !== I.denM) reds.push(fmt(I.den) + " mod 17 = " + I.denM);
+  reds.push(I.denM + "⁻¹ mod 17 = " + I.denInv);
+  const prod = I.denM * I.denInv;
+  let inv = '<span class="t">' + esc(t.invQ(String(I.denM))) + '</span><table class="invrow"><tr><td class="h">i</td>';
+  for (let i = 1n; i < p; i++) inv += "<td>" + i + "</td>";
+  inv += '</tr><tr><td class="h">' + I.denM + " × i mod 17</td>";
+  for (let i = 1n; i < p; i++) inv += '<td class="' + (mod(I.denM * i, p) === 1n ? "one" : "") + '">' + mod(I.denM * i, p) + "</td>";
+  inv += "</tr></table>";
+  const sLine = "s = " + I.numM + " × " + I.denInv + " = " + I.sRaw + " mod 17 = <span class=\"res\">" + I.s + "</span>";
+  const x3L = "x₃ = " + I.s + "² − " + x1 + " − " + x2 + " = " + fmt(I.x3Raw) + " mod 17";
+  const x3M = modLine(I.x3Raw, p) + ", " + t.so + " x₃ = <span class=\"res\">" + I.x3 + "</span>";
+  const y3L = "y₃ = " + I.s + " × (" + x1 + " − " + I.x3 + ") − " + y1 + " = " + fmt(I.y3Raw) + " mod 17";
+  const y3M = modLine(I.y3Raw, p) + ", " + t.so + " y₃ = <span class=\"res\">" + I.y3 + "</span>";
+  const lhs = I.y3 * I.y3, rhs = I.x3 ** 3n + 2n * I.x3 + 2n;
+  const ck = "y₃² = " + I.y3 + "² = " + lhs + (lhs >= p ? " = " + modLine(lhs, p).split(" = ")[1] : "") + "<br>" +
+    "x₃³ + 2x₃ + 2 = " + (I.x3 ** 3n) + " + " + (2n * I.x3) + " + 2 = " + rhs + (rhs >= p ? " = " + modLine(rhs, p).split(" = ")[1] : "") + "<br>" +
+    '<span class="okline">' + t.bothSides(String(mod(lhs, p))) + ": " + t.isOnOk(ps(I.R)) + "</span>" + (rk > 0 ? " &nbsp;" + ps(I.R) + " = " + (rk === 1 ? "G" : rk + "G") : "");
+  const blk = (n, title, html) => '<div class="mk' + (s4 === n ? " on" : "") + '">' + n + '</div><div class="lines"><span class="t">' + title + '</span><br><span class="' + (s4 < n ? "later" : "") + '">' + html + "</span></div>";
+  document.getElementById("calc").innerHTML = '<div class="stepsf">' +
+    blk(1, t.stSlope, L1 + "<br>" + reds.join(", ") + " &nbsp;<span class=\"note\">(" + t.because + " " + I.denM + " × " + I.denInv + " = " + prod + (prod >= p ? " = " + modLine(prod, p).split(" = ")[1] : "") + ")</span><br>" + inv + sLine) +
+    blk(2, t.stX, x3L + "<br>" + x3M) + blk(3, t.stY, y3L + "<br>" + y3M) + blk(4, t.stCheck, ck) + "</div>";
+  const marks = baseMarks.slice();
+  if (s4 >= 3) marks.push({ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: kind === "double" ? "2P" : "P + Q", big: true });
+  g4.innerHTML = gridSVG({ c: 16, marks: marks, vline: s4 === 2 ? I.x3 : undefined });
+}
+function setS4(v) { app.s4 = clampInt(v, 1, 4); renderL3Body(); }
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[[app.tab1, "add", "mod", "one"][app.level]];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
+    [render0, render1, render2, render3][app.level]() + "</div>";
+  if (app.level === 0) updateL0();
+  if (app.level === 1) { drawReal(); hookReal(); }
+  if (app.level === 2) renderL2Body();
+  if (app.level === 3) renderL3Body();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+}
+function goTo(level) {
+  app.level = level;
+  render();
+  view.scrollTop = 0;
+}
+// from step 3 to step 4: take the addition that is on the screen
+function originFromStep3() {
+  const lab = i => (2n ** BigInt(i)).toString() + "G";
+  if (app.mode3 === "mult") {
+    if (app.mk < 2) return;
+    app.p4 = app.mk - 1; app.q4 = 1;
+    app.origin4 = app.mk + "G = " + (app.mk - 1) + "G + G";
+  } else {
+    const ops = mulTrace(TOY, BigInt(app.dk), TOY.G).ops;
+    let o = app.dstep > 0 ? ops[app.dstep - 1] : null;
+    if (!o || o.t === "take") o = ops.find(x => x.t !== "take");
+    if (!o) return;
+    app.p4 = o.P === null ? 19 : multOf(o.P); app.q4 = multOf(o.Q);
+    app.origin4 = o.t === "double" ? lab(o.i + 1) + " = " + lab(o.i) + " + " + lab(o.i) : "R + " + lab(o.i) + " (k = " + app.dk + ")";
+  }
+  app.s4 = 1;
+}
+function zoomIn() {
+  if (app.level === 2) originFromStep3();
+  if (app.level < 3) goTo(app.level + 1);
+}
+function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+
+function setSmall(f, v) {
+  if (!Number.isFinite(v)) return;
+  app[f] = clampInt(Math.round(v), 1, 18);
+  const inp = view.querySelector('input[data-field="' + f + '"]');
+  if (inp && +inp.value !== app[f]) inp.value = app[f];
+  updateL0();
+}
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "zoom") zoomIn();
+  else if (a === "tab1") { app.tab1 = el.dataset.t; render(); }
+  else if (a === "dec" || a === "inc") setSmall(el.dataset.f, app[el.dataset.f] + (a === "inc" ? 1 : -1));
+  else if (a === "rand") { const r = new Uint32Array(1); crypto.getRandomValues(r); setSmall(el.dataset.f, 1 + r[0] % 18); }
+  else if (a === "bigrand") {
+    const b = new Uint8Array(32); let v;
+    do { crypto.getRandomValues(b); v = BigInt("0x" + Array.from(b, x => x.toString(16).padStart(2, "0")).join("")); } while (v < 1n || v >= P256.n);
+    app[el.dataset.f] = v.toString(16).padStart(64, "0");
+    const inp = view.querySelector('input[data-field="' + el.dataset.f + '"]'); if (inp) inp.value = app[el.dataset.f];
+    updateBig();
+  }
+  else if (a === "rmode") {
+    app.rmode = el.dataset.m;
+    const st = MODE_START[app.rmode]; app.rP = Object.assign({}, st[0]); if (st[1]) app.rQ = Object.assign({}, st[1]);
+    render();
+  }
+  else if (a === "mode3") { app.mode3 = el.dataset.m; render(); }
+  else if (a === "cell") { app.cell = { x: +el.dataset.x, y: +el.dataset.y }; renderL2Body(); }
+  else if (a === "mk-reset") { app.mk = 1; renderL2Body(); }
+  else if (a === "mk-prev") { app.mk = Math.max(1, app.mk - 1); renderL2Body(); }
+  else if (a === "mk-next") { app.mk = Math.min(19, app.mk + 1); renderL2Body(); }
+  else if (a === "mk-set") { app.mk = +el.dataset.k; renderL2Body(); }
+  else if (a === "ds-reset") { app.dstep = 0; renderL2Body(); }
+  else if (a === "ds-prev") { app.dstep = Math.max(0, app.dstep - 1); renderL2Body(); }
+  else if (a === "ds-next" || a === "ds-all") {
+    const n = mulTrace(TOY, BigInt(app.dk), TOY.G).ops.length;
+    app.dstep = a === "ds-all" ? n : Math.min(n, app.dstep + 1); renderL2Body();
+  }
+  else if (a === "dop") { app.dstep = +el.dataset.q + 1; originFromStep3(); goTo(3); }
+  else if (a === "pre") { app.p4 = +el.dataset.p; app.q4 = +el.dataset.q; app.s4 = 1; app.origin4 = null; render(); }
+  else if (a === "s4-reset") setS4(1);
+  else if (a === "s4-prev") setS4(app.s4 - 1);
+  else if (a === "s4-next") setS4(app.s4 + 1);
+  else if (a === "s4-all") setS4(4);
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  const v = e.target.value;
+  if (f === "a" || f === "b" || f === "d" || f === "k") { const n = parseInt(v, 10); if (n >= 1 && n <= 18) { app[f] = n; updateL0(); } }
+  else if (f === "bigA" || f === "bigB") { app[f] = v; updateBig(); }
+  else if (f === "dk") { const n = parseInt(v, 10); if (n >= 1 && n <= 1048575) setDk(n); }
+});
+view.addEventListener("change", e => {
+  const f = e.target.dataset.field;
+  if (f === "m") { app.m = +e.target.value; updateL0(); }
+  else if (f === "p4" || f === "q4") { app[f] = +e.target.value; app.s4 = 1; app.origin4 = null; render(); }
+  else if (f === "a" || f === "b" || f === "d" || f === "k") setSmall(f, parseInt(e.target.value, 10));
+  else if (f === "dk") { setDk(parseInt(e.target.value, 10)); e.target.value = app.dk; }
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Enter" && tag === "BUTTON") return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
+  else if (app.level === 2 && (e.key === "n" || e.key === " ")) {
+    e.preventDefault();
+    if (app.mode3 === "mult") app.mk = Math.min(19, app.mk + 1);
+    else app.dstep = Math.min(mulTrace(TOY, BigInt(app.dk), TOY.G).ops.length, app.dstep + 1);
+    renderL2Body();
+  }
+  else if (app.level === 2 && e.key === "p") {
+    if (app.mode3 === "mult") app.mk = Math.max(1, app.mk - 1); else app.dstep = Math.max(0, app.dstep - 1);
+    renderL2Body();
+  }
+  else if (app.level === 3 && (e.key === "n" || e.key === " ")) { e.preventDefault(); setS4(app.s4 + 1); }
+  else if (app.level === 3 && e.key === "p") setS4(app.s4 - 1);
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+const startStep = parseInt(location.hash.slice(1), 10);
+if (startStep >= 1 && startStep <= 4) app.level = startStep - 1;
+render();
+</script>
+</body>
+</html>

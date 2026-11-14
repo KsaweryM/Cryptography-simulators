@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RSA explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  --key-b:#E2A60E;   --key-bg:#FDF3DC;
+  --ctr-b:#2FA84F;   --ctr-bg:#E3F4E8;
+  --non-b:#2F6FDB;   --non-bg:#E5EDFB;
+  --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
+  --p:#2F6FDB; --z:#9A6B00; --c:#7446C4;
+  --g0:#2F6FDB; --g1:#2FA84F; --g2:#E5484D; --g3:#E2A60E;
+  --eve-bg:#FDE9EA;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+    --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+    --ct-b:#B596F5; --ct-bg:#2A2142;
+    --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+    --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+    --eve-bg:#3A1A1C;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+  --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+  --ct-b:#B596F5; --ct-bg:#2A2142;
+  --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+  --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+  --eve-bg:#3A1A1C;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+.mono{font-family:var(--mono)}
+
+/* frame: the same as the ChaCha20 explorer */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.cardhead h3{margin:0}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.schwrap{overflow-x:auto}
+.box{background:var(--ink);color:var(--surface);border:0;border-radius:10px;padding:12px 18px;font-size:19px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.box:hover{background:var(--ink);box-shadow:0 0 0 3px var(--chg)}
+.box small{font-size:12px;font-weight:400;opacity:.8}
+.box .f{font-family:var(--mono);font-size:13.5px;font-weight:500;opacity:.95}
+
+/* roles: one colour per role in every step */
+.role-pub{border-color:var(--ctr-b);background:var(--ctr-bg)}
+.role-sec{border-color:var(--key-b);background:var(--key-bg)}
+.role-msg{border-color:var(--non-b);background:var(--non-bg)}
+.role-ct{border-color:var(--ct-b);background:var(--ct-bg)}
+.role-eve{border-color:var(--g2);background:var(--eve-bg)}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1.5px solid;white-space:nowrap}
+.v{font-family:var(--mono);font-weight:600}
+.vbig{font-family:var(--mono);font-size:22px;font-weight:600;line-height:1.25;word-break:break-all}
+
+/* step 1: the schematic */
+.sch1{position:relative;width:890px;height:484px}
+.sch1 .arrows{position:absolute;left:0;top:0}
+.node{position:absolute;border-radius:10px;padding:8px 12px;border:1.5px solid;color:var(--ink);overflow:hidden}
+.node .nh{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.node small{display:block;font-size:12px;color:var(--muted)}
+.node input{width:100%;margin-top:6px;font-size:20px;font-weight:600;padding:4px 8px}
+.node textarea{width:100%;margin-top:6px;font-size:15px;resize:none;height:44px;padding:5px 8px}
+.kbox{position:absolute;border:1.5px solid;border-radius:10px;padding:8px 12px;text-align:left;color:var(--ink);display:flex;flex-direction:column;gap:2px}
+.kbox:hover{box-shadow:0 0 0 3px var(--chg)}
+.kbox.role-pub:hover{background:var(--ctr-bg)} .kbox.role-sec:hover{background:var(--key-bg)}
+.kbox .nh{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.kbox small{font-size:12px;color:var(--muted)}
+.kbox .kv{font-family:var(--mono);font-size:17px;font-weight:600;word-break:break-all}
+.s1-pub{left:120px;top:0;width:310px;min-height:84px}
+.s1-prv{left:500px;top:0;width:310px;min-height:84px}
+.s1-m{left:0;top:146px;width:172px;height:132px}
+.s1-enc{position:absolute;left:200px;top:172px;width:150px;height:80px}
+.s1-c{left:380px;top:146px;width:170px;height:132px}
+.s1-dec{position:absolute;left:580px;top:172px;width:150px;height:80px}
+.s1-out{left:758px;top:146px;width:132px;height:132px}
+.s1-eve{left:180px;top:326px;width:570px;min-height:134px}
+.s1-who{position:absolute;font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px}
+.clist{font-family:var(--mono);font-size:14px;font-weight:600;line-height:1.45;margin-top:4px;word-break:break-word}
+.eveline{font-size:13.5px;margin-top:3px}
+.ftab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:4px}
+.ftab td{padding:3px 10px 3px 0;white-space:nowrap}
+.ftab td.lbl{font-family:var(--sans);font-weight:600;font-size:13px;color:var(--muted)}
+.ltab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:6px}
+.ltab td{padding:3px 6px;text-align:center;min-width:2.6em;border:1px solid var(--rule)}
+.ltab td.lbl{font-family:var(--sans);font-size:12.5px;font-weight:600;text-align:left;border:0;padding-right:12px;white-space:nowrap}
+.ltab tr.rm td:not(.lbl){background:var(--non-bg)}
+.ltab tr.rc td:not(.lbl){background:var(--ct-bg)}
+.ltab td.same{outline:2.5px solid var(--chg);outline-offset:-2px;font-weight:700}
+.tablewrap{overflow-x:auto}
+
+/* step 2: the key table and Euclid */
+.presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.presets button{font-size:13px;padding:4px 10px}
+.presets button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.inrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.chip{display:flex;flex-direction:column;border-radius:8px;padding:6px 10px;border:1.5px solid;font-weight:600;font-size:13.5px}
+.chip small{font-weight:400;color:var(--muted);font-size:12px}
+.chip input{margin-top:4px;width:12em;font-size:16px;font-weight:600}
+.ktab{border-collapse:collapse;width:100%;font-size:14.5px}
+.ktab td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:middle}
+.ktab td.num{width:40px}
+.ktab td.val{font-family:var(--mono)}
+.ktab td.val .okline,.ktab td.val .note,.ktab td.val .err{font-family:var(--sans)}
+.sumline .st{font-family:var(--sans);font-size:14px}
+.ktab tr.todo td{color:var(--muted);opacity:.6}
+.badge{display:inline-flex;width:26px;height:26px;border-radius:7px;background:var(--ink);color:var(--surface);font-family:var(--mono);font-weight:700;align-items:center;justify-content:center}
+.etab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:4px}
+.etab th{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px 22px 4px 0;border-bottom:1.5px solid var(--rule)}
+.etab td{padding:4px 22px 4px 0;white-space:nowrap;border-bottom:1px solid var(--rule)}
+.etab tr.start td{color:var(--muted)}
+.etab tr.cur td{background:var(--chg-bg)}
+.etab tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--chg)}
+.etab tr.one td{background:var(--ctr-bg)}
+.etab tr.hide td{opacity:.35}
+.etab tr.hide td:nth-child(n+4){visibility:hidden}
+.etab .tcoef{color:var(--chg);font-weight:700}
+.result{margin-top:12px;font-size:14.5px;line-height:1.8}
+.twokeys{display:flex;gap:18px;flex-wrap:wrap;align-items:stretch;margin-top:4px}
+.twokeys .kbox{position:static;min-width:300px;flex:1 1 300px}
+.trash{margin-top:12px;border:1.5px dashed var(--rule);border-radius:8px;padding:6px 12px;font-size:13.5px;color:var(--muted)}
+
+/* step 3: square and multiply */
+.formula{font-family:var(--mono);font-size:24px;font-weight:600;margin:6px 0 4px;word-break:break-all}
+.formula sup{font-size:15px}
+.bits{display:inline-flex;gap:2px;align-items:flex-start;flex-wrap:wrap}
+.bitcol{display:flex;flex-direction:column;align-items:center;gap:1px}
+.bit{display:inline-block;min-width:22px;height:26px;line-height:26px;text-align:center;font-family:var(--mono);font-size:14px;border-radius:4px;background:var(--sunken);color:var(--muted);padding:0 2px}
+.bit.one{background:var(--ink);color:var(--surface)}
+.bit.cur{background:var(--chg);color:#fff}
+.bitcol small{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.ptab{border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:8px}
+.ptab th{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px 14px 4px 0;border-bottom:1.5px solid var(--rule)}
+.ptab td{padding:5px 14px 5px 0;white-space:nowrap;border-bottom:1px solid var(--rule)}
+.ptab tr.cur td{background:var(--chg-bg)}
+.ptab tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--chg)}
+.ptab tr.hide td{opacity:.35}
+.ptab tr.hide td:nth-child(n+3){visibility:hidden}
+.ptab td.skip{color:var(--muted)}
+.ptab td.res{font-weight:700}
+.sumline{font-family:var(--mono);font-size:15px;margin-top:12px;line-height:1.8;word-break:break-word}
+.sumline b{color:var(--chg)}
+
+/* step 4 */
+.evebar{height:10px;border-radius:5px;background:var(--sunken);overflow:hidden;margin:8px 0 4px;max-width:520px}
+.evebar span{display:block;height:100%;background:var(--g2);width:0}
+.bign{font-family:var(--mono);font-size:11.5px;line-height:1.35;word-break:break-all;background:var(--sunken);border-radius:8px;padding:8px 10px;max-height:118px;overflow:auto;color:var(--muted)}
+.ul{margin:4px 0 0;padding-left:20px}
+.ul li{margin:4px 0}
+.found{font-size:16px;margin-top:8px}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== RSA core (textbook RSA, small numbers, BigInt) ===================== */
+// CORE-BEGIN
+const MAX_PRIME = 1000000000n;   // p and q below 10^9: trial division stays fast
+
+function gcd(a, b) {
+  while (b !== 0n) { const r = a % b; a = b; b = r; }
+  return a;
+}
+// the smallest divisor of n > 1 (n itself if n is prime), by trying divisors
+function smallestFactor(n) {
+  if (n % 2n === 0n) return 2n;
+  for (let i = 3n; i * i <= n; i += 2n) if (n % i === 0n) return i;
+  return n;
+}
+function isPrime(n) { return n >= 2n && smallestFactor(n) === n; }
+
+// Euclid's table: a = q * b + r, then (a, b) <- (b, r) until r = 0
+function euclidRows(a, b) {
+  const rows = [];
+  while (b !== 0n) {
+    const q = a / b, r = a % b;
+    rows.push({ a: a, b: b, q: q, r: r });
+    a = b; b = r;
+  }
+  return rows;
+}
+// extended Euclid: every remainder is written as r = s * phi + t * e.
+// The two start rows: phi = 1 * phi + 0 * e and e = 0 * phi + 1 * e.
+// Each next row = (the row two above) - q * (the row above).
+function extEuclid(phi, e) {
+  const rows = euclidRows(phi, e);
+  const mix = [{ r: phi, s: 1n, t: 0n }, { r: e, s: 0n, t: 1n }];
+  for (const row of rows) {
+    const A = mix[mix.length - 2], B = mix[mix.length - 1];
+    mix.push({ r: row.r, s: A.s - row.q * B.s, t: A.t - row.q * B.t });
+  }
+  const last = mix[mix.length - 2];          // the row with the last non-zero remainder
+  const g = last.r;
+  let d = null;
+  if (g === 1n) { d = last.t % phi; if (d < 0n) d += phi; }
+  return { rows: rows, mix: mix, g: g, t: last.t, s: last.s, d: d };
+}
+function modInverse(e, m) { return extEuclid(m, e).d; }
+
+// base^exp mod n, right to left: square the power every bit, multiply it in where the bit is 1
+function modPowTrace(base, exp, n) {
+  const rows = [];
+  let power = base % n, result = 1n % n, k = 0, prev = null;
+  let x = exp;
+  while (x > 0n) {
+    if (k > 0) { prev = power; power = (power * power) % n; }
+    const bit = Number(x & 1n);
+    const before = result;
+    if (bit === 1) result = (result * power) % n;
+    rows.push({ k: k, bit: bit, prev: prev, power: power, before: before, result: result });
+    x >>= 1n; k++;
+  }
+  return { rows: rows, result: result };
+}
+function modPow(base, exp, n) {
+  let power = base % n, result = 1n % n, x = exp;
+  while (x > 0n) {
+    if (x & 1n) result = (result * power) % n;
+    power = (power * power) % n;
+    x >>= 1n;
+  }
+  return result;
+}
+function encrypt(m, pub) { return modPow(m, pub.e, pub.n); }    // c = m^e mod n
+function decrypt(c, prv) { return modPow(c, prv.d, prv.n); }    // m = c^d mod n
+
+// Bob makes his keys; errors are returned as codes for the page to explain
+function makeKeys(p, q, e) {
+  const K = { p: p, q: q, e: e, n: null, phi: null, d: null, ext: null, err: null, ok: false };
+  if (p < 2n || p >= MAX_PRIME) { K.err = { at: 1, code: "pRange" }; return K; }
+  if (q < 2n || q >= MAX_PRIME) { K.err = { at: 1, code: "qRange" }; return K; }
+  const fp = smallestFactor(p), fq = smallestFactor(q);
+  K.pf = fp; K.qf = fq;
+  if (fp !== p) { K.err = { at: 1, code: "pComp", f: fp }; return K; }
+  if (fq !== q) { K.err = { at: 1, code: "qComp", f: fq }; return K; }
+  if (p === q) { K.err = { at: 1, code: "pq" }; return K; }
+  K.n = p * q;
+  K.phi = (p - 1n) * (q - 1n);
+  if (e <= 1n || e >= K.phi) { K.err = { at: 4, code: "eRange" }; return K; }
+  K.ext = extEuclid(K.phi, e);
+  if (K.ext.g !== 1n) { K.err = { at: 4, code: "eGcd", g: K.ext.g }; return K; }
+  K.d = K.ext.d;
+  K.ok = true;
+  return K;
+}
+// the smallest e >= 3 with gcd(e, phi) = 1 (to suggest when the chosen e does not work)
+function firstGoodE(phi) { for (let e = 3n; e < phi; e += 2n) if (gcd(e, phi) === 1n) return e; return null; }
+
+// a short text as numbers: one number per letter (its Unicode code). Only for tiny n, see the page.
+function textToNums(s) { return Array.from(s, ch => BigInt(ch.codePointAt(0))); }
+function numsToText(a) { return a.map(x => (x < 0x110000n ? String.fromCodePoint(Number(x)) : "?")).join(""); }
+
+/* Test values and where they come from (every one also recomputed with Python 3.12 pow() in a scratch script):
+   1. W. Stallings, "Cryptography and Network Security", RSA example; the same numbers are on the lecture 3
+      slides "Making the keys", "The example: encrypt 88", "The example: decrypt 11":
+      p = 17, q = 11, n = 187, phi = 160, e = 7, d = 23, 88^7 mod 187 = 11, 11^23 mod 187 = 88,
+      88^1, 88^2, 88^4 mod 187 = 88, 77, 132; 11^1, 11^2, 11^4, 11^8, 11^16 mod 187 = 11, 121, 55, 33, 154.
+   2. Lecture 3 slide "Euclid's algorithm": gcd(160, 7): 160 = 22*7 + 6, 7 = 1*6 + 1, 6 = 6*1 + 0;
+      slide "Extended Euclid, step 3": 1 = 23*7 - 1*160.
+   3. Lecture 3, Task 4 (slide "Solution: an inverse by hand"): inverse of 23 mod 120 = 47, 1 = 47*23 - 9*120.
+   4. Wikipedia "RSA (cryptosystem)", worked example (the version with Euler's phi; the current article uses
+      lambda = 780 and d = 413 instead): p = 61, q = 53, n = 3233, phi = 3120, e = 17, d = 2753,
+      65^17 mod 3233 = 2790, 2790^2753 mod 3233 = 65.
+   5. Lecture 3, Task 5 (slide "Solution: your own RSA", Task5/solution/my_rsa.py): p = 37908704904578413183,
+      q = 58606630333925820283, e = 65537, d = 1367151349159148221410861819858768950381,
+      2026 -> C = 736246060401132335090489988934276767570.
+   6. Lecture 3, Task 6: with n = 187, e = 7, d = 23 every P from 0 to 186 comes back; 17 -> 85 -> 17.
+   7. Lecture 3, Task 7 (Task7/pin.py): the bank's 2048-bit n, e = 65537, and C; PIN 4821 gives C.
+   8. Invariant: decrypt(encrypt(m)) = m for every m < n with the preset keys of this page. */
+const TASK7_N = BigInt(
+  "1872841195117846544841412217848882016914999669618551874656442540592245157199172284036666" +
+  "4133819670868121337628024215357371088011677213618179225491492308522638260766784577579056" +
+  "2503833714947149399785696726501129650715798554202938177179190554594601904751852083122215" +
+  "8057947034828253454638553229680182930743346009701935234179308516240818438791244416535117" +
+  "4438599548369347346440740878583632951593243478160883166083141596520077822941268222256906" +
+  "3007444251582916339284117927636160928694447560172861239100470527351501529873947354944785" +
+  "6512761663278694200484166169777618275780233631406978635015286934781219895694598917365383" +
+  "3");
+const TASK7_C = BigInt(
+  "7332072385529698190639629753233484374256896745430252412164314970011183931212726541097741" +
+  "8517601857555236271280372126699069139375204601624878637979013676460224617842168808286379" +
+  "5857214264834240122145254830440949565363086589962516854173388760424190608057515512132795" +
+  "6969317451095860438602167078955063616733772359080776681126370710924434944332506229572697" +
+  "0903607216716755528169246962615220088320071217812749942469660037831165985056493785539608" +
+  "3503439207009097456414061872740443999816367937732652442509322860944524988225405526067258" +
+  "9811720959928951502493599386072038265358314787833313330898379884238139910309050126307341");
+const TASK7_E = 65537n;
+const PRESETS = [   // [p, q, e]
+  [17n, 11n, 7n],          // the slides (Stallings)
+  [11n, 13n, 23n],         // phi = 120: the numbers of Task 4
+  [61n, 53n, 17n],         // Wikipedia
+  [1009n, 1013n, 65537n],  // e = 65537 as in practice
+];
+
+function selfTest() {
+  const fails = [];
+  const eq = (a, b) => a === b;
+  // 1. Stallings / the slides
+  const K = makeKeys(17n, 11n, 7n);
+  if (!K.ok || K.n !== 187n || K.phi !== 160n || K.d !== 23n) fails.push("keys 17, 11, 7");
+  if (encrypt(88n, { n: 187n, e: 7n }) !== 11n) fails.push("88^7 mod 187");
+  if (decrypt(11n, { n: 187n, d: 23n }) !== 88n) fails.push("11^23 mod 187");
+  const tr1 = modPowTrace(88n, 7n, 187n).rows.map(r => r.power).join(",");
+  if (tr1 !== "88,77,132") fails.push("powers of 88");
+  const tr2 = modPowTrace(11n, 23n, 187n);
+  if (tr2.rows.map(r => r.power).join(",") !== "11,121,55,33,154" || tr2.result !== 88n) fails.push("powers of 11");
+  // 2. Euclid on the slides
+  const er = euclidRows(160n, 7n).map(r => [r.a, r.b, r.q, r.r].join(" ")).join("|");
+  if (er !== "160 7 22 6|7 6 1 1|6 1 6 0") fails.push("Euclid 160, 7");
+  const x1 = extEuclid(160n, 7n);
+  if (x1.g !== 1n || x1.t !== 23n || x1.s !== -1n || x1.d !== 23n) fails.push("extended Euclid 160, 7");
+  // 3. Task 4
+  const x2 = extEuclid(120n, 23n);
+  if (x2.d !== 47n || x2.t !== 47n || x2.s !== -9n || euclidRows(120n, 23n).length !== 5) fails.push("Task 4: 23 mod 120");
+  // 4. Wikipedia
+  const W = makeKeys(61n, 53n, 17n);
+  if (!W.ok || W.n !== 3233n || W.phi !== 3120n || W.d !== 2753n) fails.push("keys 61, 53, 17");
+  if (encrypt(65n, W) !== 2790n || decrypt(2790n, W) !== 65n) fails.push("65 -> 2790");
+  // 5. Task 5 (20-digit primes)
+  const p5 = 37908704904578413183n, q5 = 58606630333925820283n, phi5 = (p5 - 1n) * (q5 - 1n);
+  const d5 = modInverse(65537n, phi5);
+  if (d5 !== 1367151349159148221410861819858768950381n) fails.push("Task 5: d");
+  if (modPow(2026n, 65537n, p5 * q5) !== 736246060401132335090489988934276767570n) fails.push("Task 5: C");
+  if (modPow(736246060401132335090489988934276767570n, d5, p5 * q5) !== 2026n) fails.push("Task 5: back");
+  // 6. Task 6
+  for (let m = 0n; m < 187n; m++) if (decrypt(encrypt(m, { n: 187n, e: 7n }), { n: 187n, d: 23n }) !== m) { fails.push("Task 6: " + m); break; }
+  if (encrypt(17n, { n: 187n, e: 7n }) !== 85n) fails.push("Task 6: 17 -> 85");
+  // 7. Task 7 (2048 bits)
+  if (modPow(4821n, TASK7_E, TASK7_N) !== TASK7_C) fails.push("Task 7: PIN 4821");
+  // 8. invariants: every preset, every m (or 400 spread values), and the trace equals modPow
+  for (const [p, q, e] of PRESETS) {
+    const k = makeKeys(p, q, e);
+    if (!k.ok || (e * k.d) % k.phi !== 1n) { fails.push("preset " + p + ", " + q); continue; }
+    const step = k.n > 400n ? k.n / 400n : 1n;
+    for (let m = 0n; m < k.n; m += step) {
+      const c = encrypt(m, k);
+      if (decrypt(c, k) !== m || modPowTrace(m, e, k.n).result !== c) { fails.push("round trip " + m + " mod " + k.n); break; }
+    }
+  }
+  // primality and errors
+  if (!isPrime(1000000007n) || isPrime(15n) || isPrime(1n) || smallestFactor(221n) !== 13n) fails.push("primes");
+  if (makeKeys(17n, 11n, 8n).err.code !== "eGcd" || makeKeys(15n, 11n, 7n).err.code !== "pComp") fails.push("key errors");
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const T = {
+  en: {
+    title: "RSA explorer", home: "All simulators",
+    intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
+    stepOf: n => "Step " + n + " of 4 · RSA",
+    steps: [["Black box", "Alice encrypts, Bob decrypts, Eve listens"], ["Making the keys", "p, q, n, phi, e, and d from Euclid's table"],
+            ["One power mod n", "square and multiply, bit by bit"], ["Textbook RSA is not enough", "the same m always gives the same c"]],
+    explain: [
+      ["A padlock anyone can close", "Bob has a key pair. Alice encrypts her message m with Bob's public key, Bob decrypts with his private key. Eve sees n, e and c, and that does not help her. Change the message and watch c. Click a key to see how Bob made it, or a box to see the power inside."],
+      ["Five steps from two primes", "Bob picks two secret primes p and q. n and e become public; phi and d stay secret. d is the inverse of e modulo phi, and it falls out of Euclid's table. Try the presets or your own primes. Click a key at the bottom to use it."],
+      ["Encrypting is one power modulo n", "c = m<sup>e</sup> mod n and m = c<sup>d</sup> mod n. Nobody multiplies m by itself e times: we square, take the remainder, and multiply in the powers where the exponent has a 1 bit. The numbers never grow bigger than n². Step through the rows."],
+      ["The same m always gives the same c", "Textbook RSA has no randomness. Anyone can encrypt with the public key, so Eve encrypts her guesses and compares them with c. If the message comes from a small set (a PIN, yes or no), she finds it without d. Real RSA adds random padding."]],
+    selfOk: "✓ checked against Stallings, Wikipedia and the lecture tasks", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
+    fixKeys: "Bob's keys are not valid. Fix p, q or e in step 2.", goKeys: "go to step 2",
+    alice: "Alice", bob: "Bob", eve: "Eve",
+    pubKey: "Bob's public key {e, n}", prvKey: "Bob's private key {d, n}",
+    pubSub: "everybody may know it · click: how it was made", prvSub: "only Bob knows it · click: how it was made",
+    modeNum: "a number", modeText: "a short text",
+    card1: "Alice sends Bob a message",
+    mNode: "message m", mHint: n => "a number from 0 to " + n, mTextHint: "one number per letter",
+    cNode: "ciphertext c", outNode: "Bob: m",
+    encBox: "encrypt", decBox: "decrypt", boxSub: "click to look inside",
+    eveSees: "sees", eveNot: "does not see", eveNotWhat: "(nor p, q, phi)",
+    eveFactor: (n, p, q) => "To get d, she would need phi, so p and q. " + n + " = " + p + " × " + q + " is easy to factor because n is tiny. A 2048-bit n (617 digits) is not (Task 3).",
+    errM: n => "m must be a whole number from 0 to " + n + ".",
+    errText: (ch, code, n) => "The letter “" + ch + "” has the code " + code + ", which is not smaller than n = " + n + ". Pick bigger primes in step 2.",
+    errEmpty: "Type a few letters.",
+    cardDetails1: "The two powers",
+    rowAlice: "Alice computes", rowBob: "Bob computes", clickPow: "Click a line to see the power step by step.",
+    rowLetter: "letter", rowCode: "m (its code)", rowC: "c", rowBack: "Bob: m back", rowLetter2: "Bob reads",
+    textNote: "Each letter is encrypted on its own, only because n is tiny here. Real RSA turns the whole short text into one big number (as rsa_ready.py does in Task 2), and real messages go with hybrid encryption.",
+    legPub: "public: everybody may know it", legSec: "secret: only Bob", legMsg: "message m", legCt: "ciphertext c", legEve: "Eve, who listens",
+    // step 2
+    cardKeys: "Bob makes his key pair", presets: "examples:",
+    preNames: ["17, 11, e = 7 (the slides)", "11, 13, e = 23 (Task 4)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
+    inP: "p (prime, secret)", inQ: "q (prime, secret)", inE: "e (public)", inLimit: "primes below 10⁹ on this page",
+    kStep: ["choose two primes p and q", "n = p × q", "phi = (p - 1)(q - 1)", "choose e with gcd(e, phi) = 1", "d = the inverse of e mod phi"],
+    pub: "public", sec: "secret",
+    primeOk: "both prime", notPrime: (x, f) => x + " = " + f + " × " + (x / f) + " is not prime",
+    errPRange: "p must be a whole number from 2 to 999 999 999.", errQRange: "q must be a whole number from 2 to 999 999 999.",
+    errPQ: "p and q must be different.", errNum: "Type whole numbers only.",
+    errERange: phi => "e must be bigger than 1 and smaller than phi = " + phi + ".",
+    errEGcd: (e, phi, g) => "gcd(" + e + ", " + phi + ") = " + g + ", not 1: e has no inverse modulo phi.",
+    tryE: e => "try e = " + e,
+    dHow: "how: Euclid's table below",
+    cardEuclid: (e, phi) => "Step 5 in detail: the inverse of " + e + " mod " + phi + " from Euclid's table",
+    euclidNote: "Left: Euclid's algorithm, as on the slides. Right: each remainder written as a mix of phi and e. The first two rows are free; each next row is the row two above minus q times the row above. The number in front of e (orange) in the row with remainder 1 is the inverse. This is the slides' “read it from the bottom”, done from the top.",
+    thA: "a", thB: "b", thDiv: "a = q × b + r", thMix: "r as a mix: s × phi + t × e", start: "start",
+    stopRow: "remainder 0: stop",
+    bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bAll: "all rows",
+    rowK: (k, N) => "row " + k + " of " + N,
+    resOne: (e, phi, t) => "The last non-zero remainder is 1, so gcd(" + e + ", " + phi + ") = 1 and the inverse exists. In that row the number in front of e is <b>" + t + "</b>.",
+    resNeg: (t, phi, d) => t + " is negative, so we add phi: " + t + " + " + phi + " = <b>" + d + "</b>. (Any multiple of phi can be added: it does not change anything mod phi.)",
+    resD: d => "d = <b>" + d + "</b>",
+    resCheck: (e, d, ed, k, phi) => "Check: " + e + " × " + d + " = " + ed + " = " + k + " × " + phi + " + 1, so e × d mod phi = 1 ✓",
+    resPy: (e, phi, d) => "In Python: <span class=\"v\">pow(" + e + ", -1, " + phi + ")</span> gives " + d + ".",
+    resBad: g => "The last non-zero remainder is " + g + ", not 1: there is no inverse. Bob must pick another e.",
+    cardTwo: "The two keys", twoNote: "Click a key to use it: one power modulo n.",
+    trash: "p, q and phi: not needed any more; keep them secret or delete them. Whoever knows p and q can compute d.",
+    // step 3
+    tabEnc: "encrypt: c = m^e mod n", tabDec: "decrypt: m = c^d mod n",
+    cardPow: "One power modulo n, square and multiply", baseM: "Alice's m",
+    expIs: (name, x, bin, parts) => "The exponent " + name + " = " + x + " in binary is " + bin + (parts ? " = " + parts : ""),
+    thK: "bit k", thBit: "bit", thPow: "base^(2^k) mod n: square the row above", thMul: "bit 1: multiply it in", thRes: "result so far",
+    first: "the base itself", skip: "bit 0: skip",
+    sumTitle: "Together, as on the slides:",
+    count: (sq, mul, naive) => "That is " + sq + " " + (sq === 1 ? "squaring" : "squarings") + " and " + mul + " " + (mul === 1 ? "multiplication" : "multiplications") + " instead of " + naive + " " + (naive === 1n ? "multiplication" : "multiplications") + " one by one.",
+    countBig: "A 2048-bit exponent takes about 2048 squarings. This is why Python's pow(m, e, n) is fast.",
+    goDec: "now decrypt this c ▶", goEnc: "◀ back to encrypting",
+    mod: "mod",
+    // step 4
+    cardSame: "The same message, the same ciphertext",
+    sameNote: "Alice's text from step 1, encrypted letter by letter with Bob's public key. Equal letters give equal ciphertexts (framed), every time. Eve does not need d to see which letters repeat.",
+    sameNone: "No letter repeats in this text. Type one with a repeated letter in step 1, for example HELLO BOB.",
+    cardGuess: "Eve guesses and checks",
+    guessIntro: (c, n, e) => "Eve caught c = " + c + ". She knows the public key {e, n} = {" + e + ", " + n + "}, and she knows Alice sends a PIN (a number below 10 000). She encrypts every guess and compares it with c.",
+    guessRange: (lim) => "guesses: 0 to " + lim,
+    bGuess: "Eve: try every guess", bGuessBig: "the same on the 2048-bit key of Task 7",
+    found: (m, k, ms) => "Found m = " + m + " after " + k + " " + (k === 1 ? "guess" : "guesses") + " (" + ms + " ms), without the private key.",
+    notFound: k => "Not found in " + k + " guesses: Alice's m is not below 10 000, so Eve's assumption was wrong. With a big message space this attack fails; with a PIN it always works.",
+    lastTries: "the last guesses:",
+    bigIntro: "Task 7: the bank's public key has 2048 bits (n has 617 digits) and e = 65537. Eve caught C. Same trick, same result: the key size does not help.",
+    bigRun: (k) => "trying… " + k + " guesses",
+    bigFound: (pin, k, s) => "PIN " + pin + " found after " + k + " guesses in " + s + " s, in your browser.",
+    showN: "the 2048-bit n of Task 7",
+    cardReal: "What real RSA does",
+    real: ["<b>Random padding (OAEP).</b> Before encrypting, random bytes are added to the message in a fixed way. The same PIN then gives a different c every time, and Eve's guesses no longer match. Bob removes the padding after decrypting. Every library does this for you.",
+           "<b>Big keys.</b> n has at least 2048 bits (617 digits), so nobody can factor it to find p, q and d. The small numbers on this page are only for learning.",
+           "<b>Only a key.</b> RSA is slow, so in practice it carries only a random symmetric key (hybrid encryption), and ChaCha20 or AES encrypts the data."],
+    realNote: "This page shows textbook RSA only. It does not show OAEP.",
+    cardLeak: "What if Bob's private key leaks?",
+    leakIntro: "Eve recorded every ciphertext Alice sent (here: the letters of her text from step 1). Years later she steals Bob's private key d.",
+    bLeak: "Eve steals d", bUnleak: "undo",
+    leakRec: "recorded", leakOpen: "opened with d",
+    leakNote: "A leaked private key opens all recorded messages, from everybody who wrote to Bob, and all new ones until Bob changes his key. The fix is keys that live for one session only (forward secrecy, next lecture).",
+  },
+  pl: {
+    title: "Eksplorator RSA", home: "Wszystkie symulatory",
+    intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
+    stepOf: n => "Krok " + n + " z 4 · RSA",
+    steps: [["Czarna skrzynka", "Alice szyfruje, Bob odszyfrowuje, Eve podsłuchuje"], ["Tworzenie kluczy", "p, q, n, phi, e oraz d z tabeli Euklidesa"],
+            ["Jedna potęga mod n", "kwadrat i mnożenie, bit po bicie"], ["Podręcznikowe RSA nie wystarcza", "to samo m zawsze daje to samo c"]],
+    explain: [
+      ["Kłódka, którą każdy może zamknąć", "Bob ma parę kluczy. Alice szyfruje wiadomość m kluczem publicznym Boba, a Bob odszyfrowuje ją swoim kluczem prywatnym. Eve widzi n, e i c, i nic jej to nie daje. Zmień wiadomość i patrz na c. Kliknij klucz, żeby zobaczyć, jak Bob go zrobił, albo pole, żeby zajrzeć do potęgi."],
+      ["Pięć kroków od dwóch liczb pierwszych", "Bob wybiera dwie tajne liczby pierwsze p i q. n i e są jawne, phi i d zostają tajne. d to odwrotność e modulo phi i wychodzi z tabeli Euklidesa. Wypróbuj przykłady albo własne liczby. Kliknij klucz na dole, żeby go użyć."],
+      ["Szyfrowanie to jedna potęga modulo n", "c = m<sup>e</sup> mod n oraz m = c<sup>d</sup> mod n. Nikt nie mnoży m przez siebie e razy: podnosimy do kwadratu, bierzemy resztę i domnażamy te potęgi, przy których wykładnik ma bit 1. Liczby nigdy nie przekraczają n². Przejdź po wierszach."],
+      ["To samo m zawsze daje to samo c", "Podręcznikowe RSA nie ma losowości. Każdy może szyfrować kluczem publicznym, więc Eve szyfruje swoje strzały i porównuje je z c. Jeśli wiadomość pochodzi z małego zbioru (PIN, tak lub nie), Eve znajdzie ją bez d. Prawdziwe RSA dodaje losowe dopełnienie."]],
+    selfOk: "✓ sprawdzone z przykładami Stallingsa, Wikipedii i zadań z wykładu", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
+    fixKeys: "Klucze Boba są niepoprawne. Popraw p, q albo e w kroku 2.", goKeys: "przejdź do kroku 2",
+    alice: "Alice", bob: "Bob", eve: "Eve",
+    pubKey: "klucz publiczny Boba {e, n}", prvKey: "klucz prywatny Boba {d, n}",
+    pubSub: "może go znać każdy · kliknij: skąd się wziął", prvSub: "zna go tylko Bob · kliknij: skąd się wziął",
+    modeNum: "liczba", modeText: "krótki tekst",
+    card1: "Alice wysyła Bobowi wiadomość",
+    mNode: "wiadomość m", mHint: n => "liczba od 0 do " + n, mTextHint: "jedna liczba na literę",
+    cNode: "szyfrogram c", outNode: "Bob: m",
+    encBox: "szyfruj", decBox: "odszyfruj", boxSub: "kliknij, by zajrzeć",
+    eveSees: "widzi", eveNot: "nie widzi", eveNotWhat: "(ani p, q, phi)",
+    eveFactor: (n, p, q) => "Żeby policzyć d, potrzebowałaby phi, czyli p i q. " + n + " = " + p + " × " + q + " łatwo rozłożyć, bo n jest malutkie. 2048-bitowego n (617 cyfr) się nie da (zadanie 3).",
+    errM: n => "m musi być liczbą całkowitą od 0 do " + n + ".",
+    errText: (ch, code, n) => "Litera „" + ch + "” ma kod " + code + ", który nie jest mniejszy od n = " + n + ". Wybierz większe liczby pierwsze w kroku 2.",
+    errEmpty: "Wpisz kilka liter.",
+    cardDetails1: "Dwie potęgi",
+    rowAlice: "Alice liczy", rowBob: "Bob liczy", clickPow: "Kliknij wiersz, żeby zobaczyć potęgę krok po kroku.",
+    rowLetter: "litera", rowCode: "m (jej kod)", rowC: "c", rowBack: "Bob: m z powrotem", rowLetter2: "Bob czyta",
+    textNote: "Każda litera jest szyfrowana osobno tylko dlatego, że n jest tu malutkie. Prawdziwe RSA zamienia cały krótki tekst w jedną dużą liczbę (jak rsa_ready.py w zadaniu 2), a prawdziwe wiadomości idą szyfrowaniem hybrydowym.",
+    legPub: "jawne: może znać każdy", legSec: "tajne: tylko Bob", legMsg: "wiadomość m", legCt: "szyfrogram c", legEve: "Eve, która podsłuchuje",
+    cardKeys: "Bob tworzy parę kluczy", presets: "przykłady:",
+    preNames: ["17, 11, e = 7 (ze slajdów)", "11, 13, e = 23 (zadanie 4)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
+    inP: "p (pierwsza, tajna)", inQ: "q (pierwsza, tajna)", inE: "e (jawne)", inLimit: "na tej stronie liczby pierwsze poniżej 10⁹",
+    kStep: ["wybierz dwie liczby pierwsze p i q", "n = p × q", "phi = (p - 1)(q - 1)", "wybierz e, dla którego gcd(e, phi) = 1", "d = odwrotność e mod phi"],
+    pub: "jawne", sec: "tajne",
+    primeOk: "obie pierwsze", notPrime: (x, f) => x + " = " + f + " × " + (x / f) + " nie jest pierwsza",
+    errPRange: "p musi być liczbą całkowitą od 2 do 999 999 999.", errQRange: "q musi być liczbą całkowitą od 2 do 999 999 999.",
+    errPQ: "p i q muszą być różne.", errNum: "Wpisuj tylko liczby całkowite.",
+    errERange: phi => "e musi być większe od 1 i mniejsze od phi = " + phi + ".",
+    errEGcd: (e, phi, g) => "gcd(" + e + ", " + phi + ") = " + g + ", a nie 1: e nie ma odwrotności modulo phi.",
+    tryE: e => "spróbuj e = " + e,
+    dHow: "jak: tabela Euklidesa niżej",
+    cardEuclid: (e, phi) => "Krok 5 dokładnie: odwrotność " + e + " mod " + phi + " z tabeli Euklidesa",
+    euclidNote: "Po lewej algorytm Euklidesa, jak na slajdach. Po prawej każda reszta zapisana jako mieszanka phi i e. Dwa pierwsze wiersze są za darmo; każdy następny to wiersz dwa wyżej minus q razy wiersz wyżej. Liczba przy e (pomarańczowa) w wierszu z resztą 1 to odwrotność. To samo co „czytanie od dołu” ze slajdów, tylko liczone od góry.",
+    thA: "a", thB: "b", thDiv: "a = q × b + r", thMix: "r jako mieszanka: s × phi + t × e", start: "start",
+    stopRow: "reszta 0: koniec",
+    bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bAll: "wszystkie wiersze",
+    rowK: (k, N) => "wiersz " + k + " z " + N,
+    resOne: (e, phi, t) => "Ostatnia niezerowa reszta to 1, więc gcd(" + e + ", " + phi + ") = 1 i odwrotność istnieje. W tym wierszu liczba przy e to <b>" + t + "</b>.",
+    resNeg: (t, phi, d) => t + " jest ujemne, więc dodajemy phi: " + t + " + " + phi + " = <b>" + d + "</b>. (Można dodać dowolną wielokrotność phi: modulo phi nic to nie zmienia.)",
+    resD: d => "d = <b>" + d + "</b>",
+    resCheck: (e, d, ed, k, phi) => "Sprawdzenie: " + e + " × " + d + " = " + ed + " = " + k + " × " + phi + " + 1, więc e × d mod phi = 1 ✓",
+    resPy: (e, phi, d) => "W Pythonie: <span class=\"v\">pow(" + e + ", -1, " + phi + ")</span> daje " + d + ".",
+    resBad: g => "Ostatnia niezerowa reszta to " + g + ", a nie 1: odwrotności nie ma. Bob musi wybrać inne e.",
+    cardTwo: "Dwa klucze", twoNote: "Kliknij klucz, żeby go użyć: jedna potęga modulo n.",
+    trash: "p, q i phi: już niepotrzebne; trzymaj je w tajemnicy albo usuń. Kto zna p i q, ten policzy d.",
+    tabEnc: "szyfrowanie: c = m^e mod n", tabDec: "odszyfrowanie: m = c^d mod n",
+    cardPow: "Jedna potęga modulo n: kwadrat i mnożenie", baseM: "m od Alice",
+    expIs: (name, x, bin, parts) => "Wykładnik " + name + " = " + x + " dwójkowo to " + bin + (parts ? " = " + parts : ""),
+    thK: "bit k", thBit: "bit", thPow: "podstawa^(2^k) mod n: kwadrat wiersza wyżej", thMul: "bit 1: domnóż", thRes: "wynik do tej pory",
+    first: "sama podstawa", skip: "bit 0: pomiń",
+    sumTitle: "Razem, jak na slajdach:",
+    count: (sq, mul, naive) => "To " + sq + " " + plN(sq, "podniesienie", "podniesienia", "podniesień") + " do kwadratu i " + mul + " " + plN(mul, "mnożenie", "mnożenia", "mnożeń") + " zamiast " + naive + " " + plN(naive > 1000n ? 100 + Number(naive % 100n) : Number(naive), "mnożenia", "mnożeń", "mnożeń") + " po kolei.",
+    countBig: "Wykładnik 2048-bitowy to około 2048 podniesień do kwadratu. Dlatego pow(m, e, n) w Pythonie jest szybkie.",
+    goDec: "teraz odszyfruj to c ▶", goEnc: "◀ wróć do szyfrowania",
+    mod: "mod",
+    cardSame: "Ta sama wiadomość, ten sam szyfrogram",
+    sameNote: "Tekst Alice z kroku 1, zaszyfrowany litera po literze kluczem publicznym Boba. Takie same litery dają takie same szyfrogramy (w ramkach), za każdym razem. Eve nie potrzebuje d, żeby zobaczyć, które litery się powtarzają.",
+    sameNone: "W tym tekście żadna litera się nie powtarza. Wpisz w kroku 1 tekst z powtórzoną literą, na przykład HELLO BOB.",
+    cardGuess: "Eve zgaduje i sprawdza",
+    guessIntro: (c, n, e) => "Eve przechwyciła c = " + c + ". Zna klucz publiczny {e, n} = {" + e + ", " + n + "} i wie, że Alice wysyła PIN (liczbę mniejszą od 10 000). Szyfruje każdy strzał i porównuje z c.",
+    guessRange: (lim) => "strzały: od 0 do " + lim,
+    bGuess: "Eve: sprawdź wszystkie strzały", bGuessBig: "to samo na 2048-bitowym kluczu z zadania 7",
+    found: (m, k, ms) => "Znalezione m = " + m + " po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " (" + ms + " ms), bez klucza prywatnego.",
+    notFound: k => "Nie znaleziono w " + k + " strzałach: m od Alice nie jest mniejsze od 10 000, więc założenie Eve było błędne. Przy dużym zbiorze wiadomości ten atak zawodzi; przy PIN-ie działa zawsze.",
+    lastTries: "ostatnie strzały:",
+    bigIntro: "Zadanie 7: klucz publiczny banku ma 2048 bitów (n ma 617 cyfr), a e = 65537. Eve przechwyciła C. Ta sama sztuczka, ten sam wynik: długość klucza nie pomaga.",
+    bigRun: (k) => "sprawdzam… " + k + " " + plN(k, "strzał", "strzały", "strzałów"),
+    bigFound: (pin, k, s) => "PIN " + pin + " znaleziony po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " w " + s + " s, w Twojej przeglądarce.",
+    showN: "2048-bitowe n z zadania 7",
+    cardReal: "Co robi prawdziwe RSA",
+    real: ["<b>Losowe dopełnienie (OAEP).</b> Przed szyfrowaniem do wiadomości dokleja się w ustalony sposób losowe bajty. Ten sam PIN daje wtedy za każdym razem inne c i strzały Eve przestają pasować. Bob usuwa dopełnienie po odszyfrowaniu. Każda biblioteka robi to za nas.",
+           "<b>Duże klucze.</b> n ma co najmniej 2048 bitów (617 cyfr), więc nikt nie rozłoży go na p i q, żeby policzyć d. Małe liczby na tej stronie służą tylko do nauki.",
+           "<b>Tylko klucz.</b> RSA jest wolne, więc w praktyce przenosi tylko losowy klucz symetryczny (szyfrowanie hybrydowe), a dane szyfruje ChaCha20 albo AES."],
+    realNote: "Ta strona pokazuje tylko podręcznikowe RSA. Nie pokazuje OAEP.",
+    cardLeak: "A jeśli klucz prywatny Boba wycieknie?",
+    leakIntro: "Eve nagrywała każdy szyfrogram od Alice (tutaj: litery jej tekstu z kroku 1). Po latach kradnie klucz prywatny Boba d.",
+    bLeak: "Eve kradnie d", bUnleak: "cofnij",
+    leakRec: "nagrane", leakOpen: "otwarte przez d",
+    leakNote: "Wyciek klucza prywatnego otwiera wszystkie nagrane wiadomości od wszystkich, którzy pisali do Boba, i wszystkie nowe, dopóki Bob nie zmieni klucza. Rozwiązanie to klucze, które żyją tylko przez jedną sesję (forward secrecy, następny wykład).",
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+/* one language setting for all the simulators on the site */
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+
+const app = {
+  level: 0,
+  pText: "17", qText: "11", eText: "7", inErr: false,
+  K: null,
+  mode: "num",
+  mText: "88", m: 88n, mErr: false,
+  msg: "HELLO BOB",
+  dir: "enc", pStep: -1,        // step 3: rows shown (-1 = all)
+  eStep: -1,                    // step 2: Euclid rows shown (-1 = all)
+  guess: null, big: null, bigRun: 0, leaked: false,
+};
+app.K = makeKeys(17n, 11n, 7n);
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+const keyOK = () => app.K && app.K.ok;
+const pubK = () => ({ n: app.K.n, e: app.K.e });
+const prvK = () => ({ n: app.K.n, d: app.K.d });
+const mOK = () => !app.mErr && keyOK() && app.m < app.K.n;
+function textNums() { return textToNums(app.msg); }
+function textErr() {
+  if (!keyOK()) return null;
+  const a = Array.from(app.msg);
+  if (a.length === 0) return L().errEmpty;
+  for (const ch of a) { const c = BigInt(ch.codePointAt(0)); if (c >= app.K.n) return L().errText(ch, c, app.K.n); }
+  return null;
+}
+const sup = (b, x) => b + "<sup>" + x + "</sup>";
+
+/* icons */
+const LOCK_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="3.5" y="9" width="13" height="9" rx="2" fill="currentColor"/><path d="M6.5 9V6a3.5 3.5 0 0 1 7 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+const KEY_SVG = '<svg viewBox="0 0 40 20" width="30" height="15" aria-hidden="true"><circle cx="9" cy="10" r="7.5" fill="currentColor"/><circle cx="9" cy="10" r="2.8" fill="var(--surface)"/><path d="M15 7.5h22v5h-3v3h-3v-3h-3v3h-3v-3h-10z" fill="currentColor"/></svg>';
+const PERSON_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="6" r="4" fill="currentColor"/><path d="M2.5 19a7.5 7 0 0 1 15 0z" fill="currentColor"/></svg>';
+const EAR_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="10" r="3" fill="currentColor"/></svg>';
+const pubPill = () => '<span class="pill role-pub">' + LOCK_SVG.replace('width="18" height="18"', 'width="12" height="12"') + L().pub + "</span>";
+const secPill = () => '<span class="pill role-sec">' + L().sec + "</span>";
+
+const mk = (id, c) => '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="' + c + '"/></marker>';
+const ln = (pts, c, m, extra) => '<polyline fill="none" stroke="' + c + '" stroke-width="2.4" marker-end="url(#' + m + ')" points="' + pts + '"' + (extra || "") + "/>";
+
+function errCard() {
+  return '<div class="card"><p class="err">' + L().fixKeys + '</p><button data-action="go" data-to="1">' + L().goKeys + "</button></div>";
+}
+function legendHTML() {
+  const t = L();
+  return '<div class="legend"><span class="role-pub">' + t.legPub + '</span><span class="role-sec">' + t.legSec + '</span><span class="role-msg">' + t.legMsg +
+    '</span><span class="role-ct">' + t.legCt + '</span><span class="role-eve">' + t.legEve + "</span></div>";
+}
+
+/* ---------- step 1: black box ---------- */
+function render0() {
+  const t = L();
+  if (!keyOK()) return errCard();
+  const K = app.K;
+  const tab = (m, s) => '<button data-action="mode" data-m="' + m + '" aria-pressed="' + (app.mode === m) + '">' + s + "</button>";
+  const mIn = app.mode === "num"
+    ? '<input data-field="m" inputmode="numeric" spellcheck="false" value="' + esc(app.mText) + '"><small>' + t.mHint(K.n - 1n) + "</small>"
+    : '<textarea data-field="msg" spellcheck="false" maxlength="40">' + esc(app.msg) + '</textarea><small>' + t.mTextHint + "</small>";
+  return '<div class="card"><div class="cardhead"><h3>' + t.card1 + '</h3><span class="tabs">' + tab("num", t.modeNum) + tab("text", t.modeText) + "</span></div>" +
+    '<div class="schwrap"><div class="sch1">' +
+      '<svg class="arrows" width="890" height="464" aria-hidden="true"><defs>' + mk("a_pub", "var(--ctr-b)") + mk("a_sec", "var(--key-b)") + mk("a_ink", "var(--ink)") + mk("a_eve", "var(--g2)") + "</defs>" +
+        ln("275,86 275,166", "var(--ctr-b)", "a_pub") + ln("655,86 655,166", "var(--key-b)", "a_sec") +
+        ln("174,212 196,212", "var(--ink)", "a_ink") + ln("352,212 376,212", "var(--ink)", "a_ink") +
+        ln("552,212 576,212", "var(--ink)", "a_ink") + ln("732,212 754,212", "var(--ink)", "a_ink") +
+        ln("465,280 465,320", "var(--g2)", "a_eve", ' stroke-dasharray="6 4"') + "</svg>" +
+      '<button class="kbox role-pub s1-pub" data-action="go" data-to="1"><span class="nh">' + LOCK_SVG + t.pubKey + '</span><span class="kv">e = ' + K.e + (String(K.n).length > 8 ? "<br>" : ",&nbsp; ") + "n = " + K.n + "</span><small>" + t.pubSub + "</small></button>" +
+      '<button class="kbox role-sec s1-prv" data-action="go" data-to="1"><span class="nh">' + KEY_SVG + t.prvKey + '</span><span class="kv">d = ' + K.d + (String(K.n).length > 8 ? "<br>" : ",&nbsp; ") + "n = " + K.n + "</span><small>" + t.prvSub + "</small></button>" +
+      '<div class="node role-msg s1-m"><div class="nh">' + PERSON_SVG + t.alice + ": " + t.mNode + "</div>" + mIn + '<div class="err" id="s1merr"></div></div>' +
+      '<button class="box s1-enc" data-action="pow" data-dir="enc">' + t.encBox + '<span class="f">c = m<sup>e</sup> mod n</span><small>' + t.boxSub + "</small></button>" +
+      '<div class="node role-ct s1-c"><div class="nh">' + t.cNode + '</div><div id="s1c"></div></div>' +
+      '<button class="box s1-dec" data-action="pow" data-dir="dec">' + t.decBox + '<span class="f">m = c<sup>d</sup> mod n</span><small>' + t.boxSub + "</small></button>" +
+      '<div class="node role-msg s1-out"><div class="nh">' + PERSON_SVG + t.outNode + '</div><div id="s1out"></div></div>' +
+      '<div class="node role-eve s1-eve"><div class="nh">' + EAR_SVG + t.eve + '</div><div id="s1eve"></div></div>' +
+    "</div></div>" + legendHTML() + "</div>" +
+    '<div class="card"><h3>' + t.cardDetails1 + '</h3><div id="s1det"></div></div>';
+}
+function updateL0() {
+  const cEl = document.getElementById("s1c");
+  if (!cEl) return;
+  const t = L(), K = app.K;
+  const out = document.getElementById("s1out"), eve = document.getElementById("s1eve"), det = document.getElementById("s1det"), me = document.getElementById("s1merr");
+  me.textContent = "";
+  let cShow = "";
+  if (app.mode === "num") {
+    if (!mOK()) {
+      me.textContent = t.errM(K.n - 1n);
+      cEl.innerHTML = out.innerHTML = det.innerHTML = ""; cShow = "?";
+    } else {
+      const c = encrypt(app.m, K), back = decrypt(c, K);
+      cEl.innerHTML = '<div class="vbig">' + c + "</div>";
+      out.innerHTML = '<div class="vbig">' + back + "</div>";
+      cShow = String(c);
+      det.innerHTML = '<table class="ftab">' +
+        '<tr data-action="pow" data-dir="enc" style="cursor:pointer"><td class="lbl">' + t.rowAlice + "</td><td>c = " + sup(app.m, K.e) + " mod " + K.n + " = <b>" + c + "</b></td></tr>" +
+        '<tr data-action="pow" data-dir="dec" style="cursor:pointer"><td class="lbl">' + t.rowBob + "</td><td>m = " + sup(c, K.d) + " mod " + K.n + " = <b>" + back + "</b></td></tr></table>" +
+        '<p class="note" style="margin:6px 0 0">' + t.clickPow + "</p>";
+    }
+  } else {
+    const er = textErr();
+    if (er) {
+      me.textContent = er; cEl.innerHTML = out.innerHTML = det.innerHTML = ""; cShow = "?";
+    } else {
+      const ms = textNums(), cs = ms.map(m => encrypt(m, K)), back = cs.map(c => decrypt(c, K));
+      let k = 0, len = 0;
+      while (k < cs.length && (k === 0 || len + String(cs[k]).length + 1 <= 36)) { len += String(cs[k]).length + 1; k++; }
+      const shown = cs.slice(0, k).join(" ") + (k < cs.length ? " …" : "");
+      cEl.innerHTML = '<div class="clist">' + shown + "</div>";
+      out.innerHTML = '<div class="vbig" style="font-size:17px;word-break:break-word">' + esc(numsToText(back)) + "</div>";
+      cShow = shown;
+      det.innerHTML = '<div class="tablewrap">' + letterTable(ms, cs, back, false) + "</div>" + '<p class="note" style="margin:8px 0 0">' + t.textNote + "</p>";
+    }
+  }
+  eve.innerHTML = '<div class="eveline"><b>' + t.eveSees + ':</b> <span class="v">n = ' + K.n + ", e = " + K.e + ", c = " + esc(cShow) + "</span></div>" +
+    '<div class="eveline"><b>' + t.eveNot + ':</b> <span class="v">d</span> ' + t.eveNotWhat + "</div>" +
+    '<div class="eveline note">' + t.eveFactor(K.n, K.p < K.q ? K.p : K.q, K.p < K.q ? K.q : K.p) + "</div>";
+}
+function letterTable(ms, cs, back, markSame) {
+  const t = L();
+  const cnt = new Map();
+  cs.forEach(c => cnt.set(String(c), (cnt.get(String(c)) || 0) + 1));
+  const chars = Array.from(app.msg);
+  const row = (lbl, cls, arr) => '<tr class="' + cls + '"><td class="lbl">' + lbl + "</td>" + arr.map(x => "<td>" + x + "</td>").join("") + "</tr>";
+  const vis = ch => ch === " " ? "␣" : esc(ch);
+  let h = '<table class="ltab">' + row(t.rowLetter, "", chars.map(vis)) + row(t.rowCode, "rm", ms.map(String));
+  h += '<tr class="rc"><td class="lbl">' + t.rowC + "</td>" + cs.map(c => '<td class="' + (markSame && cnt.get(String(c)) > 1 ? "same" : "") + '">' + c + "</td>").join("") + "</tr>";
+  if (back) h += row(t.rowBack, "rm", back.map(String)) + row(t.rowLetter2, "", Array.from(numsToText(back)).map(vis));
+  return h + "</table>";
+}
+
+/* ---------- step 2: making the keys ---------- */
+function render1() {
+  const t = L();
+  const pre = PRESETS.map((pr, i) => {
+    const on = app.pText === String(pr[0]) && app.qText === String(pr[1]) && app.eText === String(pr[2]);
+    return '<button data-action="preset" data-i="' + i + '" aria-pressed="' + on + '">' + t.preNames[i] + "</button>";
+  }).join("");
+  const chip = (f, lbl, role, v) => '<label class="chip ' + role + '">' + lbl + '<input data-field="' + f + '" inputmode="numeric" spellcheck="false" value="' + esc(v) + '"></label>';
+  return '<div class="card"><h3>' + t.cardKeys + '</h3><div class="presets"><span class="note">' + t.presets + "</span>" + pre + "</div>" +
+      '<div class="inrow">' + chip("p", t.inP, "role-sec", app.pText) + chip("q", t.inQ, "role-sec", app.qText) + chip("e", t.inE, "role-pub", app.eText) +
+      '<span class="note" style="align-self:flex-end">' + t.inLimit + "</span></div>" +
+      '<div class="tablewrap" id="s2tab"></div></div>' +
+    '<div class="card" id="s2euc"></div>' +
+    '<div class="card" id="s2two"></div>';
+}
+function updateL1() {
+  const tabEl = document.getElementById("s2tab");
+  if (!tabEl) return;
+  const t = L(), K = app.K;
+  const rows = [];
+  const err = K && K.err;
+  const at = app.inErr ? 1 : (err ? err.at : 99);
+  // row 1
+  let v1;
+  if (app.inErr) v1 = '<span class="err">' + t.errNum + "</span>";
+  else if (err && err.at === 1) {
+    const c = err.code;
+    v1 = '<span class="err">' + (c === "pRange" ? t.errPRange : c === "qRange" ? t.errQRange : c === "pq" ? t.errPQ :
+      c === "pComp" ? t.notPrime(K.p, err.f) : t.notPrime(K.q, err.f)) + "</span>";
+  } else v1 = "p = " + K.p + ", q = " + K.q + ' <span class="okline">✓ ' + t.primeOk + "</span>";
+  rows.push([v1, "sec"]);
+  rows.push([at > 1 ? "n = " + K.p + " × " + K.q + " = <b>" + K.n + "</b>" : "", "pub"]);
+  rows.push([at > 1 ? "phi = " + (K.p - 1n) + " × " + (K.q - 1n) + " = <b>" + K.phi + "</b>" : "", "sec"]);
+  let v4 = "";
+  if (at === 4) {
+    if (err.code === "eRange") v4 = '<span class="err">' + t.errERange(K.phi) + "</span>";
+    else {
+      const ge = firstGoodE(K.phi);
+      v4 = '<span class="err">' + t.errEGcd(K.e, K.phi, err.g) + "</span>" + (ge ? ' <button data-action="sete" data-e="' + ge + '">' + t.tryE(ge) + "</button>" : "");
+    }
+  } else if (at > 4) v4 = "e = <b>" + K.e + "</b>, gcd(" + K.e + ", " + K.phi + ") = 1";
+  rows.push([v4, "pub"]);
+  rows.push([at > 4 ? "d = <b>" + K.d + "</b>, " + K.e + " × " + K.d + " mod " + K.phi + ' = 1 <span class="note">(' + t.dHow + ")</span>" : "", "sec"]);
+  tabEl.innerHTML = '<table class="ktab">' + rows.map((r, i) => {
+    const todo = i + 1 > at;
+    return '<tr class="' + (todo ? "todo" : "") + '"><td class="num"><span class="badge">' + (i + 1) + "</span></td><td>" + t.kStep[i] +
+      '</td><td class="val">' + (todo ? "" : r[0]) + "</td><td>" + (r[1] === "pub" ? pubPill() : secPill()) + "</td></tr>";
+  }).join("") + "</table>";
+  // Euclid
+  const eu = document.getElementById("s2euc"), two = document.getElementById("s2two");
+  if (app.inErr || !K.ext) { eu.style.display = "none"; }
+  else { eu.style.display = ""; eu.innerHTML = euclidHTML(K); }
+  if (keyOK()) {
+    two.style.display = "";
+    two.innerHTML = '<h3>' + t.cardTwo + '</h3><div class="twokeys">' +
+      '<button class="kbox role-pub" data-action="pow" data-dir="enc"><span class="nh">' + LOCK_SVG + t.pubKey + '</span><span class="kv">{' + K.e + ", " + K.n + "}</span><small>" + t.pubSub.split(" · ")[0] + "</small></button>" +
+      '<button class="kbox role-sec" data-action="pow" data-dir="dec"><span class="nh">' + KEY_SVG + t.prvKey + '</span><span class="kv">{' + K.d + ", " + K.n + "}</span><small>" + t.prvSub.split(" · ")[0] + "</small></button></div>" +
+      '<div class="trash">' + t.trash + '</div><p class="note" style="margin:8px 0 0">' + t.twoNote + "</p>";
+  } else two.style.display = "none";
+}
+function fmtMix(r, s, tt, phi, e, hot) {
+  const sStr = String(s), tAbs = tt < 0n ? -tt : tt;
+  const tStr = hot ? '<span class="tcoef">' + tAbs + "</span>" : String(tAbs);
+  return r + " = " + sStr + " × " + phi + (tt < 0n ? " - " : " + ") + tStr + " × " + e;
+}
+function euclidHTML(K) {
+  const t = L(), x = K.ext, phi = K.phi, e = K.e;
+  const N = x.rows.length;
+  const shown = app.eStep < 0 || app.eStep > N ? N : app.eStep;
+  let h = "<h3>" + t.cardEuclid(e, phi) + '</h3><p class="note" style="margin:0 0 6px">' + t.euclidNote + "</p>";
+  h += '<div class="tablewrap"><table class="etab"><tr><th></th><th>' + t.thA + "</th><th>" + t.thB + "</th><th>" + t.thDiv + "</th><th>" + t.thMix + "</th></tr>";
+  h += '<tr class="start"><td>' + t.start + "</td><td></td><td></td><td></td><td>" + fmtMix(phi, 1n, 0n, phi, e, false) + "</td></tr>";
+  h += '<tr class="start"><td>' + t.start + "</td><td></td><td></td><td></td><td>" + fmtMix(e, 0n, 1n, phi, e, false) + "</td></tr>";
+  x.rows.forEach((r, i) => {
+    const m = x.mix[i + 2];
+    const done = shown === N;
+    const isLastNZ = r.r === x.g && i === N - 2;
+    let cls = i >= shown ? "hide" : (i === shown - 1 && !done ? "cur" : "");
+    if (done && x.g === 1n && isLastNZ) cls = "one";
+    h += '<tr class="' + cls + '"><td>' + (i + 1) + "</td><td>" + r.a + "</td><td>" + r.b + "</td><td>" + r.a + " = " + r.q + " × " + r.b + " + " + r.r + "</td><td>" +
+      (r.r === 0n ? '<span class="note">' + t.stopRow + "</span>" : fmtMix(r.r, m.s, m.t, phi, e, isLastNZ && x.g === 1n)) + "</td></tr>";
+  });
+  // e divides phi: the first row has remainder 0, the last non-zero remainder is e itself
+  h += "</table></div>";
+  h += '<div class="btns"><button data-action="eu-reset">' + t.bReset + '</button><button data-action="eu-prev"' + (shown <= 0 ? " disabled" : "") + ">" + t.bPrev +
+    '</button><button data-action="eu-next"' + (shown >= N ? " disabled" : "") + ">" + t.bNext + '</button><button data-action="eu-all"' + (shown >= N ? " disabled" : "") + ">" + t.bAll +
+    '</button><span class="note">' + t.rowK(shown, N) + "</span></div>";
+  if (shown === N) {
+    if (x.g === 1n) {
+      const d = x.d, ed = e * d;
+      h += '<div class="result">' + t.resOne(e, phi, x.t) + "<br>" + (x.t < 0n ? t.resNeg(x.t, phi, d) + "<br>" : "") + t.resD(d) + "<br>" +
+        '<span class="okline">' + t.resCheck(e, d, ed, ed / phi, phi) + "</span><br>" + t.resPy(e, phi, d) + "</div>";
+    } else h += '<div class="result err">' + t.resBad(x.g) + "</div>";
+  }
+  return h;
+}
+
+/* ---------- step 3: one power ---------- */
+function render2() {
+  const t = L();
+  if (!keyOK()) return errCard();
+  const tab = (d, s) => '<button data-action="dir" data-d="' + d + '" aria-pressed="' + (app.dir === d) + '">' + s + "</button>";
+  return '<div class="card"><div class="cardhead"><h3>' + t.cardPow + '</h3><span class="tabs">' + tab("enc", t.tabEnc) + tab("dec", t.tabDec) + "</span></div>" +
+    (app.dir === "enc" ? '<label class="chip role-msg" style="display:inline-flex">' + t.baseM + '<input data-field="m" inputmode="numeric" spellcheck="false" value="' + esc(app.mText) + '"></label>' : "") +
+    '<div id="s3body"></div></div>';
+}
+function powSetup() {
+  const K = app.K;
+  if (!mOK()) return null;
+  const c = encrypt(app.m, K);
+  return app.dir === "enc" ? { base: app.m, exp: K.e, n: K.n, en: "e", bn: "m", rn: "c", role: "role-ct" }
+                           : { base: c, exp: K.d, n: K.n, en: "d", bn: "c", rn: "m", role: "role-msg" };
+}
+function updateL2() {
+  const body = document.getElementById("s3body");
+  if (!body) return;
+  const t = L(), S = powSetup();
+  if (!S) { body.innerHTML = '<p class="err">' + t.errM(app.K.n - 1n) + "</p>"; return; }
+  const tr = modPowTrace(S.base, S.exp, S.n), R = tr.rows, N = R.length;
+  const shown = app.pStep < 0 || app.pStep > N ? N : app.pStep;
+  const cur = shown - 1;
+  const bin = S.exp.toString(2);
+  const ones = R.filter(r => r.bit).map(r => r.k).reverse();
+  const parts = ones.length > 1 && ones.length <= 12 ? ones.map(k => String(1n << BigInt(k))).join(" + ") : "";
+  let h = '<div class="formula">' + S.rn + " = " + sup(S.base, S.exp) + " mod " + S.n + "</div>";
+  h += "<p style=\"margin:4px 0\">" + t.expIs(S.en, S.exp, bin, parts) + "</p>";
+  // bits, the most significant first
+  h += '<div class="bits">';
+  for (let k = N - 1; k >= 0; k--) {
+    const b = R[k].bit;
+    h += '<span class="bitcol"><span class="bit' + (k === cur && shown < N ? " cur" : b ? " one" : "") + '">' + b + "</span>" + (N <= 20 ? "<small>" + (1n << BigInt(k)) + "</small>" : "") + "</span>";
+  }
+  h += "</div>";
+  h += '<div class="tablewrap"><table class="ptab"><tr><th>' + t.thK + "</th><th>" + t.thBit + "</th><th>" + t.thPow + "</th><th>" + t.thMul + "</th><th>" + t.thRes + "</th></tr>";
+  R.forEach((r, i) => {
+    const cls = i >= shown ? "hide" : (i === cur && shown < N ? "cur" : "");
+    const pw = sup(S.base, String(1n << BigInt(r.k)));
+    const how = r.k === 0 ? pw + " mod " + S.n + " = <b>" + r.power + "</b>" + (S.base >= S.n ? "" : ' <span class="note">(' + t.first + ")</span>")
+                          : pw + " = " + r.prev + "² = " + (r.prev * r.prev) + " → " + t.mod + " " + S.n + " = <b>" + r.power + "</b>";
+    const mul = r.bit ? r.before + " × " + r.power + " = " + (r.before * r.power) + " → " + t.mod + " " + S.n + " = <b>" + r.result + "</b>" : t.skip;
+    h += '<tr class="' + cls + '"><td>' + r.k + "</td><td>" + r.bit + "</td><td>" + how + '</td><td class="' + (r.bit ? "" : "skip") + '">' + mul + '</td><td class="res">' + r.result + "</td></tr>";
+  });
+  h += "</table></div>";
+  h += '<div class="btns"><button data-action="pw-reset">' + t.bReset + '</button><button data-action="pw-prev"' + (shown <= 0 ? " disabled" : "") + ">" + t.bPrev +
+    '</button><button data-action="pw-next"' + (shown >= N ? " disabled" : "") + ">" + t.bNext + '</button><button data-action="pw-all"' + (shown >= N ? " disabled" : "") + ">" + t.bAll +
+    '</button><span class="note">' + t.rowK(shown, N) + "</span></div>";
+  if (shown === N) {
+    const used = R.filter(r => r.bit).reverse();
+    h += '<div class="sumline"><span class="st">' + t.sumTitle + "</span><br>" + sup(S.base, S.exp) + " = " + used.map(r => sup(S.base, String(1n << BigInt(r.k)))).join(" · ") +
+      " → " + used.map(r => String(r.power)).join(" · ") + " " + t.mod + " " + S.n + " = <b>" + tr.result + "</b></div>";
+    const sq = N - 1, mul = used.length;
+    const naive = S.exp - 1n;
+    h += '<p class="note" style="margin:8px 0 0">' + t.count(sq, mul, naive) + " " + t.countBig + "</p>";
+    h += '<div class="btns">' + (app.dir === "enc" ? '<button class="dark" data-action="dir" data-d="dec">' + t.goDec + "</button>" : '<button data-action="dir" data-d="enc">' + t.goEnc + "</button>") + "</div>";
+  }
+  body.innerHTML = h;
+}
+function pwGo(k) {
+  const S = powSetup(); if (!S) return;
+  const N = modPowTrace(S.base, S.exp, S.n).rows.length;
+  app.pStep = Math.max(0, Math.min(N, k));
+  if (app.pStep === N) app.pStep = -1;
+  updateL2();
+}
+function curPStep() {
+  const S = powSetup(); if (!S) return 0;
+  const N = modPowTrace(S.base, S.exp, S.n).rows.length;
+  return app.pStep < 0 ? N : app.pStep;
+}
+
+/* ---------- step 4: textbook RSA is not enough ---------- */
+function render3() {
+  const t = L();
+  if (!keyOK()) return errCard();
+  return '<div class="card"><h3>' + t.cardSame + '</h3><div id="s4same"></div></div>' +
+    '<div class="card"><h3>' + t.cardGuess + '</h3><label class="chip role-msg" style="display:inline-flex">' + t.baseM +
+      '<input data-field="m" inputmode="numeric" spellcheck="false" value="' + esc(app.mText) + '"></label><div id="s4guess"></div>' +
+      '<hr style="border:0;border-top:1px solid var(--rule);margin:14px 0"><p style="margin:0 0 6px">' + t.bigIntro + "</p>" +
+      '<details><summary class="note" style="cursor:pointer">' + t.showN + '</summary><div class="bign">' + TASK7_N + "</div></details>" +
+      '<div class="btns"><button class="dark" data-action="guess-big" id="bigBtn">' + t.bGuessBig + '</button></div><div id="s4big"></div></div>' +
+    '<div class="card"><h3>' + t.cardReal + '</h3><ul class="ul">' + t.real.map(x => "<li>" + x + "</li>").join("") + '</ul><p class="note" style="margin:8px 0 0">' + t.realNote + "</p></div>" +
+    '<div class="card"><h3>' + t.cardLeak + '</h3><p style="margin:0 0 6px">' + t.leakIntro + '</p><div id="s4leak"></div></div>';
+}
+function updateL3() {
+  const same = document.getElementById("s4same");
+  if (!same) return;
+  const t = L(), K = app.K;
+  // same message, same ciphertext
+  const er = textErr();
+  if (er) same.innerHTML = '<p class="err">' + er + "</p>";
+  else {
+    const ms = textNums(), cs = ms.map(m => encrypt(m, K));
+    const rep = new Set(ms.map(String)).size < ms.length;
+    same.innerHTML = '<p class="note" style="margin:0 0 4px">' + t.sameNote + '</p><div class="tablewrap">' + letterTable(ms, cs, null, true) + "</div>" +
+      (rep ? "" : '<p class="note">' + t.sameNone + "</p>");
+  }
+  // guess and check
+  const g = document.getElementById("s4guess");
+  if (!mOK()) g.innerHTML = '<p class="err">' + t.errM(K.n - 1n) + "</p>";
+  else {
+    const c = encrypt(app.m, K);
+    const lim = K.n < 10000n ? K.n : 10000n;
+    let h = '<p style="margin:8px 0 4px">' + t.guessIntro(c, K.n, K.e) + ' <span class="note">(' + t.guessRange(lim - 1n) + ")</span></p>" +
+      '<div class="btns"><button class="dark" data-action="guess">' + t.bGuess + "</button></div>";
+    const G = app.guess;
+    if (G && G.c === c && G.n === K.n && G.e === K.e) {
+      h += '<div class="found">' + (G.found !== null ? '<span class="okline">' + t.found(G.found, G.tries, G.ms) + "</span>" : '<span class="badline">' + t.notFound(G.tries) + "</span>") + "</div>";
+      h += '<p class="note" style="margin:6px 0 2px">' + t.lastTries + '</p><table class="ftab">' + G.last.map(r =>
+        "<tr" + (r.hit ? ' style="color:var(--ok);font-weight:700"' : "") + "><td>" + sup(r.g, K.e) + " mod " + K.n + " = " + r.c + "</td><td>" + (r.hit ? "= c ✓" : "≠ c") + "</td></tr>").join("") + "</table>";
+    }
+    g.innerHTML = h;
+  }
+  // the 2048-bit run
+  const b = document.getElementById("s4big");
+  if (b) {
+    const B = app.big;
+    if (!B) b.innerHTML = "";
+    else if (B.found === null) b.innerHTML = '<div class="evebar"><span style="width:' + (B.tries / 100) + '%"></span></div><span class="note">' + t.bigRun(B.tries) + "</span>";
+    else b.innerHTML = '<div class="evebar"><span style="width:' + (B.tries / 100) + '%"></span></div><div class="found okline">' + t.bigFound(B.found, B.tries, (B.ms / 1000).toFixed(2)) + "</div>";
+    const btn = document.getElementById("bigBtn"); if (btn) btn.disabled = !!(B && B.found === null);
+  }
+  // a leaked key
+  const lk = document.getElementById("s4leak");
+  if (er) lk.innerHTML = '<p class="err">' + er + "</p>";
+  else {
+    const cs = textNums().map(m => encrypt(m, K));
+    let h = '<table class="ltab"><tr class="rc"><td class="lbl">' + t.leakRec + "</td>" + cs.map(c => "<td>" + c + "</td>").join("") + "</tr>";
+    if (app.leaked) {
+      const back = cs.map(c => decrypt(c, K));
+      h += '<tr class="rm"><td class="lbl">' + t.leakOpen + "</td>" + back.map(m => "<td>" + m + "</td>").join("") + "</tr>" +
+        '<tr><td class="lbl"></td>' + Array.from(numsToText(back)).map(ch => "<td><b>" + (ch === " " ? "␣" : esc(ch)) + "</b></td>").join("") + "</tr>";
+    }
+    h += "</table>";
+    lk.innerHTML = '<div class="tablewrap">' + h + '</div><div class="btns"><button class="' + (app.leaked ? "" : "dark") + '" data-action="leak">' + (app.leaked ? t.bUnleak : t.bLeak) + "</button></div>" +
+      (app.leaked ? '<div class="why">' + t.leakNote + "</div>" : "");
+  }
+}
+function runGuess() {
+  const K = app.K; if (!mOK()) return;
+  const c = encrypt(app.m, K), lim = K.n < 10000n ? K.n : 10000n;
+  const t0 = performance.now();
+  let found = null, tries = 0;
+  const last = [];
+  for (let g = 0n; g < lim; g++) {
+    tries++;
+    const cg = encrypt(g, K);
+    last.push({ g: g, c: cg, hit: cg === c });
+    if (last.length > 4) last.shift();
+    if (cg === c) { found = g; break; }
+  }
+  app.guess = { c: c, n: K.n, e: K.e, found: found, tries: tries, last: last, ms: Math.max(1, Math.round(performance.now() - t0)) };
+  updateL3();
+}
+function runBig() {
+  if (app.big && app.big.found === null) return;
+  const run = ++app.bigRun;
+  app.big = { tries: 0, found: null, ms: 0 };
+  const t0 = performance.now();
+  let g = 0n;
+  const pub = { n: TASK7_N, e: TASK7_E };
+  function chunk() {
+    if (run !== app.bigRun) return;
+    const end = performance.now() + 25;
+    while (performance.now() < end && g < 10000n) {
+      app.big.tries++;
+      if (encrypt(g, pub) === TASK7_C) { app.big.found = g; break; }
+      g++;
+    }
+    app.big.ms = performance.now() - t0;
+    if (app.big.found === null && g >= 10000n) app.big.found = "?";
+    if (app.level === 3) updateL3();
+    if (app.big.found === null) setTimeout(chunk, 0);
+  }
+  updateL3();
+  setTimeout(chunk, 0);
+}
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function updateAll() {
+  if (app.level === 0) updateL0();
+  if (app.level === 1) updateL1();
+  if (app.level === 2) updateL2();
+  if (app.level === 3) updateL3();
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
+    [render0, render1, render2, render3][app.level]() + "</div>";
+  updateAll();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+}
+function goTo(level) {
+  app.level = level;
+  render();
+  view.scrollTop = 0;
+}
+function zoomIn() { if (app.level < 3) goTo(app.level + 1); }
+function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+
+function keysChanged() {
+  const ok = /^\d{1,12}$/.test(app.pText.trim()) && /^\d{1,12}$/.test(app.qText.trim()) && /^\d{1,24}$/.test(app.eText.trim());
+  app.inErr = !ok;
+  if (ok) app.K = makeKeys(BigInt(app.pText.trim()), BigInt(app.qText.trim()), BigInt(app.eText.trim()));
+  else app.K = { ok: false, err: null };
+  app.eStep = -1; app.pStep = -1; app.guess = null;
+  updateL1();
+  document.querySelectorAll(".presets button").forEach(b => {
+    const pr = PRESETS[+b.dataset.i];
+    b.setAttribute("aria-pressed", String(app.pText === String(pr[0]) && app.qText === String(pr[1]) && app.eText === String(pr[2])));
+  });
+}
+function setM(v) {
+  app.mText = v;
+  const s = v.trim();
+  if (/^\d{1,40}$/.test(s)) { app.m = BigInt(s); app.mErr = false; } else app.mErr = true;
+  app.pStep = -1;
+  updateAll();
+}
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "go") goTo(+el.dataset.to);
+  else if (a === "pow") { app.dir = el.dataset.dir; app.pStep = -1; goTo(2); }
+  else if (a === "mode") { app.mode = el.dataset.m; render(); }
+  else if (a === "preset") {
+    const pr = PRESETS[+el.dataset.i];
+    app.pText = String(pr[0]); app.qText = String(pr[1]); app.eText = String(pr[2]);
+    ["p", "q", "e"].forEach((f, i) => { const inp = view.querySelector('input[data-field="' + f + '"]'); if (inp) inp.value = String(pr[i]); });
+    keysChanged();
+  }
+  else if (a === "sete") { app.eText = el.dataset.e; const inp = view.querySelector('input[data-field="e"]'); if (inp) inp.value = app.eText; keysChanged(); }
+  else if (a === "eu-reset" || a === "eu-prev" || a === "eu-next" || a === "eu-all") {
+    const N = app.K.ext.rows.length, cur = app.eStep < 0 ? N : app.eStep;
+    let k = a === "eu-reset" ? 0 : a === "eu-prev" ? cur - 1 : a === "eu-next" ? cur + 1 : N;
+    k = Math.max(0, Math.min(N, k));
+    app.eStep = k === N ? -1 : k;
+    document.getElementById("s2euc").innerHTML = euclidHTML(app.K);
+  }
+  else if (a === "dir") { app.dir = el.dataset.d; app.pStep = -1; render(); }
+  else if (a === "pw-reset") pwGo(0);
+  else if (a === "pw-prev") pwGo(curPStep() - 1);
+  else if (a === "pw-next") pwGo(curPStep() + 1);
+  else if (a === "pw-all") pwGo(1e9);
+  else if (a === "guess") runGuess();
+  else if (a === "guess-big") runBig();
+  else if (a === "leak") { app.leaked = !app.leaked; updateL3(); }
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  const v = e.target.value;
+  if (f === "m") setM(v);
+  else if (f === "msg") { app.msg = v; updateAll(); }
+  else if (f === "p" || f === "q" || f === "e") { app[f + "Text"] = v; keysChanged(); }
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Enter" && tag === "BUTTON") return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
+  else if (app.level === 2 && (e.key === "n" || e.key === " ")) { e.preventDefault(); pwGo(curPStep() + 1); }
+  else if (app.level === 2 && e.key === "p") pwGo(curPStep() - 1);
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+const startStep = parseInt(location.hash.slice(1), 10);
+if (startStep >= 1 && startStep <= 4) app.level = startStep - 1;
+render();
+</script>
+</body>
+</html>

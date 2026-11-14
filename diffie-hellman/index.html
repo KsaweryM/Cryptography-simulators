@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diffie-Hellman explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --pub-b:#2F6FDB; --pub-bg:#E5EDFB;
+  --sec-b:#E2A60E; --sec-bg:#FDF3DC;
+  --sh-b:#2FA84F;  --sh-bg:#E3F4E8;
+  --msg-b:#8A5CD8; --msg-bg:#F1EAFD;
+  --mal-b:#D6336C; --mal-bg:#FBE3EC;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --pub-b:#7FA8F0; --pub-bg:#1A2740; --sec-b:#F5C044; --sec-bg:#3A2E10;
+    --sh-b:#4CC877; --sh-bg:#15301E; --msg-b:#B596F5; --msg-bg:#2A2142;
+    --mal-b:#F27BA5; --mal-bg:#3B1828;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --pub-b:#7FA8F0; --pub-bg:#1A2740; --sec-b:#F5C044; --sec-bg:#3A2E10;
+  --sh-b:#4CC877; --sh-bg:#15301E; --msg-b:#B596F5; --msg-bg:#2A2142;
+  --mal-b:#F27BA5; --mal-bg:#3B1828;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:4px 7px;font-size:14px}
+input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+.mono{font-family:var(--mono)}
+
+/* frame: the same as the ChaCha20 explorer */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+.schwrap{overflow-x:auto}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btns .lbl{font-size:13px;color:var(--muted);margin-right:2px}
+.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.rnd{position:absolute;top:5px;right:6px;padding:2px 5px;line-height:0;border-radius:5px;color:var(--ink)}
+.box{background:var(--ink);color:var(--surface);border:0;border-radius:10px;padding:8px 14px;font-size:18px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.box:hover{background:var(--ink);box-shadow:0 0 0 3px var(--chg)}
+.box small{font-size:11.5px;font-weight:400;opacity:.8}
+.opnow{font-family:var(--mono);background:var(--chg);color:#fff;border-radius:5px;padding:2px 8px}
+
+/* roles: one colour per role, the same in every step */
+.role-pub{border-color:var(--pub-b);background:var(--pub-bg)}
+.role-sec{border-color:var(--sec-b);background:var(--sec-bg)}
+.role-sh{border-color:var(--sh-b);background:var(--sh-bg)}
+.role-msg{border-color:var(--msg-b);background:var(--msg-bg)}
+.role-mal{border-color:var(--mal-b);background:var(--mal-bg)}
+
+/* the schematics */
+.sch{position:relative;color:var(--ink)}
+.sch .arrows{position:absolute;left:0;top:0;pointer-events:none}
+.ab{position:absolute}
+.chip{position:absolute;border:1.5px solid;border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden}
+.chip small{font-weight:400;color:var(--muted);font-size:12px}
+.chip .v{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip .v b{font-size:17px}
+.chip label{display:block}
+.chip input{display:block;margin-top:3px;width:100%}
+.chip .inrow{display:flex;gap:6px;align-items:center;margin-top:3px}
+.chip .inrow input{margin-top:0;flex:1 1 auto;min-width:0}
+.chip.tiny .v{font-size:14px}
+.person{position:absolute;display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
+.ava{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;flex:none}
+.ava.mal{background:var(--mal-b);color:var(--surface)}
+.person small{font-weight:400;font-size:12.5px;color:var(--muted)}
+.sbox{position:absolute}
+.wlbl{position:absolute;font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap;background:var(--surface);padding:0 4px;border-radius:4px}
+.evecard{position:absolute;border:1.5px solid var(--mal-b);background:var(--surface);border-radius:8px;overflow:hidden;font-size:13px}
+.evecard .eh{background:var(--mal-b);color:var(--surface);font-weight:600;padding:3px 10px;display:flex;align-items:center;gap:6px}
+.evecard .eb{padding:0 12px 4px;font-family:var(--mono);font-size:13.5px;line-height:22px;background:repeating-linear-gradient(var(--surface) 0 21px,var(--rule) 21px 22px)}
+.evecard .eb .no{color:var(--muted)}
+.banner{margin-top:8px;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14.5px;border:1.5px solid}
+.banner.good{border-color:var(--sh-b);background:var(--sh-bg)}
+.banner.bad{border-color:var(--mal-b);background:var(--mal-bg)}
+.banner.neutral{border-color:var(--rule);background:var(--sunken)}
+.todo{opacity:.22;transition:opacity .25s}
+.mfaded{opacity:1;transition:opacity .25s}
+.pgfield{display:flex;gap:10px;align-items:flex-end;margin-top:4px}
+.pgfield label{font-size:12.5px;font-weight:600}
+.pgfield input{display:block;margin-top:2px}
+.stamp{display:inline-block;font-size:11px;font-weight:700;color:var(--mal-b);border:1.5px solid var(--mal-b);border-radius:4px;padding:0 5px;margin-left:4px;vertical-align:1px}
+.stamp.ok{color:var(--sh-b);border-color:var(--sh-b)}
+
+/* step 2: the clock and the table of powers */
+.clockrow{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.clock{display:block;flex:none}
+.clock .ring{fill:none;stroke:var(--rule);stroke-width:2}
+.clock .nd{fill:var(--surface);stroke:var(--rule);stroke-width:1.5}
+.clock .nd.on{fill:var(--pub-bg);stroke:var(--pub-b);stroke-width:2}
+.clock .nd.cur{fill:var(--chg);stroke:var(--chg)}
+.clock .nt{font-family:var(--mono);font-size:12.5px;fill:var(--muted);text-anchor:middle;dominant-baseline:central}
+.clock .nt.on{fill:var(--ink);font-weight:600}
+.clock .nt.cur{fill:#fff;font-weight:700}
+.clock .ch{stroke:var(--muted);stroke-width:1.4;fill:none;opacity:.55}
+.clock .ch.last{stroke:var(--chg);stroke-width:2.6;opacity:1}
+.clock .ctr{font-family:var(--mono);font-size:22px;font-weight:700;fill:var(--ink);text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:6px;stroke-linejoin:round}
+.clock .ctrs{font-family:var(--sans);font-size:12.5px;fill:var(--muted);text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:5px}
+.clock .aring{fill:none;stroke:var(--pub-b);stroke-width:2.5;stroke-dasharray:4 3}
+.clockside{flex:1 1 380px;min-width:340px}
+.bigeq{font-family:var(--mono);font-size:22px;margin:6px 0}
+.bigeq b{color:var(--chg)}
+.ptable{border-collapse:collapse;font-family:var(--mono);font-size:13px;margin-top:6px}
+.ptable td{border:1px solid var(--rule);padding:2px 0;text-align:center;min-width:2.6em}
+.ptable td.lbl{font-family:var(--sans);font-weight:600;font-size:12.5px;text-align:right;padding:2px 8px;border:0;min-width:0;white-space:nowrap}
+.ptable tr.ex td{color:var(--muted);font-size:12px}
+.ptable td.on{background:var(--pub-bg)}
+.ptable td.cur{background:var(--chg);color:#fff;font-weight:700}
+.ptable td.rep{background:var(--chg-bg)}
+.ptable td.isA{box-shadow:inset 0 0 0 2px var(--pub-b)}
+.ptable td.click{cursor:pointer}
+.ctl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.ctl input[type=range]{width:220px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.half{border:1.5px solid var(--rule);border-radius:9px;padding:10px 14px}
+.half h4{margin:0 0 6px;font-size:14.5px}
+.tries{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;font-family:var(--mono);font-size:12.5px}
+.try{padding:1px 6px;border-radius:4px;background:var(--sunken)}
+.try.hit{background:var(--sh-bg);outline:1.5px solid var(--sh-b);font-weight:700}
+.rtable{border-collapse:collapse;font-size:13.5px;margin-top:6px}
+.rtable th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;padding:3px 12px 3px 0;border-bottom:1px solid var(--rule)}
+.rtable td{padding:4px 12px 4px 0;font-family:var(--mono);border-bottom:1px solid var(--rule)}
+.rtable td.r{text-align:right}
+.rtable td.x{color:var(--chg);font-weight:700}
+.bar{display:inline-block;height:10px;background:var(--pub-b);border-radius:3px;vertical-align:middle}
+
+/* step 4: ElGamal */
+.eg{display:grid;grid-template-columns:300px minmax(44px,1fr) 270px minmax(44px,1fr) 300px;align-items:start;min-width:958px;max-width:1150px}
+.harr{height:2.4px;background:var(--pub-b);position:relative;margin:342px 10px 0 4px}
+.harr::after{content:"";position:absolute;right:-2px;top:-5.5px;border:6.5px solid transparent;border-left:10px solid var(--pub-b);border-right:0}
+.egcol{display:flex;flex-direction:column;gap:0}
+.egcol .chip,.egcol .person,.egcol .evecard{position:relative}
+.egcol .box{width:100%}
+.down{text-align:center;color:var(--muted);font-size:17px;line-height:22px;height:22px}
+.pair{font-family:var(--mono);font-size:22px;font-weight:600}
+.ctx{border:1.5px solid var(--pub-b);background:var(--pub-bg);border-radius:8px;padding:8px 12px;margin-top:290px}
+.calc{font-family:var(--mono);font-size:14px;line-height:1.9}
+.calc .cr{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.calc .cn{font-family:var(--sans);font-weight:600;color:var(--muted);font-size:12.5px;width:1.5em}
+.mark{padding:0 5px;border-radius:4px;border:1.5px solid}
+.inl{display:inline-flex;gap:6px;align-items:center}
+.inl input{width:7em}
+.realbox{font-family:var(--mono);font-size:12.5px;word-break:break-all;color:var(--muted)}
+
+/* step 5: square-and-multiply */
+.bits{display:inline-flex;gap:3px;align-items:center;flex-wrap:wrap}
+.bit{display:inline-block;width:20px;height:26px;line-height:26px;text-align:center;font-family:var(--mono);font-size:13px;border-radius:3px;background:var(--sunken);color:var(--muted)}
+.bit.one{background:var(--ink);color:var(--surface)}
+.bit.cur{box-shadow:0 0 0 2.5px var(--chg)}
+.bit.done{opacity:.45}
+.optable{border-collapse:collapse;font-size:13.5px;margin-top:8px}
+.optable th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;padding:3px 14px 3px 0;border-bottom:1px solid var(--rule)}
+.optable td{padding:3px 14px 3px 0;font-family:var(--mono);border-bottom:1px solid var(--rule);white-space:nowrap}
+.optable tr.todo2 td{color:var(--muted);opacity:.45}
+.optable tr.cur td{background:var(--chg-bg)}
+.optable tr.cur td.opc{color:var(--chg);font-weight:700}
+.optable td.ell{text-align:center;color:var(--muted)}
+.pwin{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.pwin label{font-size:12.5px;font-weight:600}
+.pwin input{display:block;margin-top:2px;width:12em}
+.cmp{display:grid;grid-template-columns:auto auto;gap:4px 18px;font-size:14px;margin-top:6px}
+.cmp b{font-family:var(--mono)}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+  .two{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== Diffie-Hellman and ElGamal core ===================== */
+// CORE-BEGIN
+// The 2048-bit MODP group 14 from RFC 3526, section 3 (generator 2). The same prime is used in Task 2 to Task 6.
+const RFC3526_P = BigInt("0x" +
+  "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74" +
+  "020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437" +
+  "4FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" +
+  "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF05" +
+  "98DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB" +
+  "9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B" +
+  "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF695581718" +
+  "3995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF");
+const RFC3526_G = 2n;
+const SMALL_P_MAX = 1000000000000n;   // a p up to 10^12 is checked for being prime by trial division
+
+// base^exp mod m by square-and-multiply: start with base, then for every next bit of exp
+// (from the top): square, and if the bit is 1, multiply by base. The same steps as in step 5.
+function modPow(base, exp, m) {
+  if (m === 1n) return 0n;
+  base = base % m;
+  if (exp === 0n) return 1n;
+  const bits = exp.toString(2);
+  let r = base;
+  for (let i = 1; i < bits.length; i++) {
+    r = r * r % m;
+    if (bits[i] === "1") r = r * base % m;
+  }
+  return r;
+}
+// the same computation, written down step by step (for step 5)
+function powSteps(base, exp, m) {
+  base = base % m;
+  const bits = exp.toString(2);
+  const steps = [{ op: "start", bit: 0, after: base }];
+  let r = base;
+  for (let i = 1; i < bits.length; i++) {
+    const b = r;
+    r = r * r % m;
+    steps.push({ op: "sq", bit: i, before: b, after: r });
+    if (bits[i] === "1") {
+      const b2 = r;
+      r = r * base % m;
+      steps.push({ op: "mul", bit: i, before: b2, after: r });
+    }
+  }
+  return { bits: bits, steps: steps, result: r };
+}
+// the inverse of a mod m by the extended Euclidean algorithm (lecture 3); null if there is none
+function modInv(a, m) {
+  let oldR = ((a % m) + m) % m, r = m, oldS = 1n, s = 0n;
+  while (r !== 0n) {
+    const q = oldR / r;
+    let t = r; r = oldR - q * r; oldR = t;
+    t = s; s = oldS - q * s; oldS = t;
+  }
+  if (oldR !== 1n) return null;
+  return ((oldS % m) + m) % m;
+}
+// trial division, only for p up to 10^12 (at most 500 000 divisions)
+function isPrimeSmall(n) {
+  const x = Number(n);
+  if (x < 2) return false;
+  if (x % 2 === 0) return x === 2;
+  for (let d = 3; d * d <= x; d += 2) if (x % d === 0) return false;
+  return true;
+}
+// g^1, g^2, ..., g^n mod p
+function powersList(p, g, n) {
+  const out = [];
+  let v = 1n;
+  for (let e = 1; e <= n; e++) { v = v * g % p; out.push(v); }
+  return out;
+}
+// how many different values g^e mod p takes (the smallest e > 0 with g^e = 1); null above the limit
+function orderOf(p, g, limit) {
+  if (p > BigInt(limit)) return null;
+  const P = Number(p), G = Number(g);
+  let v = G % P, e = 1;
+  while (v !== 1) { v = (v * G) % P; e++; if (e > limit) return null; }
+  return e;
+}
+
+// Diffie-Hellman: A = g^a, B = g^b, Alice computes B^a, Bob computes A^b (all mod p)
+function dhExchange(p, g, a, b) {
+  const A = modPow(g, a, p), B = modPow(g, b, p);
+  return { A: A, B: B, sAlice: modPow(B, a, p), sBob: modPow(A, b, p) };
+}
+// Mallory in the middle with her own secret m: Alice and Bob both receive M = g^m
+function mitmExchange(p, g, a, b, m) {
+  const A = modPow(g, a, p), B = modPow(g, b, p), M = modPow(g, m, p);
+  return { A: A, B: B, M: M,
+           sAlice: modPow(M, a, p), sBob: modPow(M, b, p),        // what Alice and Bob compute
+           sMalAlice: modPow(A, m, p), sMalBob: modPow(B, m, p) }; // what Mallory computes
+}
+// ElGamal: Bob's keys x (private) and y = g^x (public)
+function egEncrypt(p, g, y, M, k) {
+  const C1 = modPow(g, k, p), mask = modPow(y, k, p);
+  return { C1: C1, mask: mask, C2: M * mask % p };
+}
+function egDecrypt(p, x, C1, C2) {
+  const s = modPow(C1, x, p), sInv = modInv(s, p);
+  return { s: s, sInv: sInv, M: sInv === null ? null : C2 * sInv % p };
+}
+// k used twice: with M1 known, mask = C2 * M1^-1, then M2 = C2' * mask^-1 (Task 6)
+function reuseAttack(p, M1, C2first, C2second) {
+  const M1inv = modInv(M1, p);
+  const mask = C2first * M1inv % p;
+  const maskInv = modInv(mask, p);
+  return { M1inv: M1inv, mask: mask, maskInv: maskInv, M2: C2second * maskInv % p };
+}
+// text <-> number as in Task 5 and Task 6: the UTF-8 bytes, big-endian
+function textToNumber(t) {
+  let n = 0n;
+  for (const byte of new TextEncoder().encode(t)) n = n * 256n + BigInt(byte);
+  return n;
+}
+function numberToText(n) {
+  const bytes = [];
+  while (n > 0n) { bytes.unshift(Number(n % 256n)); n = n / 256n; }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+// Eve's search: try e = e0, e0+1, ... (value = g^e mod p), at most count times. Plain numbers when g*p fits in 2^53.
+function searchChunk(p, g, A, e0, v0, count) {
+  if (Number(g) * Number(p) < 9e15) {
+    const P = Number(p), G = Number(g), T = Number(A);
+    let e = e0, v = Number(v0);
+    for (let i = 0; i < count; i++) {
+      if (v === T) return { found: true, e: e, v: BigInt(v) };
+      v = (v * G) % P; e++;
+    }
+    return { found: false, e: e, v: BigInt(v) };
+  }
+  let e = e0, v = v0;
+  for (let i = 0; i < count; i++) {
+    if (v === A) return { found: true, e: e, v: v };
+    v = v * g % p; e++;
+  }
+  return { found: false, e: e, v: v };
+}
+
+// Task 3 (Lecture4/Task3/dlog.py): p, g, A; the answers below were found with Task3/solution/dlog.py
+const TASK3 = [
+  { bits: 16, p: 49223n, g: 4n, A: 38043n, a: 17773 },
+  { bits: 20, p: 939167n, g: 4n, A: 532807n, a: 415826 },
+  { bits: 24, p: 10684799n, g: 4n, A: 3257080n, a: 3465539 },
+  { bits: 28, p: 187882979n, g: 4n, A: 180535483n, a: 60546499 },
+];
+// Task 6 (Lecture4/Task6/reuse.py): the two C2 values made with the same k, and the known first message.
+const T6_C2_FIRST = BigInt("17820659653148686588981613431381401602338807636448641636557539969989079266470094767791290151347641772835341521272590277844038759273736740109775394763045946043357584143813958366465947046481088203901083588487565111310736886959428846242843136709721514298149799398810415931257319402763030697580887445454186676481821210043900939781667096968233565976944450452864268937452405051087863751271873726893476433159107620587812601006046492393571768390521271045234984636680630256469863267946906051482029061786181086487495160925475482529037553761789909493550158493611184753225224405977782190972435244310787203655277951438229896472711");
+const T6_C2_SECOND = BigInt("19065383106845731582829648274560051127274696256521695015617218040716493399461653572206501287874153207841981209918152699682968402361651022384060390963480874821947201382141386544742648800358290006944342897409554171758370687391410985653695877218256561225668235642938327116369583644095655756582580003919405026788024857401902118119027888979388964662401331494491306787903557061280936196209507538563809128460880888389126651820588177143654150203510899094274070153352444664772035299369551534811104340301900379791447046879345426933251113192572227115613436031218116913459430958023934055288540782966171068680103342464402443305847");
+const T6_FIRST = "Payment approved: 250 EUR, order 1187.";
+const T6_C1_START = "268389893958";
+
+function selfTest() {
+  const fails = [];
+  const eq = (name, got, want) => { if (got !== want) fails.push(name); };
+  // 1. The lecture slides, "The exchange, step 1 to 5": p = 23, g = 5, a = 6, b = 15 -> A = 8, B = 19, secret 2.
+  //    The same numbers are the classic textbook example (also checked with Python 3: pow(5, 6, 23) etc.).
+  let d = dhExchange(23n, 5n, 6n, 15n);
+  eq("DH slides", [d.A, d.B, d.sAlice, d.sBob].join(), "8,19,2,2");
+  // 2. Slide "Task 1: an exchange on paper" (and the Wikipedia example): a = 4, b = 3 -> A = 4, B = 10, secret 18.
+  d = dhExchange(23n, 5n, 4n, 3n);
+  eq("DH task 1", [d.A, d.B, d.sAlice, d.sBob].join(), "4,10,18,18");
+  // 3. W. Stallings, "Cryptography and Network Security", the Diffie-Hellman example:
+  //    q = 353, alpha = 3, XA = 97, XB = 233 -> YA = 40, YB = 248, K = 160 (checked again with Python 3).
+  d = dhExchange(353n, 3n, 97n, 233n);
+  eq("DH Stallings", [d.A, d.B, d.sAlice, d.sBob].join(), "40,248,160,160");
+  // 4. Slides "Why this g?" and "A bad g": the powers of 5 and of 2 mod 23.
+  eq("powers of 5", powersList(23n, 5n, 22).join(" "), "5 2 10 4 20 8 17 16 11 9 22 18 21 13 19 3 15 6 7 12 14 1");
+  eq("order of 2", orderOf(23n, 2n, 100), 11);
+  eq("order of 5", orderOf(23n, 5n, 100), 22);
+  // 5. ElGamal on the slides "The keys", "Encrypt", "Decrypt", "The same message twice":
+  //    x = 6 -> y = 8; M = 10, k = 3 -> (10, 14); s = 6, s^-1 = 4, M = 10; k = 7 -> (17, 5).
+  const y = modPow(5n, 6n, 23n);
+  let c = egEncrypt(23n, 5n, y, 10n, 3n), m = egDecrypt(23n, 6n, c.C1, c.C2);
+  eq("ElGamal slides", [y, c.C1, c.C2, m.s, m.sInv, m.M].join(), "8,10,14,6,4,10");
+  c = egEncrypt(23n, 5n, y, 10n, 7n);
+  eq("ElGamal k = 7", [c.C1, c.C2].join(), "17,5");
+  eq("inverse of 6", modInv(6n, 23n), 4n);
+  // 6. W. Stallings, the ElGamal example: q = 19, alpha = 10, XA = 5 -> YA = 3; M = 17, k = 6 -> C1 = 11, C2 = 5;
+  //    decrypt: K = 7, K^-1 = 11, M = 17 (checked again with Python 3).
+  const yS = modPow(10n, 5n, 19n);
+  c = egEncrypt(19n, 10n, yS, 17n, 6n); m = egDecrypt(19n, 5n, c.C1, c.C2);
+  eq("ElGamal Stallings", [yS, c.C1, c.C2, m.s, m.sInv, m.M].join(), "3,11,5,7,11,17");
+  // 7. Invariant: decrypt(encrypt(M)) = M for every M and k with p = 23, g = 5, x = 6.
+  let okAll = true;
+  for (let M = 1n; M < 23n; M++) for (let k = 1n; k < 22n; k++) {
+    const cc = egEncrypt(23n, 5n, y, M, k);
+    if (egDecrypt(23n, 6n, cc.C1, cc.C2).M !== M) okAll = false;
+  }
+  if (!okAll) fails.push("ElGamal round trip");
+  // 8. Mallory with m = 9 on the slide numbers: M = 11; Alice gets 9 = A^m, Bob gets 10 = B^m (Python 3).
+  const mi = mitmExchange(23n, 5n, 6n, 15n, 9n);
+  eq("MITM", [mi.M, mi.sAlice, mi.sMalAlice, mi.sBob, mi.sMalBob].join(), "11,9,9,10,10");
+  // 9. RFC 3526 group 14: 2048 bits, 617 digits; an exchange with two fixed 256-bit secrets,
+  //    the first 20 digits computed independently with Python 3 (pow).
+  eq("RFC 3526 size", RFC3526_P.toString(2).length + "/" + RFC3526_P.toString().length, "2048/617");
+  const bigA = BigInt("0x" + "7f3a9c51e2d4b6a8".repeat(4)), bigB = BigInt("0x" + "1b2e3d4c5f6a7980".repeat(4));
+  d = dhExchange(RFC3526_P, RFC3526_G, bigA, bigB);
+  eq("RFC 3526 exchange", [d.A.toString().slice(0, 20), d.B.toString().slice(0, 20), d.sAlice.toString().slice(0, 20), d.sAlice === d.sBob].join(),
+     "80235203082549063091,23079903781931393279,23881371980742647979,true");
+  // 10. Task 6 at real size: the known first message gives away the second one.
+  const r6 = reuseAttack(RFC3526_P, textToNumber(T6_FIRST), T6_C2_FIRST, T6_C2_SECOND);
+  eq("Task 6", numberToText(r6.M2), "New door code for the server room: 4096.");
+  // 11. Task 3: the search finds the answers of Task3/solution/dlog.py (16 and 20 bits here, to stay fast).
+  for (const t of TASK3.slice(0, 2)) {
+    const s = searchChunk(t.p, t.g, t.A, 1, t.g, 2000000);
+    if (!s.found || s.e !== t.a) fails.push("Task 3, " + t.bits + " bits");
+  }
+  // 12. Square-and-multiply against plain repeated multiplication, and its trace.
+  for (const [b, e, mm] of [[5n, 6n, 23n], [19n, 6n, 23n], [8n, 15n, 23n], [3n, 97n, 353n], [7n, 1n, 11n]]) {
+    let v = 1n; for (let i = 0n; i < e; i++) v = v * b % mm;
+    if (modPow(b, e, mm) !== v || powSteps(b, e, mm).result !== v) fails.push("square-and-multiply " + b + "^" + e);
+  }
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const T = {
+  en: {
+    title: "Diffie-Hellman explorer", home: "All simulators",
+    intro: "Diffie-Hellman and ElGamal, from the outside in. Pick a step on the left, or click a dark box to zoom in.",
+    stepOf: n => "Step " + n + " of 5 · Diffie-Hellman",
+    steps: [["Black box", "two secrets, one shared number"], ["The powers of g", "easy forward, hard back"],
+            ["Mallory in the middle", "when nobody checks who is who"], ["ElGamal", "Diffie-Hellman with a message"],
+            ["One power", "square-and-multiply"]],
+    explain: [
+      ["A secret in public", "Alice and Bob agree on a number without sending it. Eve hears everything on the channel: p, g, A and B. Both sides end with the same secret s, Eve does not. Change any number, everything is computed again. Click a dark box to look inside."],
+      ["Why Eve cannot go back", "The powers of g modulo p jump around the clock with no order. Going forward (a to A) is fast. Going back (A to a) is the discrete logarithm: Eve has to try exponents one by one. Real p has 2048 bits."],
+      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own value M. Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons."],
+      ["Diffie-Hellman with a message", "Bob publishes y = g^x once. To send a number M, Alice picks a new secret k, sends C1 = g^k (her half of an exchange) and C2 = M × y^k (the message hidden by the shared value). Bob divides by the same value and gets M back."],
+      ["One modular power", "How does Alice compute g^a mod p when a has 256 bits? Not by multiplying a times. Square-and-multiply goes through the bits of the exponent: square for every bit, multiply once more for every 1."]],
+    selfOk: "✓ checked against the slides, Stallings and RFC 3526", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back",
+    digits: n => n + " digits", clickIn: "click to look inside", clickPow: "click: this power, step by step",
+    // inputs
+    pLbl: "p: a public prime", gLbl: "g: public", pubTitle: "Public, known to everybody (Eve too)",
+    aLbl: "a: Alice's secret", bLbl: "b: Bob's secret", rand: "random secret",
+    presets: "Examples:", prSlides: "slides: a = 6, b = 15", prTask1: "Task 1: a = 4, b = 3", prBook: "textbook: p = 353", prReal: "real size: 2048 bits",
+    errNum: "Type a whole number.", errPsmall: "p must be a prime of at least 5.", errPbig: "Up to 10^12 here (or the 2048-bit prime of the last example).",
+    errPrime: p => p + " is not a prime.", errRange: (n, hi) => n + " must be between 1 and " + hi + ".", errG: hi => "g must be between 2 and " + hi + ".",
+    fixFirst: "Fix the red numbers in step 1 first.", fixHere: "Fix the red numbers first.",
+    // step 1
+    alice: "Alice", bob: "Bob", eve: "Eve", mallory: "Mallory",
+    sendsA: "sends A", sendsB: "sends B", fromBob: "from Bob", fromAlice: "from Alice",
+    sharedA: "Alice's secret s", sharedB: "Bob's secret s",
+    eveListens: "Eve listens: her notebook", eveNo: "a = ?   b = ?   s = ?",
+    res1: (s, list) => "Both have s = " + s + ". Eve saw only " + list + ".",
+    resBad: "The two secrets differ. This cannot happen: report it.",
+    whyTitle: "Why are they equal?",
+    whyA: "Alice: B<sup>a</sup> = (g<sup>b</sup>)<sup>a</sup> = g<sup>b·a</sup>", whyB: "Bob: A<sup>b</sup> = (g<sup>a</sup>)<sup>b</sup> = g<sup>a·b</sup>",
+    whyNum: (ab, r) => "a·b = " + ab + ", and g<sup>" + ab + "</sup> mod p = " + r + ": the same number, and nobody ever sent it.",
+    whyBig: "a·b is huge here, but the rule is the same: both compute g<sup>ab</sup> mod p.",
+    legPub: "public: everybody sees it", legSec: "secret: only its owner", legSh: "shared secret", legMal: "the attackers: Eve and Mallory", legMsg: "the message",
+    honest: "Small numbers are only for learning: with p = 23 Eve can try all 22 exponents in no time. Real Diffie-Hellman uses a p of 2048 bits and secrets of at least 256 bits (try the last example).",
+    // step 2
+    clockTitle: (g, p) => "The powers of " + g + " mod " + p + " around a clock",
+    clockNote: "The clock shows the numbers 1 to p - 1. Each step multiplies by g (mod p) and jumps to the next number. The blue ring is Alice's A.",
+    expo: "exponent e", play: "▶ play", stop: "■ stop",
+    distinctAll: (n, p) => "g reaches all " + n + " numbers from 1 to " + (p - 1) + ": a good g.",
+    distinctFew: (n, p) => "g reaches only " + n + " different numbers, then they repeat: a bad g, fewer for Eve to try.",
+    distinctBig: "p is too big to count all the powers here.",
+    distinctRfc: "For this group g = 2 reaches (p - 1)/2 different numbers: about 2^2047.",
+    noClock: "The clock is drawn for p up to 61. Below: the first powers.",
+    tryG: "Try another g:", goodG: "g = 5 (good)", badG: "g = 2 (bad)",
+    rowE: "e", rowV: "g^e mod p",
+    fwdTitle: "Forward: easy", backTitle: "Back: hard",
+    fwdText: (n, bits) => "Alice knows a and computes A in " + n + " " + (n === 1 ? "multiplication" : "multiplications") + " (square-and-multiply). A 2048-bit p with a 256-bit a needs at most about 512, a few milliseconds.",
+    fwdBtn: "see this power step by step",
+    backText: A => "Eve knows only A = " + A + ". There is no formula: she tries e = 1, 2, 3, … until g^e mod p = A.",
+    tryOne: "try one more", tryAll: "try all", reset: "⏮ reset",
+    tried: n => "Tried " + n.toLocaleString("en-US") + " " + (n === 1 ? "exponent" : "exponents") + ".",
+    found: (e, n) => "Found a = " + e + " after " + n.toLocaleString("en-US") + " " + (n === 1 ? "try" : "tries") + ". Now Eve can compute s too.",
+    foundOther: (e, a) => "Eve found e = " + e + ", not Alice's a = " + a + ", but g^" + e + " gives the same A, so it works just as well for her.",
+    bigSearch: "With this p the search would take far too long: about 2^2047 tries. That is why real p has 2048 bits.",
+    searching: (n) => "searching … " + n.toLocaleString("en-US") + " tries",
+    t3Title: "Task 3: 4 more bits each time. How much longer?",
+    t3Predict: "Predict first: p grows by 4 bits from row to row. How many times longer will the search take?",
+    t3Run: "run the search", t3Bits: "bits", t3Tries: "tries until A", t3Time: "time in this browser", t3Ratio: "more tries than the row above",
+    t3Note: "The time depends on how big the random a was, so the growth is not even. On average 4 more bits mean 16 times more tries. Python (as in Task 3) is slower than this browser.",
+    // step 3
+    malOn: "Mallory sits on the cable", malStepLbl: k => "attack, step " + k + " of 4",
+    malSteps: ["Alice sends A. Mallory keeps it and sends her own M to Bob.", "Bob sends B. Mallory keeps it and sends M to Alice.",
+               "Alice shares a secret with Mallory. Bob shares another one with Mallory.", "Alice sends a message. Mallory decrypts it, reads it, encrypts it again for Bob."],
+    mLbl: "m: Mallory's secret", malM: "M = g^m mod p, sent to both", malWithA: "key with Alice: A^m", malWithB: "key with Bob: B^m",
+    recvAsB: "\"from Bob\" (really M)", recvAsA: "\"from Alice\" (really M)",
+    sealOn: "Alice and Bob check a seal (authentication)",
+    noSealB: "no seal of Bob: rejected", noSealA: "no seal of Alice: rejected", stopped: "exchange stopped",
+    res3: (sa, sb) => "Alice has " + sa + ", Bob has " + sb + ": two different secrets, and Mallory knows both. Without Mallory both would have the same secret (step 1).",
+    res3same: s => "By chance Alice and Bob both got " + s + ", but Mallory knows it too.",
+    res3seal: "Alice and Bob see that M carries no seal of the other side and stop. Mallory can replace B, but she cannot seal her M as Bob.",
+    msgTitle: "What the attack gives", msgLbl: "Alice's message",
+    lockedWith: (n, s) => "locked with key " + n + " (from " + s + ")", malReads: "Mallory opens it, reads, locks it again",
+    bobReads: "Bob reads", aliceSends: "Alice sends",
+    msgNote: "As in Task 4: the key comes from the secret through SHA-256. Here we only show which key locks which envelope. Both sides see correct messages: nothing looks wrong.",
+    msgStopped: "Nothing is sent: the exchange was stopped.",
+    fixTitle: "The fix: authenticate the exchange",
+    fixText: "Bob adds to his B a seal that only his private key can make. Alice checks the seal with Bob's public key, which she knows from a <b>certificate</b>: Bob's public key, sealed by a party she already trusts. Mallory can replace B, but she cannot seal M as Bob. How such a seal works is a topic of its own, not covered here. Turn on the check above to see the effect.",
+    // step 4
+    keysTitle: "Bob's keys",
+    xLbl: "x: Bob's private key", yLbl: "y = g^x mod p: Bob's public key, on a notice board", pgNow: (p, g) => "p = " + p + ", g = " + g + " (change them in step 1)",
+    MLbl: "M: the message, a number from 1 to p - 1", kLbl: "k: a new random secret",
+    c1Box: "C1 = g^k mod p", c2Box: "C2 = M × y^k mod p",
+    sent: "the ciphertext, sent over the network", eveSees: "Eve sees C1, C2 and y, but not M, k or x.",
+    sBox: "s = C1^x mod p", invBox: "s^-1 mod p", mBox: "M = C2 × s^-1 mod p",
+    back: "the message is back", c1Is: "Alice's half of a Diffie-Hellman exchange", c2Is: "the message, hidden by y^k",
+    sameS: "s is the same as y^k: (g^k)^x = (g^x)^k. Bob divides by it.",
+    twiceTitle: "The same message twice",
+    twiceText: "A new k gives a new ciphertext every time. Textbook RSA gives the same one (the PIN attack of lecture 3). The price: two numbers, twice as long as p.",
+    withK: "with k =", reuseTitle: "k used twice (Task 6)",
+    reuseText: "The sender used the same k for a second message M2. Eve knows the first message M (it was printed on a public receipt). Can she read M2 without Bob's x?",
+    m2Lbl: "the second message M2 =", sameK: "the same k", newK: "a new k' = ",
+    second: "second ciphertext",
+    rs1: "the mask y^k = C2 × M^-1 mod p", rs2: "M2 = C2' × (mask)^-1 mod p",
+    rsOk: "Eve read the second message. She never needed x.", rsBad: "With a new k the trick gives a wrong number: Eve learns nothing.",
+    sameC1: "C1 is the same twice: Eve sees that k was reused.",
+    rule: "<b>The rule:</b> k must be random, secret and new for every message. The same lesson as the keystream and the nonce in the stream cipher lectures.",
+    realTitle: "At real size: the numbers from Task 6",
+    realText: "Two 2048-bit ciphertexts with the same C1 (" + "268389893958…" + "). The first message is known: \"" + "Payment approved: 250 EUR, order 1187." + "\"",
+    realBtn: "do Eve's two steps", realOut: "second message:",
+    // step 5
+    pwTitle: "Compute base^e mod p", pwBase: "base", pwExp: "exponent e", pwMod: "modulus p",
+    pwFrom: s => "From " + s + ".",
+    pwBits: (e, b) => "e = " + e + " in binary: " + b + " bits. Start with the base, then go through the remaining bits from left to right.",
+    pwBitsBig: b => "e in binary has " + b + " bits. Start with the base, then go through the remaining bits from left to right.",
+    colN: "#", colBit: "bit", colOp: "operation", colVal: "value (mod p)",
+    opStart: "start: r = base", opSq: "square: r = r × r", opMul: "bit 1: r = r × base",
+    bPrev: "◀ previous", bNext: "next ▶", stepK: (k, n) => "step " + k + " / " + n,
+    pwRes: (r) => "Result: " + r,
+    pwCount: (s, m, e) => s + " " + (s === 1 ? "squaring" : "squarings") + " + " + m + " " + (m === 1 ? "multiplication" : "multiplications") +
+      " = " + (s + m) + " operations, instead of " + e + " multiplications by the base one at a time.",
+    pwReal: "With a 256-bit exponent: at most 255 squarings and 255 multiplications. Going back is a different story: Eve has no such shortcut (step 2).",
+    pwMore: n => "… " + n + " more steps …",
+    errMod: "p must be at least 2.", errExp: "The exponent must be at least 1.", errLen: "At most 2048 bits for the exponent here.",
+    origins: { gA: "Alice: A = g^a mod p", gB: "Bob: B = g^b mod p", Ba: "Alice: s = B^a mod p", Ab: "Bob: s = A^b mod p",
+               gk: "ElGamal: C1 = g^k mod p", yk: "ElGamal: y^k mod p", C1x: "ElGamal: s = C1^x mod p", gx: "Bob's public key: y = g^x mod p", gm: "Mallory: M = g^m mod p" },
+  },
+  pl: {
+    title: "Eksplorator Diffiego-Hellmana", home: "Wszystkie symulatory",
+    intro: "Diffie-Hellman i ElGamal, od ogółu do szczegółu. Wybierz krok po lewej albo kliknij ciemne pole, żeby wejść głębiej.",
+    stepOf: n => "Krok " + n + " z 5 · Diffie-Hellman",
+    steps: [["Czarna skrzynka", "dwa sekrety, jedna wspólna liczba"], ["Potęgi g", "łatwo w przód, trudno wstecz"],
+            ["Mallory pośrodku", "gdy nikt nie sprawdza, kto jest kim"], ["ElGamal", "Diffie-Hellman z wiadomością"],
+            ["Jedna potęga", "podnoszenie do kwadratu i mnożenie"]],
+    explain: [
+      ["Sekret na oczach wszystkich", "Alice i Bob ustalają liczbę, nie wysyłając jej. Eve słyszy wszystko w kanale: p, g, A i B. Obie strony kończą z tym samym sekretem s, Eve go nie zna. Zmień dowolną liczbę, wszystko przeliczy się od nowa. Kliknij ciemne pole, żeby zajrzeć do środka."],
+      ["Dlaczego Eve nie cofnie potęgi", "Potęgi g modulo p skaczą po tarczy zegara bez żadnego porządku. W przód (z a do A) jest szybko. Wstecz (z A do a) to logarytm dyskretny: Eve musi próbować wykładników po kolei. Prawdziwe p ma 2048 bitów."],
+      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość M. Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami."],
+      ["Diffie-Hellman z wiadomością", "Bob raz publikuje y = g^x. Żeby wysłać liczbę M, Alice losuje nowe tajne k i wysyła C1 = g^k (swoją połowę wymiany) oraz C2 = M × y^k (wiadomość zakrytą wspólną wartością). Bob dzieli przez tę samą wartość i odzyskuje M."],
+      ["Jedna potęga modulo", "Jak Alice liczy g^a mod p, gdy a ma 256 bitów? Na pewno nie mnożąc a razy. Metoda „kwadrat i mnożenie” idzie po bitach wykładnika: dla każdego bitu podnosi do kwadratu, a dla każdej jedynki mnoży jeszcze raz."]],
+    selfOk: "✓ sprawdzone ze slajdami, Stallingsem i RFC 3526", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: następny krok · ← / Esc: wstecz",
+    digits: n => n + " " + plN(n, "cyfra", "cyfry", "cyfr"), clickIn: "kliknij, by zajrzeć", clickPow: "kliknij: ta potęga krok po kroku",
+    pLbl: "p: jawna liczba pierwsza", gLbl: "g: jawne", pubTitle: "Jawne, zna je każdy (także Eve)",
+    aLbl: "a: sekret Alice", bLbl: "b: sekret Boba", rand: "losowy sekret",
+    presets: "Przykłady:", prSlides: "slajdy: a = 6, b = 15", prTask1: "zadanie 1: a = 4, b = 3", prBook: "podręcznik: p = 353", prReal: "prawdziwy rozmiar: 2048 bitów",
+    errNum: "Wpisz liczbę całkowitą.", errPsmall: "p musi być liczbą pierwszą, co najmniej 5.", errPbig: "Tutaj najwyżej 10^12 (albo 2048-bitowa liczba pierwsza z ostatniego przykładu).",
+    errPrime: p => p + " nie jest liczbą pierwszą.", errRange: (n, hi) => n + " musi być od 1 do " + hi + ".", errG: hi => "g musi być od 2 do " + hi + ".",
+    fixFirst: "Najpierw popraw czerwone liczby w kroku 1.", fixHere: "Najpierw popraw czerwone liczby.",
+    alice: "Alice", bob: "Bob", eve: "Eve", mallory: "Mallory",
+    sendsA: "wysyła A", sendsB: "wysyła B", fromBob: "od Boba", fromAlice: "od Alice",
+    sharedA: "sekret s u Alice", sharedB: "sekret s u Boba",
+    eveListens: "Eve słucha: jej notes", eveNo: "a = ?   b = ?   s = ?",
+    res1: (s, list) => "Oboje mają s = " + s + ". Eve widziała tylko " + list + ".",
+    resBad: "Sekrety się różnią. To nie powinno się zdarzyć: zgłoś to.",
+    whyTitle: "Dlaczego wychodzi to samo?",
+    whyA: "Alice: B<sup>a</sup> = (g<sup>b</sup>)<sup>a</sup> = g<sup>b·a</sup>", whyB: "Bob: A<sup>b</sup> = (g<sup>a</sup>)<sup>b</sup> = g<sup>a·b</sup>",
+    whyNum: (ab, r) => "a·b = " + ab + ", a g<sup>" + ab + "</sup> mod p = " + r + ": ta sama liczba, której nikt nigdy nie wysłał.",
+    whyBig: "Tutaj a·b jest ogromne, ale zasada ta sama: oboje liczą g<sup>ab</sup> mod p.",
+    legPub: "jawne: widzi każdy", legSec: "tajne: zna tylko właściciel", legSh: "wspólny sekret", legMal: "napastnicy: Eve i Mallory", legMsg: "wiadomość",
+    honest: "Małe liczby są tylko do nauki: przy p = 23 Eve sprawdzi wszystkie 22 wykładniki w mgnieniu oka. Prawdziwy Diffie-Hellman używa p o 2048 bitach i sekretów o co najmniej 256 bitach (wypróbuj ostatni przykład).",
+    clockTitle: (g, p) => "Potęgi " + g + " mod " + p + " na tarczy zegara",
+    clockNote: "Na tarczy są liczby od 1 do p - 1. Każdy krok mnoży przez g (mod p) i skacze do następnej liczby. Niebieski pierścień to A Alice.",
+    expo: "wykładnik e", play: "▶ odtwórz", stop: "■ stop",
+    distinctAll: (n, p) => "g dochodzi do wszystkich " + n + " liczb od 1 do " + (p - 1) + ": dobre g.",
+    distinctFew: (n, p) => "g daje tylko " + n + " " + plN(n, "różną liczbę", "różne liczby", "różnych liczb") + ", potem się powtarzają: złe g, Eve ma mniej do sprawdzenia.",
+    distinctBig: "p jest za duże, żeby tu policzyć wszystkie potęgi.",
+    distinctRfc: "W tej grupie g = 2 daje (p - 1)/2 różnych liczb: około 2^2047.",
+    noClock: "Tarcza jest rysowana dla p do 61. Niżej: pierwsze potęgi.",
+    tryG: "Wypróbuj inne g:", goodG: "g = 5 (dobre)", badG: "g = 2 (złe)",
+    rowE: "e", rowV: "g^e mod p",
+    fwdTitle: "W przód: łatwo", backTitle: "Wstecz: trudno",
+    fwdText: (n, bits) => "Alice zna a i liczy A w " + n + " " + plN(n, "mnożeniu", "mnożeniach", "mnożeniach") + " (kwadrat i mnożenie). Przy p o 2048 bitach i a o 256 bitach to najwyżej około 512, kilka milisekund.",
+    fwdBtn: "zobacz tę potęgę krok po kroku",
+    backText: A => "Eve zna tylko A = " + A + ". Nie ma wzoru: próbuje e = 1, 2, 3, …, aż g^e mod p = A.",
+    tryOne: "spróbuj jeszcze jeden", tryAll: "próbuj do skutku", reset: "⏮ od nowa",
+    tried: n => "Sprawdzono " + n.toLocaleString("pl-PL") + " " + plN(n, "wykładnik", "wykładniki", "wykładników") + ".",
+    found: (e, n) => "Znaleziono a = " + e + " po " + n.toLocaleString("pl-PL") + " " + plN(n, "próbie", "próbach", "próbach") + ". Teraz Eve też policzy s.",
+    foundOther: (e, a) => "Eve znalazła e = " + e + ", a nie a = " + a + " Alice, ale g^" + e + " daje to samo A, więc dla niej działa tak samo dobrze.",
+    bigSearch: "Przy takim p szukanie trwałoby o wiele za długo: około 2^2047 prób. Dlatego prawdziwe p ma 2048 bitów.",
+    searching: (n) => "szukam … " + n.toLocaleString("pl-PL") + " prób",
+    t3Title: "Zadanie 3: za każdym razem 4 bity więcej. Ile dłużej?",
+    t3Predict: "Najpierw przewiduj: z wiersza na wiersz p rośnie o 4 bity. Ile razy dłużej potrwa szukanie?",
+    t3Run: "uruchom szukanie", t3Bits: "bity", t3Tries: "próby do A", t3Time: "czas w tej przeglądarce", t3Ratio: "ile razy więcej prób niż wyżej",
+    t3Note: "Czas zależy od tego, jak duże było losowe a, więc wzrost nie jest równy. Średnio 4 bity więcej to 16 razy więcej prób. Python (jak w zadaniu 3) jest wolniejszy niż ta przeglądarka.",
+    malOn: "Mallory siedzi na kablu", malStepLbl: k => "atak, krok " + k + " z 4",
+    malSteps: ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi swoje M.", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice M.",
+               "Alice ma wspólny sekret z Mallory. Bob ma inny wspólny sekret z Mallory.", "Alice wysyła wiadomość. Mallory ją odszyfrowuje, czyta i szyfruje na nowo dla Boba."],
+    mLbl: "m: sekret Mallory", malM: "M = g^m mod p, wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
+    recvAsB: "„od Boba” (naprawdę M)", recvAsA: "„od Alice” (naprawdę M)",
+    sealOn: "Alice i Bob sprawdzają pieczęć (uwierzytelnienie)",
+    noSealB: "brak pieczęci Boba: odrzucone", noSealA: "brak pieczęci Alice: odrzucone", stopped: "wymiana przerwana",
+    res3: (sa, sb) => "Alice ma " + sa + ", Bob ma " + sb + ": dwa różne sekrety, a Mallory zna oba. Bez Mallory oboje mieliby ten sam sekret (krok 1).",
+    res3same: s => "Przypadkiem Alice i Bob dostali to samo " + s + ", ale Mallory też to zna.",
+    res3seal: "Alice i Bob widzą, że M nie ma pieczęci drugiej strony, i przerywają. Mallory może podmienić B, ale nie przyłoży do swojego M pieczęci Boba.",
+    msgTitle: "Co daje atak", msgLbl: "wiadomość Alice",
+    lockedWith: (n, s) => "zamknięta kluczem " + n + " (z " + s + ")", malReads: "Mallory otwiera, czyta, zamyka na nowo",
+    bobReads: "Bob czyta", aliceSends: "Alice wysyła",
+    msgNote: "Jak w zadaniu 4: klucz powstaje z sekretu przez SHA-256. Tutaj pokazujemy tylko, który klucz zamyka którą kopertę. Obie strony widzą poprawne wiadomości: nic nie wygląda podejrzanie.",
+    msgStopped: "Nic nie zostaje wysłane: wymiana została przerwana.",
+    fixTitle: "Ratunek: uwierzytelnić wymianę",
+    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego klucz prywatny. Alice sprawdza pieczęć kluczem publicznym Boba, który zna z <b>certyfikatu</b>: klucza publicznego Boba opieczętowanego przez kogoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje M jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie wyżej, żeby zobaczyć efekt.",
+    keysTitle: "Klucze Boba",
+    xLbl: "x: klucz prywatny Boba", yLbl: "y = g^x mod p: klucz publiczny Boba, na tablicy ogłoszeń", pgNow: (p, g) => "p = " + p + ", g = " + g + " (zmienisz je w kroku 1)",
+    MLbl: "M: wiadomość, liczba od 1 do p - 1", kLbl: "k: nowy losowy sekret",
+    c1Box: "C1 = g^k mod p", c2Box: "C2 = M × y^k mod p",
+    sent: "szyfrogram, wysłany przez sieć", eveSees: "Eve widzi C1, C2 i y, ale nie M, k ani x.",
+    sBox: "s = C1^x mod p", invBox: "s^-1 mod p", mBox: "M = C2 × s^-1 mod p",
+    back: "wiadomość wróciła", c1Is: "połowa wymiany Diffiego-Hellmana od Alice", c2Is: "wiadomość zakryta przez y^k",
+    sameS: "s to to samo co y^k: (g^k)^x = (g^x)^k. Bob przez nie dzieli.",
+    twiceTitle: "Ta sama wiadomość dwa razy",
+    twiceText: "Nowe k daje za każdym razem nowy szyfrogram. Podręcznikowe RSA daje ten sam (atak na PIN z wykładu 3). Cena: dwie liczby, dwa razy dłużej niż p.",
+    withK: "dla k =", reuseTitle: "k użyte dwa razy (zadanie 6)",
+    reuseText: "Nadawca użył tego samego k dla drugiej wiadomości M2. Eve zna pierwszą wiadomość M (była wydrukowana na publicznym paragonie). Czy przeczyta M2 bez x Boba?",
+    m2Lbl: "druga wiadomość M2 =", sameK: "to samo k", newK: "nowe k' = ",
+    second: "drugi szyfrogram",
+    rs1: "maska y^k = C2 × M^-1 mod p", rs2: "M2 = C2' × (maska)^-1 mod p",
+    rsOk: "Eve przeczytała drugą wiadomość. Ani razu nie potrzebowała x.", rsBad: "Przy nowym k sztuczka daje złą liczbę: Eve niczego się nie dowiaduje.",
+    sameC1: "C1 jest dwa razy takie samo: Eve widzi, że k się powtórzyło.",
+    rule: "<b>Zasada:</b> k musi być losowe, tajne i nowe dla każdej wiadomości. Ta sama lekcja co keystream i nonce w wykładach o szyfrach strumieniowych.",
+    realTitle: "W prawdziwym rozmiarze: liczby z zadania 6",
+    realText: "Dwa 2048-bitowe szyfrogramy z tym samym C1 (" + "268389893958…" + "). Pierwsza wiadomość jest znana: „" + "Payment approved: 250 EUR, order 1187." + "”",
+    realBtn: "wykonaj dwa kroki Eve", realOut: "druga wiadomość:",
+    pwTitle: "Policz podstawa^e mod p", pwBase: "podstawa", pwExp: "wykładnik e", pwMod: "moduł p",
+    pwFrom: s => "Z: " + s + ".",
+    pwBits: (e, b) => "e = " + e + " dwójkowo: " + b + " " + plN(b, "bit", "bity", "bitów") + ". Zaczynamy od podstawy, potem idziemy po pozostałych bitach od lewej do prawej.",
+    pwBitsBig: b => "e dwójkowo ma " + b + " " + plN(b, "bit", "bity", "bitów") + ". Zaczynamy od podstawy, potem idziemy po pozostałych bitach od lewej do prawej.",
+    colN: "nr", colBit: "bit", colOp: "działanie", colVal: "wartość (mod p)",
+    opStart: "start: r = podstawa", opSq: "kwadrat: r = r × r", opMul: "bit 1: r = r × podstawa",
+    bPrev: "◀ poprzedni", bNext: "następny ▶", stepK: (k, n) => "krok " + k + " / " + n,
+    pwRes: (r) => "Wynik: " + r,
+    pwCount: (s, m, e) => s + " " + plN(s, "podniesienie", "podniesienia", "podniesień") + " do kwadratu + " + m + " " + plN(m, "mnożenie", "mnożenia", "mnożeń") +
+      " = " + (s + m) + " " + plN(s + m, "działanie", "działania", "działań") + " zamiast " + e + " " + plN(e, "mnożenia", "mnożeń", "mnożeń") + " przez podstawę po kolei.",
+    pwReal: "Przy wykładniku o 256 bitach: najwyżej 255 podniesień do kwadratu i 255 mnożeń. Wstecz jest inaczej: Eve nie ma takiego skrótu (krok 2).",
+    pwMore: n => "… jeszcze " + n + " " + plN(n, "krok", "kroki", "kroków") + " …",
+    errMod: "p musi być co najmniej 2.", errExp: "Wykładnik musi być co najmniej 1.", errLen: "Tutaj wykładnik ma najwyżej 2048 bitów.",
+    origins: { gA: "Alice: A = g^a mod p", gB: "Bob: B = g^b mod p", Ba: "Alice: s = B^a mod p", Ab: "Bob: s = A^b mod p",
+               gk: "ElGamal: C1 = g^k mod p", yk: "ElGamal: y^k mod p", C1x: "ElGamal: s = C1^x mod p", gx: "klucz publiczny Boba: y = g^x mod p", gm: "Mallory: M = g^m mod p" },
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+/* one language setting for all the simulators on the site */
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+
+const app = {
+  level: 0,
+  f: { p: "23", g: "5", a: "6", b: "15", m: "9", x: "6", M: "10", k: "3", k2: "7", M2: "7" },
+  malStep: 1, seal: false, reuseSame: true,
+  clockE: 6, playing: null,
+  eve: null,        // Eve's search: { key, e, v, found, done, running }
+  t3: null,         // Task 3 results
+  real6: false,
+  pw: { b: "5", e: "6", m: "23", origin: "gA", step: 0 },
+  mmsg: "My new card PIN is 7314. Please keep it secret.",
+};
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function parseNum(s) { s = String(s).trim(); return /^[0-9]+$/.test(s) ? BigInt(s) : null; }
+/* a big number: the first digits, then the length */
+function fmt(v) {
+  if (v === null || v === undefined) return "?";
+  const s = v.toString();
+  return s.length <= 14 ? s : s.slice(0, 8) + "…" + " (" + L().digits(s.length) + ")";
+}
+const small = v => v.toString().length <= 6;
+/* "5<sup>6</sup> mod 23 = 8" with numbers when they are small, with the names when they are big */
+function powEq(bn, en, b, e, m, r) {
+  if (small(b) && small(e) && small(m)) return b + "<sup>" + e + "</sup> mod " + m + " = <b>" + fmt(r) + "</b>";
+  return bn + "<sup>" + en + "</sup> mod p = <b>" + fmt(r) + "</b>";
+}
+const supTxt = s => esc(s).replace(/\^(-?1|[a-zA-Z0-9]+)/g, "<sup>$1</sup>");
+
+/* the public numbers and secrets of step 1, checked */
+function params() {
+  const t = L(), f = app.f, er = {};
+  const p = parseNum(f.p), g = parseNum(f.g), a = parseNum(f.a), b = parseNum(f.b);
+  if (p === null) er.p = t.errNum;
+  else if (p !== RFC3526_P) {
+    if (p < 5n) er.p = t.errPsmall;
+    else if (p > SMALL_P_MAX) er.p = t.errPbig;
+    else if (!isPrimeSmall(p)) er.p = t.errPrime(p.toString());
+  }
+  const ok = !er.p;
+  const hi = ok ? p - 2n : null;
+  if (g === null) er.g = t.errNum; else if (ok && (g < 2n || g > hi)) er.g = t.errG(fmt(hi));
+  const chk = (k, v, name) => { if (v === null) er[k] = t.errNum; else if (ok && (v < 1n || v > hi)) er[k] = t.errRange(name, fmt(hi)); };
+  chk("a", a, "a"); chk("b", b, "b");
+  return { p: p, g: g, a: a, b: b, er: er, bad: Object.keys(er).length > 0 };
+}
+/* a secret in 1 .. p-2 (or a message in 1 .. p-1) */
+function extra(name, P, msg) {
+  const t = L(), v = parseNum(app.f[name]);
+  if (v === null) return { v: null, er: t.errNum };
+  if (P.bad) return { v: v, er: null };
+  const hi = msg ? P.p - 1n : P.p - 2n;
+  if (v < 1n || v > hi) return { v: v, er: t.errRange(name === "k2" ? "k'" : name, fmt(hi)) };
+  return { v: v, er: null };
+}
+function randBelow(n) {   // a random number in 1 .. n
+  const bytes = new Uint8Array(Math.ceil(n.toString(2).length / 8) + 8);
+  crypto.getRandomValues(bytes);
+  let r = 0n;
+  for (const x of bytes) r = r * 256n + BigInt(x);
+  return r % n + 1n;
+}
+function rand256() { const b = new Uint8Array(32); crypto.getRandomValues(b); let r = 0n; for (const x of b) r = r * 256n + BigInt(x); return (r | (1n << 255n)).toString(); }
+
+/* ---------- small pieces of HTML ---------- */
+const DICE_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/></svg>';
+const USER_SVG = '<svg viewBox="0 0 16 16" width="17" height="17" aria-hidden="true"><circle cx="8" cy="5.2" r="3.2" fill="currentColor"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z" fill="currentColor"/></svg>';
+const SPY_SVG = '<svg viewBox="0 0 16 16" width="17" height="17" aria-hidden="true"><path d="M3 6.2h10l-1.4-4.4-2.2 1h-2.8l-2.2-1z" fill="currentColor"/><rect x="1.5" y="6" width="13" height="1.4" rx=".7" fill="currentColor"/><circle cx="5.3" cy="9.8" r="1.9" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="10.7" cy="9.8" r="1.9" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7.2 9.8h1.6M3.5 15c.6-2 2.4-2.9 4.5-2.9s3.9.9 4.5 2.9z" stroke="currentColor" stroke-width="1.1" fill="currentColor"/></svg>';
+const EAR_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4.5 6a3.5 3.5 0 0 1 7 0c0 2.2-2.3 2.8-2.3 5a2.2 2.2 0 0 1-4.2.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.6 6.2a1.4 1.4 0 0 1 2.8 0c0 1-1 1.2-1.3 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+const ENV_SVG = (c) => '<svg viewBox="0 0 40 28" width="40" height="28" aria-hidden="true"><rect x="1" y="1" width="38" height="26" rx="3" fill="var(--surface)" stroke="' + c + '" stroke-width="2"/><path d="M1.5 2l18.5 13 18.5-13" fill="none" stroke="' + c + '" stroke-width="2"/></svg>';
+const LOCK_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+const rndBtn = f => '<button class="rnd" data-action="rand" data-f="' + f + '" title="' + esc(L().rand) + '" aria-label="' + esc(L().rand) + '">' + DICE_SVG + "</button>";
+const inp = (f, cls) => '<input data-field="' + f + '" spellcheck="false" autocomplete="off" inputmode="numeric" class="' + (cls || "") + '" value="' + esc(app.f[f]) + '">';
+const person = (name, x, y, sub, mal) => '<div class="person" style="left:' + x + "px;top:" + y + 'px"><span class="ava' + (mal ? " mal" : "") + '">' + (mal ? SPY_SVG : USER_SVG) + "</span>" + name + (sub ? " <small>" + sub + "</small>" : "") + "</div>";
+const mk = (id, c) => '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="' + c + '"/></marker>';
+const MARKERS = "<defs>" + mk("mInk", "var(--muted)") + mk("mPub", "var(--pub-b)") + mk("mSec", "var(--sec-b)") + mk("mMal", "var(--mal-b)") + "</defs>";
+const ln = (pts, kind, extra) => '<polyline fill="none" stroke="' + ({ ink: "var(--muted)", pub: "var(--pub-b)", sec: "var(--sec-b)", mal: "var(--mal-b)" })[kind] +
+  '" stroke-width="2.3" marker-end="url(#m' + ({ ink: "Ink", pub: "Pub", sec: "Sec", mal: "Mal" })[kind] + ')" points="' + pts + '"' + (extra || "") + "/>";
+const legend = keys => '<div class="legend">' + keys.map(k => '<span class="role-' + k + '">' + L()[{ pub: "legPub", sec: "legSec", sh: "legSh", mal: "legMal", msg: "legMsg" }[k]] + "</span>").join("") + "</div>";
+function setHTML(id, h) { const e = document.getElementById(id); if (e) e.innerHTML = h; }
+function markInputs(er) {
+  view.querySelectorAll("input[data-field]").forEach(i => {
+    const f = i.dataset.field;
+    if (f in er) { i.classList.toggle("bad", !!er[f]); i.title = er[f] || ""; }
+  });
+}
+function errList(er) { const v = Object.values(er).filter(Boolean); return v.length ? '<span class="err">' + esc(v.join(" ")) + "</span>" : ""; }
+
+/* ---------- step 1: black box ---------- */
+function render0() {
+  const t = L();
+  const W = 1045, H = 522;
+  let h = '<div class="card"><div class="btns" style="margin-bottom:12px"><span class="lbl">' + t.presets + "</span>" +
+    '<button data-action="preset" data-p="slides">' + t.prSlides + '</button><button data-action="preset" data-p="task1">' + t.prTask1 + "</button>" +
+    '<button data-action="preset" data-p="book">' + t.prBook + '</button><button data-action="preset" data-p="real">' + t.prReal + "</button></div>" +
+    '<div class="schwrap"><div class="sch" style="width:' + W + "px;height:" + H + 'px">' +
+    '<svg class="arrows" width="' + W + '" height="' + H + '" aria-hidden="true">' + MARKERS +
+      ln("160,116 160,132", "ink") + ln("160,190 160,206", "ink") + ln("160,356 160,374", "ink") + ln("160,432 160,450", "ink") +
+      ln("885,116 885,132", "ink") + ln("885,190 885,206", "ink") + ln("885,356 885,374", "ink") + ln("885,432 885,450", "ink") +
+      ln("20,80 8,80 8,404 58,404", "sec") + ln("1025,80 1037,80 1037,404 987,404", "sec") +
+      ln("345,162 264,162", "pub") + ln("700,162 781,162", "pub") +
+      ln("302,238 741,326", "pub") + ln("743,238 304,326", "pub") +
+      '<line x1="522" y1="290" x2="522" y2="370" stroke="var(--mal-b)" stroke-width="2" stroke-dasharray="5 4"/>' +
+    "</svg>" +
+    // the public numbers
+    '<div class="chip role-pub" style="left:345px;top:0;width:355px;height:178px"><div>' + t.pubTitle + "</div>" +
+      '<label style="margin-top:6px">' + t.pLbl + inp("p") + "</label>" +
+      '<label style="margin-top:6px">' + t.gLbl + inp("g") + "</label></div>" +
+    // Alice
+    person(t.alice, 20, 2) +
+    '<div class="chip role-sec" style="left:20px;top:44px;width:280px;height:72px">' + rndBtn("a") + "<label>" + t.aLbl + inp("a") + "</label></div>" +
+    '<button class="box sbox" style="left:60px;top:134px;width:200px;height:56px" data-action="zoom" data-to="1"><span>g<sup>a</sup> mod p</span><small>' + t.clickIn + "</small></button>" +
+    '<div class="chip role-pub" style="left:20px;top:208px;width:280px;height:60px">A<small> (' + t.sendsA + ')</small><span class="v" id="o_A"></span></div>' +
+    '<div class="chip role-pub" style="left:20px;top:296px;width:280px;height:60px">B<small> (' + t.fromBob + ')</small><span class="v" id="o_rB"></span></div>' +
+    '<button class="box sbox" style="left:60px;top:376px;width:200px;height:56px" data-action="pow" data-k="Ba"><span>B<sup>a</sup> mod p</span><small>' + t.clickPow + "</small></button>" +
+    '<div class="chip role-sh" style="left:20px;top:452px;width:280px;height:64px">' + t.sharedA + '<span class="v" id="o_sA"></span></div>' +
+    // Bob
+    person(t.bob, 745, 2) +
+    '<div class="chip role-sec" style="left:745px;top:44px;width:280px;height:72px">' + rndBtn("b") + "<label>" + t.bLbl + inp("b") + "</label></div>" +
+    '<button class="box sbox" style="left:785px;top:134px;width:200px;height:56px" data-action="zoom" data-to="1"><span>g<sup>b</sup> mod p</span><small>' + t.clickIn + "</small></button>" +
+    '<div class="chip role-pub" style="left:745px;top:208px;width:280px;height:60px">B<small> (' + t.sendsB + ')</small><span class="v" id="o_B"></span></div>' +
+    '<div class="chip role-pub" style="left:745px;top:296px;width:280px;height:60px">A<small> (' + t.fromAlice + ')</small><span class="v" id="o_rA"></span></div>' +
+    '<button class="box sbox" style="left:785px;top:376px;width:200px;height:56px" data-action="pow" data-k="Ab"><span>A<sup>b</sup> mod p</span><small>' + t.clickPow + "</small></button>" +
+    '<div class="chip role-sh" style="left:745px;top:452px;width:280px;height:64px">' + t.sharedB + '<span class="v" id="o_sB"></span></div>' +
+    // the channel and Eve
+    '<div class="wlbl" style="left:318px;top:206px;color:var(--pub-b)" id="w_A"></div>' +
+    '<div class="wlbl" style="left:590px;top:206px;width:140px;text-align:right;color:var(--pub-b)" id="w_B"></div>' +
+    '<div class="evecard" style="left:392px;top:372px;width:262px"><div class="eh">' + EAR_SVG + " " + t.eveListens + '</div><div class="eb" id="o_eve"></div></div>' +
+    "</div></div>" +
+    '<div id="o_res"></div>' + legend(["pub", "sec", "sh", "mal"]) + "</div>" +
+    '<div class="card"><h3>' + t.whyTitle + '</h3><div class="calc"><div>' + t.whyA + "</div><div>" + t.whyB + '</div><div id="o_why"></div></div>' +
+    '<p class="note" style="margin:10px 0 0">' + t.honest + "</p></div>";
+  return h;
+}
+function update0() {
+  const t = L(), P = params();
+  markInputs(P.er);
+  const ids = ["o_A", "o_rB", "o_sA", "o_B", "o_rA", "o_sB", "w_A", "w_B", "o_eve", "o_why"];
+  if (P.bad) {
+    ids.forEach(i => setHTML(i, ""));
+    setHTML("o_res", '<div class="banner neutral">' + errList(P.er) + "</div>");
+    return;
+  }
+  const d = dhExchange(P.p, P.g, P.a, P.b);
+  setHTML("o_A", "= " + powEq("g", "a", P.g, P.a, P.p, d.A));
+  setHTML("o_B", "= " + powEq("g", "b", P.g, P.b, P.p, d.B));
+  setHTML("o_rB", "= <b>" + fmt(d.B) + "</b>");
+  setHTML("o_rA", "= <b>" + fmt(d.A) + "</b>");
+  setHTML("o_sA", "= " + powEq("B", "a", d.B, P.a, P.p, d.sAlice));
+  setHTML("o_sB", "= " + powEq("A", "b", d.A, P.b, P.p, d.sBob));
+  setHTML("w_A", "A = " + esc(fmt(d.A)).replace(/ \(.*/, "") + " →");
+  setHTML("w_B", "← B = " + esc(fmt(d.B)).replace(/ \(.*/, ""));
+  const sh = v => esc(fmt(v)).replace(/ \(.*/, "");
+  setHTML("o_eve", "p = " + sh(P.p) + ",  g = " + sh(P.g) + "<br>A = " + sh(d.A) + "<br>B = " + sh(d.B) + '<br><span class="no">' + t.eveNo + "</span>");
+  const list = [P.p, P.g, d.A, d.B].map(v => fmt(v).replace(/ \(.*/, "")).join(", ");
+  setHTML("o_res", d.sAlice === d.sBob ? '<div class="banner good">' + esc(t.res1(fmt(d.sAlice).replace(/ \(.*/, ""), list)) + "</div>" : '<div class="banner bad">' + t.resBad + "</div>");
+  const ab = P.a * P.b;
+  setHTML("o_why", ab.toString().length <= 8 ? t.whyNum(ab.toString(), "<b>" + fmt(modPow(P.g, ab, P.p)) + "</b>") : t.whyBig);
+}
+
+/* ---------- step 2: the powers of g ---------- */
+function render1() {
+  const t = L(), P = params();
+  if (P.bad) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  const isRfc = P.p === RFC3526_P;
+  let h = '<div class="card"><h3 id="c_title"></h3>' +
+    '<div class="btns" style="margin-bottom:6px"><span class="lbl">' + t.tryG + '</span><label class="inl" style="font-weight:600">g = ' + inp("g") + "</label>" +
+    (P.p === 23n ? '<button data-action="setg" data-g="5">' + t.goodG + '</button><button data-action="setg" data-g="2">' + t.badG + "</button>" : "") + "</div>" +
+    '<div class="clockrow"><div id="c_clock"></div><div class="clockside">' +
+      (isRfc ? "" : '<div class="ctl"><span class="lbl">' + t.expo + '</span><button data-action="ce" data-d="-1">&minus;</button>' +
+        '<input type="range" min="1" max="1" value="1" data-field="clockE" id="c_range"><button data-action="ce" data-d="1">+</button>' +
+        '<button data-action="play" id="c_play">' + t.play + "</button></div>") +
+      '<div class="bigeq" id="c_eq"></div><p id="c_count" style="margin:4px 0"></p><p class="note" id="c_note"></p></div></div>' +
+    '<div class="schwrap"><table class="ptable" id="c_table"></table></div></div>';
+  h += '<div class="card"><div class="two">' +
+    '<div class="half role-sh"><h4>' + t.fwdTitle + '</h4><div class="bigeq" style="font-size:17px" id="f_eq"></div><p style="margin:4px 0 8px" id="f_txt"></p>' +
+      '<button class="dark" data-action="pow" data-k="gA">' + t.fwdBtn + " →</button></div>" +
+    '<div class="half role-mal"><h4>' + t.backTitle + '</h4><p style="margin:0 0 8px" id="b_txt"></p>' +
+      '<div class="btns"><button data-action="eve1">' + t.tryOne + '</button><button class="dark" data-action="eveall">' + t.tryAll + "</button>" +
+      '<button data-action="evereset">' + t.reset + '</button></div><div id="b_out"></div></div></div></div>';
+  h += '<div class="card"><h3>' + t.t3Title + '</h3><p style="margin:0 0 8px">' + t.t3Predict + "</p>" +
+    '<button class="dark" data-action="t3run" id="t3btn">' + t.t3Run + '</button><div class="schwrap"><table class="rtable" id="t3tab"></table></div>' +
+    '<p class="note">' + t.t3Note + "</p></div>";
+  return h;
+}
+function clockSVG(p, g, e, A) {
+  const n = Number(p) - 1, R = 190, C = 215, S = 430;
+  const pos = v => { const ang = (Number(v) - 1) / n * 2 * Math.PI - Math.PI / 2; return [C + R * Math.cos(ang), C + R * Math.sin(ang)]; };
+  const pw = powersList(p, g, e);
+  const on = new Set(pw.map(String));
+  const cur = pw[pw.length - 1];
+  let s = '<svg class="clock" width="' + S + '" height="' + S + '" viewBox="0 0 ' + S + " " + S + '" role="img" aria-label="clock">' +
+    '<defs><marker id="cA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--chg)"/></marker></defs>' +
+    '<circle class="ring" cx="' + C + '" cy="' + C + '" r="' + R + '"/>';
+  const rn = n > 40 ? 10 : 13;
+  let prev = null;
+  pw.forEach((v, i) => {
+    const q = pos(v);
+    if (prev) {
+      // stop the line at the edge of the node
+      const dx = q[0] - prev[0], dy = q[1] - prev[1], len = Math.hypot(dx, dy) || 1;
+      const x2 = q[0] - dx / len * (rn + 2), y2 = q[1] - dy / len * (rn + 2);
+      const last = i === pw.length - 1;
+      s += '<line class="ch' + (last ? " last" : "") + '" x1="' + prev[0].toFixed(1) + '" y1="' + prev[1].toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"' + (last ? ' marker-end="url(#cA)"' : "") + "/>";
+    }
+    prev = q;
+  });
+  for (let v = 1; v <= n; v++) {
+    const q = pos(v), isOn = on.has(String(v)), isCur = String(v) === String(cur);
+    const cls = isCur ? " cur" : isOn ? " on" : "";
+    if (String(v) === String(A)) s += '<circle class="aring" cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="' + (rn + 5) + '"/>';
+    s += '<circle class="nd' + cls + '" cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="' + rn + '"/>' +
+      '<text class="nt' + cls + '" x="' + q[0].toFixed(1) + '" y="' + q[1].toFixed(1) + '"' + (n > 40 ? ' style="font-size:10px"' : "") + ">" + v + "</text>";
+  }
+  s += '<text class="ctr" x="' + C + '" y="' + (C - 4) + '">' + g + "<tspan baseline-shift=\"super\" font-size=\"14\">" + e + "</tspan> = " + cur + '</text><text class="ctrs" x="' + C + '" y="' + (C + 20) + '">mod ' + p + "</text>";
+  return s + "</svg>";
+}
+function update1() {
+  const t = L(), P = params();
+  markInputs(P.er);
+  if (P.bad) { setHTML("c_clock", ""); setHTML("c_eq", errList(P.er)); return; }
+  const isRfc = P.p === RFC3526_P, d = dhExchange(P.p, P.g, P.a, P.b);
+  setHTML("c_title", esc(t.clockTitle(fmt(P.g).replace(/ \(.*/, ""), fmt(P.p).replace(/ \(.*/, ""))));
+  const n = isRfc ? 0 : Number(P.p) - 1;
+  const ord = isRfc ? null : orderOf(P.p, P.g, 2000000);
+  // the exponent slider: 1 .. p-1 (capped for big p)
+  const maxE = isRfc ? 1 : Math.min(n, 60);
+  if (app.clockE > maxE) app.clockE = maxE;
+  if (app.clockE < 1) app.clockE = 1;
+  const rg = document.getElementById("c_range");
+  if (rg) { rg.max = maxE; rg.value = app.clockE; }
+  const e = app.clockE;
+  const drawClock = !isRfc && P.p <= 61n;
+  setHTML("c_clock", drawClock ? clockSVG(P.p, P.g, e, d.A) : "");
+  if (!isRfc) {
+    const v = modPow(P.g, BigInt(e), P.p);
+    setHTML("c_eq", fmt(P.g) + "<sup>" + e + "</sup> mod " + fmt(P.p) + " = <b>" + fmt(v) + "</b>");
+  } else setHTML("c_eq", "");
+  setHTML("c_count", isRfc ? (P.g === 2n ? t.distinctRfc : t.distinctBig) : ord === null ? t.distinctBig :
+    (ord === n ? '<span class="okline">' + esc(t.distinctAll(ord, Number(P.p))) + "</span>" : '<span class="badline">' + esc(t.distinctFew(ord, Number(P.p))) + "</span>"));
+  setHTML("c_note", drawClock ? t.clockNote : isRfc ? "" : t.noClock);
+  // the table of powers (like the slide "Why this g?")
+  if (isRfc) setHTML("c_table", "");
+  else {
+    const cols = Math.min(n, 22), pw = powersList(P.p, P.g, cols);
+    const seen = new Map();
+    let r1 = '<tr class="ex"><td class="lbl">' + t.rowE + "</td>", r2 = '<tr><td class="lbl">' + supTxt(t.rowV) + "</td>";
+    pw.forEach((v, i) => {
+      const k = v.toString();
+      const rep = ord !== null && i + 1 > ord;
+      let cls = i + 1 === e ? "cur" : i + 1 < e ? "on" : "";
+      if (rep && i + 1 !== e) cls += " rep";
+      if (v === d.A) cls += " isA";
+      r1 += '<td class="click" data-action="setE" data-e="' + (i + 1) + '">' + (i + 1) + "</td>";
+      r2 += '<td class="click ' + cls + '" data-action="setE" data-e="' + (i + 1) + '">' + fmt(v) + "</td>";
+      seen.set(k, true);
+    });
+    if (n > cols) { r1 += "<td>…</td>"; r2 += "<td>…</td>"; }
+    setHTML("c_table", r1 + "</tr>" + r2 + "</tr>");
+  }
+  // forward
+  const ps = powSteps(P.g, P.a, P.p);
+  setHTML("f_eq", "A = " + powEq("g", "a", P.g, P.a, P.p, d.A));
+  setHTML("f_txt", esc(t.fwdText(ps.steps.length - 1)));
+  setHTML("b_txt", supTxt(t.backText(fmt(d.A))));
+  renderEve();
+}
+/* Eve's brute-force search, in chunks so the page never freezes */
+function eveKey() { const P = params(); return P.bad ? "" : [P.p, P.g, P.a].join("/"); }
+function eveState() {
+  const P = params();
+  const key = eveKey();
+  if (!app.eve || app.eve.key !== key) {
+    if (app.eve && app.eve.timer) clearTimeout(app.eve.timer);
+    app.eve = { key: key, e: 1, v: P.g % P.p, tries: [], found: null, count: 0, running: false, timer: null };
+  }
+  return app.eve;
+}
+function renderEve() {
+  const out = document.getElementById("b_out");
+  if (!out) return;
+  const t = L(), P = params();
+  if (P.bad) { out.innerHTML = ""; return; }
+  if (P.p === RFC3526_P) { out.innerHTML = '<p class="badline" style="margin:8px 0 0">' + t.bigSearch + "</p>"; view.querySelectorAll('[data-action="eve1"],[data-action="eveall"]').forEach(b => { b.disabled = true; }); return; }
+  const s = eveState(), A = modPow(P.g, P.a, P.p);
+  let h = "";
+  if (s.tries.length) {
+    h += '<div class="tries">' + s.tries.slice(0, 40).map(x => '<span class="try' + (x.hit ? " hit" : "") + '">' + x.e + ": " + fmt(x.v) + (x.hit ? " ✓" : "") + "</span>").join("") +
+      (s.tries.length > 40 ? '<span class="try">…</span>' : "") + "</div>";
+  }
+  if (s.found !== null) {
+    h += '<p class="badline" style="margin:8px 0 0">' + esc(t.found(s.found, s.count)) + "</p>";
+    if (BigInt(s.found) !== P.a) h += '<p class="note" style="margin:2px 0 0">' + esc(t.foundOther(s.found, P.a.toString())) + "</p>";
+  } else if (s.running) h += '<p style="margin:8px 0 0">' + esc(t.searching(s.count)) + "</p>";
+  else if (s.count) h += '<p style="margin:8px 0 0">' + esc(t.tried(s.count)) + "</p>";
+  out.innerHTML = h;
+  view.querySelectorAll('[data-action="eve1"],[data-action="eveall"]').forEach(b => { b.disabled = s.found !== null || s.running; });
+}
+function eveStep() {
+  const P = params(); if (P.bad || P.p === RFC3526_P) return;
+  const s = eveState(); if (s.found !== null || s.running) return;
+  const A = modPow(P.g, P.a, P.p);
+  const hit = s.v === A;
+  s.tries.push({ e: s.e, v: s.v, hit: hit });
+  s.count++;
+  if (hit) s.found = s.e;
+  else { s.v = s.v * P.g % P.p; s.e++; }
+  renderEve();
+}
+function eveAll() {
+  const P = params(); if (P.bad || P.p === RFC3526_P) return;
+  const s = eveState(); if (s.found !== null || s.running) return;
+  const A = modPow(P.g, P.a, P.p);
+  s.running = true;
+  const key = s.key;
+  const chunk = () => {
+    if (!app.eve || app.eve.key !== key || !app.eve.running) return;
+    const t0 = performance.now();
+    let n = 5000;
+    // small p: show every try; big p: big chunks of about 30 ms
+    if (s.tries.length < 40) {
+      const hit = s.v === A;
+      s.tries.push({ e: s.e, v: s.v, hit: hit }); s.count++;
+      if (hit) { s.found = s.e; s.running = false; renderEve(); return; }
+      s.v = s.v * P.g % P.p; s.e++;
+      renderEve();
+      s.timer = setTimeout(chunk, P.p < 100n ? 60 : 4);
+      return;
+    }
+    while (performance.now() - t0 < 30) {
+      const r = searchChunk(P.p, P.g, A, s.e, s.v, n);
+      if (r.found) { s.count += r.e - s.e + 1; s.found = r.e; s.e = r.e; s.v = r.v; s.running = false; renderEve(); return; }
+      s.count += n; s.e = r.e; s.v = r.v;
+    }
+    renderEve();
+    s.timer = setTimeout(chunk, 0);
+  };
+  renderEve();
+  chunk();
+}
+/* Task 3: four searches, timed, in chunks */
+function runTask3() {
+  const btn = document.getElementById("t3btn"); if (btn) btn.disabled = true;
+  app.t3 = TASK3.map(x => ({ bits: x.bits, p: x.p, g: x.g, A: x.A, tries: null, ms: null, e: 1, v: x.g, spent: 0 }));
+  let i = 0;
+  const go = () => {
+    if (app.level !== 1 || !app.t3) return;
+    const r = app.t3[i];
+    const t0 = performance.now();
+    const res = searchChunk(r.p, r.g, r.A, r.e, r.v, 4000000);
+    r.spent += performance.now() - t0;
+    if (res.found) { r.tries = res.e; r.ms = r.spent; i++; }
+    else { r.e = res.e; r.v = res.v; }
+    renderT3(i < app.t3.length ? i : -1);
+    if (i < app.t3.length) setTimeout(go, 0);
+    else { const b = document.getElementById("t3btn"); if (b) b.disabled = false; }
+  };
+  renderT3(0);
+  setTimeout(go, 20);
+}
+function renderT3(busy) {
+  const tab = document.getElementById("t3tab");
+  if (!tab) return;
+  const t = L(), loc = lang === "pl" ? "pl-PL" : "en-US";
+  const rows = app.t3 || TASK3.map(x => ({ bits: x.bits, p: x.p, g: x.g, A: x.A, tries: null, ms: null }));
+  const maxT = Math.max(1, ...rows.map(r => r.tries || 0));
+  let h = "<tr><th>" + t.t3Bits + "</th><th>p</th><th>g</th><th>A</th><th>" + t.t3Tries + "</th><th></th><th>" + t.t3Time + "</th><th>" + t.t3Ratio + "</th></tr>";
+  rows.forEach((r, i) => {
+    const prev = i > 0 ? rows[i - 1] : null;
+    const ratio = r.tries && prev && prev.tries ? "× " + (r.tries / prev.tries).toFixed(1) : "";
+    h += "<tr><td>" + r.bits + "</td><td>" + r.p + "</td><td>" + r.g + "</td><td>" + r.A + '</td><td class="r">' +
+      (r.tries ? r.tries.toLocaleString(loc) : (busy === i ? "…" : "?")) + '</td><td><span class="bar" style="width:' + (r.tries ? Math.max(2, Math.round(160 * r.tries / maxT)) : 0) + 'px"></span></td><td class="r">' +
+      (r.ms !== null ? (r.ms < 10 ? r.ms.toFixed(2) : r.ms.toFixed(0)) + " ms" : "") + '</td><td class="x">' + ratio + "</td></tr>";
+  });
+  tab.innerHTML = h;
+}
+
+/* ---------- step 3: Mallory in the middle ---------- */
+function render2() {
+  const t = L(), P = params();
+  if (P.bad) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  const W = 1045, H = 380;
+  const k = app.malStep, st = n => (k < n ? " todo" : " mfaded");
+  let h = '<div class="card"><div class="btns" style="margin-bottom:10px">' +
+    '<button data-action="mal" data-d="-1">' + t.bPrev + '</button><button class="dark" data-action="mal" data-d="1">' + t.bNext + "</button>" +
+    " <b>" + t.malStepLbl(k) + '</b> <span class="opnow" style="font-family:var(--sans)">' + esc(t.malSteps[k - 1]) + "</span></div>" +
+    '<div class="schwrap"><div class="sch" style="width:' + W + "px;height:" + H + 'px">' +
+    '<svg class="arrows" width="' + W + '" height="' + H + '" aria-hidden="true">' + MARKERS +
+      ln("160,110 160,124", "ink") + '<g class="' + st(2) + '">' + ln("160,274 160,300", "ink") + "</g>" +
+      ln("885,110 885,124", "ink") + '<g class="' + st(1) + '">' + ln("885,274 885,300", "ink") + "</g>" +
+      '<g class="' + st(3) + '">' + ln("20,78 8,78 8,334 18,334", "sec") + ln("1025,78 1037,78 1037,334 1027,334", "sec") + "</g>" +
+      '<g class="' + st(1) + '">' + ln("302,156 358,156", "pub") + ln("687,244 741,244", "mal") + "</g>" +
+      '<g class="' + st(2) + '">' + ln("743,156 689,156", "pub") + ln("358,244 304,244", "mal") + "</g>" +
+    "</svg>" +
+    person(t.alice, 20, 2) +
+    '<div class="chip role-sec" style="left:20px;top:42px;width:280px;height:68px">' + rndBtn("a") + "<label>" + t.aLbl + inp("a") + "</label></div>" +
+    '<div class="chip role-pub" style="left:20px;top:126px;width:280px;height:58px">A<small> (' + t.sendsA + ')</small><span class="v" id="m_A"></span></div>' +
+    '<div class="chip role-pub' + st(2) + '" style="left:20px;top:214px;width:280px;height:60px">B?<small> ' + esc(t.recvAsB) + '</small><span class="v" id="m_rA"></span></div>' +
+    '<div class="chip role-sh' + st(3) + '" style="left:20px;top:302px;width:280px;height:64px">' + t.sharedA + '<span class="v" id="m_sA"></span></div>' +
+    person(t.bob, 745, 2) +
+    '<div class="chip role-sec" style="left:745px;top:42px;width:280px;height:68px">' + rndBtn("b") + "<label>" + t.bLbl + inp("b") + "</label></div>" +
+    '<div class="chip role-pub' + st(2) + '" style="left:745px;top:126px;width:280px;height:58px">B<small> (' + t.sendsB + ')</small><span class="v" id="m_B"></span></div>' +
+    '<div class="chip role-pub' + st(1) + '" style="left:745px;top:214px;width:280px;height:60px">A?<small> ' + esc(t.recvAsA) + '</small><span class="v" id="m_rB"></span></div>' +
+    '<div class="chip role-sh' + st(3) + '" style="left:745px;top:302px;width:280px;height:64px">' + t.sharedB + '<span class="v" id="m_sB"></span></div>' +
+    // Mallory
+    '<div class="chip role-mal" style="left:360px;top:2px;width:327px;height:366px">' +
+      '<div style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700"><span class="ava mal">' + SPY_SVG + "</span>" + t.mallory + "</div>" +
+      '<div class="chip role-sec" style="position:relative;margin-top:8px;height:64px">' + rndBtn("m") + "<label>" + t.mLbl + inp("m") + "</label></div>" +
+      '<div class="chip role-pub" style="position:relative;margin-top:8px;height:58px">' + supTxt(t.malM) + '<span class="v" id="m_M"></span></div>' +
+      '<div class="chip role-sh' + st(3) + '" style="position:relative;margin-top:8px;height:58px">' + supTxt(t.malWithA) + '<span class="v" id="m_kA"></span></div>' +
+      '<div class="chip role-sh' + st(3) + '" style="position:relative;margin-top:8px;height:58px">' + supTxt(t.malWithB) + '<span class="v" id="m_kB"></span></div>' +
+    "</div>" +
+    '<div class="wlbl' + st(1) + '" style="left:302px;top:128px;color:var(--pub-b);font-size:12px" id="mw_A"></div>' +
+    '<div class="wlbl' + st(1) + '" style="left:689px;top:216px;color:var(--mal-b);font-size:12px" id="mw_M1"></div>' +
+    '<div class="wlbl' + st(2) + '" style="left:689px;top:128px;color:var(--pub-b);font-size:12px" id="mw_B"></div>' +
+    '<div class="wlbl' + st(2) + '" style="left:302px;top:216px;color:var(--mal-b);font-size:12px" id="mw_M2"></div>' +
+    "</div></div>" +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:600"><input type="checkbox" data-field="seal"' + (app.seal ? " checked" : "") + "> " + t.sealOn + "</label>" +
+    '<div id="m_res" class="' + st(3) + '"></div>' + legend(["pub", "sec", "sh", "mal"]) + "</div>" +
+    '<div class="card' + st(4) + '"><h3>' + t.msgTitle + '</h3><label style="font-size:12.5px;font-weight:600">' + t.msgLbl +
+      '<input data-field="mmsg" spellcheck="false" style="display:block;width:100%;max-width:640px;font-family:var(--sans);margin-top:3px" value="' + esc(app.mmsg) + '"></label>' +
+      '<div id="m_msg" style="margin-top:10px"></div><p class="note" style="margin:8px 0 0">' + t.msgNote + "</p></div>" +
+    '<div class="card"><h3>' + t.fixTitle + '</h3><p style="margin:0">' + t.fixText + "</p></div>";
+  return h;
+}
+function update2() {
+  const t = L(), P = params();
+  const m = extra("m", P);
+  const er = Object.assign({}, P.er, { m: m.er });
+  markInputs(er);
+  const ids = ["m_A", "m_rA", "m_sA", "m_B", "m_rB", "m_sB", "m_M", "m_kA", "m_kB", "mw_A", "mw_B", "mw_M1", "mw_M2", "m_msg"];
+  if (P.bad || m.er) { ids.forEach(i => setHTML(i, "")); setHTML("m_res", '<div class="banner neutral">' + errList(er) + "</div>"); return; }
+  const r = mitmExchange(P.p, P.g, P.a, P.b, m.v);
+  const sh = v => esc(fmt(v)).replace(/ \(.*/, "");
+  setHTML("m_A", "= " + powEq("g", "a", P.g, P.a, P.p, r.A));
+  setHTML("m_B", "= " + powEq("g", "b", P.g, P.b, P.p, r.B));
+  setHTML("m_M", "= " + powEq("g", "m", P.g, m.v, P.p, r.M));
+  setHTML("m_kA", "= " + powEq("A", "m", r.A, m.v, P.p, r.sMalAlice));
+  setHTML("m_kB", "= " + powEq("B", "m", r.B, m.v, P.p, r.sMalBob));
+  setHTML("mw_A", "A = " + sh(r.A)); setHTML("mw_B", "B = " + sh(r.B));
+  setHTML("mw_M1", "M = " + sh(r.M)); setHTML("mw_M2", "M = " + sh(r.M));
+  if (app.seal) {
+    setHTML("m_rA", '= <b>' + sh(r.M) + '</b><span class="stamp">' + t.noSealB + "</span>");
+    setHTML("m_rB", '= <b>' + sh(r.M) + '</b><span class="stamp">' + t.noSealA + "</span>");
+    setHTML("m_sA", '<span class="err">' + t.stopped + "</span>"); setHTML("m_sB", '<span class="err">' + t.stopped + "</span>");
+    setHTML("m_res", '<div class="banner good">' + esc(t.res3seal) + "</div>");
+    setHTML("m_msg", '<p class="err" style="margin:0">' + t.msgStopped + "</p>");
+    return;
+  }
+  setHTML("m_rA", "= <b>" + sh(r.M) + "</b>");
+  setHTML("m_rB", "= <b>" + sh(r.M) + "</b>");
+  setHTML("m_sA", "= " + powEq("M", "a", r.M, P.a, P.p, r.sAlice));
+  setHTML("m_sB", "= " + powEq("M", "b", r.M, P.b, P.p, r.sBob));
+  setHTML("m_res", '<div class="banner bad">' + esc(r.sAlice === r.sBob ? t.res3same(sh(r.sAlice)) : t.res3(sh(r.sAlice), sh(r.sBob))) + "</div>");
+  const msg = esc(app.mmsg);
+  const env = (lbl, c, sub) => '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 104px;text-align:center">' + ENV_SVG(c) +
+    '<span style="font-size:12.5px;font-weight:600">' + LOCK_SVG + " " + lbl + "</span>" + (sub ? '<span class="note">' + sub + "</span>" : "") + "</div>";
+  const arr = '<span style="font-size:22px;color:var(--muted)">→</span>';
+  setHTML("m_msg", '<div style="display:flex;align-items:center;gap:6px">' +
+    '<div class="chip role-msg" style="position:relative;flex:1 1 0;min-width:0"><small>' + t.aliceSends + "</small><br>" + msg + "</div>" + arr +
+    env(esc(t.lockedWith(1, sh(r.sAlice))), "var(--sh-b)") + arr +
+    '<div class="chip role-mal" style="position:relative;flex:1.15 1 0;min-width:0"><small>' + t.malReads + "</small><br>" + msg + "</div>" + arr +
+    env(esc(t.lockedWith(2, sh(r.sBob))), "var(--sh-b)") + arr +
+    '<div class="chip role-msg" style="position:relative;flex:1 1 0;min-width:0"><small>' + t.bobReads + ' <span class="stamp ok">✓</span></small><br>' + msg + "</div></div>");
+}
+
+/* ---------- step 4: ElGamal ---------- */
+function render3() {
+  const t = L(), P = params();
+  if (P.bad) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  const ch = (cls, inner, style) => '<div class="chip ' + cls + '" style="' + (style || "") + '">' + inner + "</div>";
+  const dn = '<div class="down">↓</div>';
+  let h = '<div class="card"><h3>' + t.keysTitle + '</h3><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">' +
+    ch("role-sec", rndBtn("x") + "<label>" + t.xLbl + inp("x") + "</label>", "position:relative;width:300px") +
+    '<button class="box" style="width:150px" data-action="pow" data-k="gx"><span>g<sup>x</sup> mod p</span><small>' + t.clickPow + "</small></button>" +
+    ch("role-pub", supTxt(t.yLbl) + '<span class="v" id="e_y"></span>', "position:relative;width:420px") +
+    '</div><p class="note" style="margin:8px 0 0" id="e_pg"></p></div>';
+  h += '<div class="card"><div class="schwrap"><div class="eg">' +
+    '<div class="egcol">' + '<div class="person" style="position:relative;margin-bottom:6px"><span class="ava">' + USER_SVG + "</span>" + t.alice + "</div>" +
+      ch("role-msg", "<label>" + t.MLbl + inp("M") + "</label>", "position:relative") +
+      '<div style="height:8px"></div>' + ch("role-sec", rndBtn("k") + "<label>" + t.kLbl + inp("k") + "</label>", "position:relative") + dn +
+      '<button class="box" data-action="pow" data-k="gk"><span>' + supTxt(t.c1Box) + "</span><small>" + t.clickPow + "</small></button>" + dn +
+      ch("role-pub", "C1 <small>" + t.c1Is + '</small><span class="v" id="e_c1"></span>', "position:relative") + dn +
+      '<button class="box" data-action="pow" data-k="yk"><span>' + supTxt(t.c2Box) + "</span><small>" + t.clickPow + "</small></button>" + dn +
+      ch("role-pub", "C2 <small>" + supTxt(t.c2Is) + '</small><span class="v" id="e_c2"></span>', "position:relative") +
+    "</div>" +
+    '<div class="harr"></div>' +
+    '<div class="egcol"><div class="ctx"><div style="font-size:12.5px;font-weight:600">' + t.sent + '</div><div class="pair" id="e_pair"></div></div>' +
+      '<div class="evecard" style="margin-top:16px"><div class="eh">' + EAR_SVG + " " + t.eve + '</div><div class="eb" style="font-family:var(--sans);font-size:13px">' + t.eveSees + "</div></div></div>" +
+    '<div class="harr"></div>' +
+    '<div class="egcol">' + '<div class="person" style="position:relative;margin-bottom:6px"><span class="ava">' + USER_SVG + "</span>" + t.bob + "</div>" +
+      ch("role-sec", t.xLbl + '<span class="v" id="e_x"></span>', "position:relative") + dn +
+      '<button class="box" data-action="pow" data-k="C1x"><span>' + supTxt(t.sBox) + "</span><small>" + t.clickPow + "</small></button>" + dn +
+      ch("role-sh", "s" + '<span class="v" id="e_s"></span>', "position:relative") + dn +
+      '<div class="box" style="cursor:default"><span>' + supTxt(t.invBox) + "</span></div>" + dn +
+      ch("role-sh", "s<sup>-1</sup>" + '<span class="v" id="e_si"></span>', "position:relative") + dn +
+      '<div class="box" style="cursor:default"><span>' + supTxt(t.mBox) + "</span></div>" + dn +
+      ch("role-msg", t.back + '<span class="v" id="e_m"></span>', "position:relative") +
+    "</div></div></div>" +
+    '<div class="why" id="e_why">' + supTxt(t.sameS) + '</div><div id="e_err"></div>' + legend(["pub", "sec", "sh", "msg", "mal"]) + "</div>";
+  h += '<div class="card"><h3>' + t.twiceTitle + '</h3><p style="margin:0 0 6px">' + t.twiceText + '</p><div class="calc" id="e_twice"></div>' +
+    '<div class="inl" style="margin-top:4px"><span>' + t.withK.replace("k", "k'") + "</span>" + inp("k2") + "</div></div>";
+  h += '<div class="card"><h3>' + t.reuseTitle + '</h3><p style="margin:0 0 8px">' + t.reuseText + "</p>" +
+    '<div class="btns" style="margin-bottom:8px"><span class="inl"><span>' + t.m2Lbl + "</span>" + inp("M2") + "</span>" +
+    '<span class="tabs" style="margin-left:10px"><button data-action="reuse" data-v="1" aria-pressed="' + app.reuseSame + '">' + t.sameK + "</button>" +
+    '<button data-action="reuse" data-v="0" aria-pressed="' + !app.reuseSame + '" id="e_newk"></button></span></div>' +
+    '<div class="calc" id="e_reuse"></div><div class="why">' + t.rule + "</div></div>";
+  h += '<div class="card"><h3>' + t.realTitle + '</h3><p style="margin:0 0 8px">' + esc(t.realText) + "</p>" +
+    '<button class="dark" data-action="real6">' + t.realBtn + '</button><div id="e_real" style="margin-top:8px"></div></div>';
+  return h;
+}
+function update3() {
+  const t = L(), P = params();
+  const x = extra("x", P), M = extra("M", P, true), k = extra("k", P), k2 = extra("k2", P), M2 = extra("M2", P, true);
+  const er = { x: x.er, M: M.er, k: k.er, k2: k2.er, M2: M2.er };
+  markInputs(er);
+  setHTML("e_pg", esc(t.pgNow(fmt(P.p), fmt(P.g))));
+  const bad = x.er || M.er || k.er;
+  const ids = ["e_y", "e_c1", "e_c2", "e_pair", "e_x", "e_s", "e_si", "e_m", "e_twice", "e_reuse"];
+  setHTML("e_err", Object.values(er).some(Boolean) ? '<div class="banner neutral">' + errList(er) + "</div>" : "");
+  setHTML("e_newk", esc(t.newK) + (k2.er ? "?" : esc(fmt(k2.v))));
+  if (x.er) { ids.forEach(i => setHTML(i, "")); return; }
+  const y = modPow(P.g, x.v, P.p);
+  setHTML("e_y", "= " + powEq("g", "x", P.g, x.v, P.p, y));
+  setHTML("e_x", "x = <b>" + esc(fmt(x.v)) + "</b>");
+  if (bad) { ids.slice(1).forEach(i => { if (i !== "e_x") setHTML(i, ""); }); return; }
+  const c = egEncrypt(P.p, P.g, y, M.v, k.v), d = egDecrypt(P.p, x.v, c.C1, c.C2);
+  const sm = small(P.p) && small(M.v) && small(c.mask);
+  setHTML("e_c1", "= " + powEq("g", "k", P.g, k.v, P.p, c.C1));
+  setHTML("e_c2", sm ? "= " + M.v + " × " + c.mask + " mod " + P.p + " = <b>" + c.C2 + "</b>" : "= <b>" + esc(fmt(c.C2)) + "</b>");
+  setHTML("e_pair", "(" + esc(fmt(c.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(c.C2)).replace(/ \(.*/, "") + ")");
+  setHTML("e_s", "= " + powEq("C1", "x", c.C1, x.v, P.p, d.s));
+  setHTML("e_si", sm ? "= <b>" + d.sInv + "</b>, " + d.s + " × " + d.sInv + " mod " + P.p + " = 1" : "= <b>" + esc(fmt(d.sInv)) + "</b>");
+  setHTML("e_m", (sm ? "= " + c.C2 + " × " + d.sInv + " mod " + P.p + " = <b>" + d.M + "</b>" : "= <b>" + esc(fmt(d.M)) + "</b>") + (d.M === M.v ? ' <span class="stamp ok">✓</span>' : ' <span class="stamp">✗</span>'));
+  // the same message twice
+  const row = (kk, cc) => '<div class="cr"><span>M = ' + esc(fmt(M.v)) + ", k = " + esc(fmt(kk)) + "</span><span>→</span><span class=\"mark role-pub\">(" + esc(fmt(cc.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(cc.C2)).replace(/ \(.*/, "") + ")</span></div>";
+  setHTML("e_twice", row(k.v, c) + (k2.er ? "" : row(k2.v, egEncrypt(P.p, P.g, y, M.v, k2.v))));
+  // k used twice
+  if (M2.er || k2.er) { setHTML("e_reuse", ""); return; }
+  const kSecond = app.reuseSame ? k.v : k2.v;
+  const c2 = egEncrypt(P.p, P.g, y, M2.v, kSecond);
+  const at = reuseAttack(P.p, M.v, c.C2, c2.C2);
+  const ss = small(P.p);
+  const pr = cc => "(" + esc(fmt(cc.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(cc.C2)).replace(/ \(.*/, "") + ")";
+  let h = '<div class="cr"><span class="cn"></span><span>M = ' + esc(fmt(M.v)) + ' <span class="note">(known)</span> → <span class="mark role-pub">' + pr(c) + "</span></span></div>" +
+    '<div class="cr"><span class="cn"></span><span>M2 = ? → <span class="mark role-pub">' + pr(c2) + "</span> " + '<span class="note">(' + t.second + ")</span></span></div>" +
+    (c2.C1 === c.C1 ? '<div class="cr"><span class="cn"></span><span class="badline" style="font-family:var(--sans)">' + t.sameC1 + "</span></div>" : "") +
+    '<div class="cr"><span class="cn">1.</span><span>' + supTxt(t.rs1) + " = " + (ss ? c.C2 + " × " + at.M1inv + " mod " + P.p + " = " : "") + "<b>" + esc(fmt(at.mask)) + "</b></span></div>" +
+    '<div class="cr"><span class="cn">2.</span><span>' + supTxt(t.rs2) + " = " + (ss ? c2.C2 + " × " + at.maskInv + " mod " + P.p + " = " : "") + '<b class="mark role-msg">' + esc(fmt(at.M2)) + "</b></span></div>";
+  const ok = at.M2 === M2.v;
+  h += '<div class="cr"><span class="cn"></span><span class="' + (ok ? "badline" : "okline") + '" style="font-family:var(--sans)">' + (ok ? t.rsOk : t.rsBad) + "</span></div>";
+  if (lang === "pl") h = h.replace("(known)", "(znana)");
+  setHTML("e_reuse", h);
+}
+function showReal6() {
+  const t = L();
+  const r = reuseAttack(RFC3526_P, textToNumber(T6_FIRST), T6_C2_FIRST, T6_C2_SECOND);
+  setHTML("e_real", '<div class="calc"><div class="cr"><span class="cn">1.</span><span>' + supTxt(t.rs1) + " = <b>" + esc(fmt(r.mask)) + "</b></span></div>" +
+    '<div class="cr"><span class="cn">2.</span><span>' + supTxt(t.rs2) + " = <b>" + esc(fmt(r.M2)) + "</b></span></div></div>" +
+    '<div class="banner bad">' + t.realOut + " " + esc(numberToText(r.M2)) + "</div>");
+}
+
+/* ---------- step 5: one power ---------- */
+function setPowFrom(key) {
+  const P = params();
+  const t = L();
+  app.pw.origin = key; app.pw.step = 0;
+  if (P.bad) return;
+  const d = dhExchange(P.p, P.g, P.a, P.b);
+  const xv = extra("x", P).v, kv = extra("k", P).v, mv = extra("m", P).v;
+  const y = xv !== null ? modPow(P.g, xv, P.p) : null;
+  const C1 = kv !== null ? modPow(P.g, kv, P.p) : null;
+  const map = { gA: [P.g, P.a], gB: [P.g, P.b], Ba: [d.B, P.a], Ab: [d.A, P.b], gx: [P.g, xv], gk: [P.g, kv], yk: [y, kv], C1x: [C1, xv], gm: [P.g, mv] };
+  const v = map[key];
+  if (!v || v[0] === null || v[1] === null) return;
+  app.pw.b = v[0].toString(); app.pw.e = v[1].toString(); app.pw.m = P.p.toString();
+}
+function render4() {
+  const t = L(), pw = app.pw;
+  const o = pw.origin && t.origins[pw.origin] ? '<p class="note" style="margin:0 0 8px">' + supTxt(t.pwFrom(t.origins[pw.origin])) + "</p>" : "";
+  return '<div class="card">' + o + '<div class="pwin">' +
+    "<label>" + t.pwBase + '<input data-field="pwb" spellcheck="false" inputmode="numeric" value="' + esc(pw.b) + '"></label>' +
+    "<label>" + t.pwExp + '<input data-field="pwe" spellcheck="false" inputmode="numeric" value="' + esc(pw.e) + '"></label>' +
+    "<label>" + t.pwMod + '<input data-field="pwm" spellcheck="false" inputmode="numeric" value="' + esc(pw.m) + '"></label></div></div>' +
+    '<div class="card"><h3 id="w_title"></h3><div id="w_body"></div></div>';
+}
+function update4() {
+  const t = L(), pw = app.pw;
+  const b = parseNum(pw.b), e = parseNum(pw.e), m = parseNum(pw.m);
+  const er = { pwb: b === null ? t.errNum : null, pwe: e === null ? t.errNum : e < 1n ? t.errExp : e.toString(2).length > 2048 ? t.errLen : null, pwm: m === null ? t.errNum : m < 2n ? t.errMod : null };
+  markInputs(er);
+  if (er.pwb || er.pwe || er.pwm) { setHTML("w_title", ""); setHTML("w_body", errList(er)); return; }
+  const tr = powSteps(b, e, m), n = tr.steps.length, k = Math.max(0, Math.min(n - 1, pw.step));
+  pw.step = k;
+  const bitsLen = tr.bits.length;
+  setHTML("w_title", fmt(b).replace(/ \(.*/, "") + "<sup>" + (small(e) ? e : "e") + "</sup> mod " + fmt(m).replace(/ \(.*/, ""));
+  const curBit = tr.steps[k].bit;
+  let bits = '<span class="bits">';
+  for (let i = 0; i < bitsLen; i++) {
+    if (bitsLen > 64 && i === 32) { bits += '<span class="note">…</span>'; i = bitsLen - 16; }
+    bits += '<span class="bit' + (tr.bits[i] === "1" ? " one" : "") + (i === curBit ? " cur" : i < curBit ? " done" : "") + '">' + tr.bits[i] + "</span>";
+  }
+  bits += "</span>";
+  const opName = s => s.op === "start" ? t.opStart : s.op === "sq" ? t.opSq : t.opMul;
+  const val = s => {
+    const bs = fmt(b).replace(/ \(.*/, ""), ms = fmt(m).replace(/ \(.*/, "");
+    if (s.op === "start") return "r = <b>" + esc(fmt(s.after)) + "</b>";
+    const sm = small(s.before) && small(b) && small(m);
+    if (s.op === "sq") return sm ? s.before + " × " + s.before + " = " + (s.before * s.before) + " mod " + ms + " = <b>" + s.after + "</b>" : "r = <b>" + esc(fmt(s.after)) + "</b>";
+    return sm ? s.before + " × " + bs + " = " + (s.before * b) + " mod " + ms + " = <b>" + s.after + "</b>" : "r = <b>" + esc(fmt(s.after)) + "</b>";
+  };
+  let rows = "<tr><th>" + t.colN + "</th><th>" + t.colBit + "</th><th>" + t.colOp + "</th><th>" + t.colVal + "</th></tr>";
+  const show = i => n <= 40 || i < 16 || i >= n - 8 || Math.abs(i - k) <= 3;
+  let gap = false;
+  tr.steps.forEach((s, i) => {
+    if (!show(i)) { if (!gap) { rows += '<tr><td class="ell" colspan="4">' + t.pwMore(n - 24) + "</td></tr>"; gap = true; } return; }
+    if (show(i)) gap = gap && !(i > 0 && !show(i - 1)) ? gap : false;
+    rows += '<tr class="' + (i === k ? "cur" : i > k ? "todo2" : "") + '"><td>' + (i + 1) + "</td><td>" + (s.op === "start" ? "1" : tr.bits[s.bit]) + '</td><td class="opc">' + opName(s) + "</td><td>" + val(s) + "</td></tr>";
+  });
+  const sq = tr.steps.filter(s => s.op === "sq").length, mu = tr.steps.filter(s => s.op === "mul").length;
+  const eNum = e - 1n;
+  setHTML("w_body", '<p style="margin:0 0 6px">' + (small(e) ? t.pwBits(e.toString(), bitsLen) : t.pwBitsBig(bitsLen)) + "</p>" + bits +
+    '<div class="btns" style="margin-top:10px"><button data-action="pw0">' + t.reset + '</button><button data-action="pwd" data-d="-1">' + t.bPrev + '</button><button class="dark" data-action="pwd" data-d="1">' + t.bNext + "</button> <b>" + t.stepK(k + 1, n) + "</b></div>" +
+    '<div class="schwrap"><table class="optable">' + rows + "</table></div>" +
+    '<p style="margin:10px 0 2px;font-weight:600">' + (k === n - 1 ? t.pwRes(esc(fmt(tr.result))) + ' <span class="stamp ok">✓</span>' : '<span class="note">' + t.pwRes("…") + "</span>") + "</p>" +
+    '<p style="margin:0">' + esc(t.pwCount(sq, mu, eNum.toString().length > 12 ? fmt(eNum) : eNum.toString())) + "</p>" +
+    '<p class="note" style="margin:6px 0 0">' + t.pwReal + "</p>");
+}
+
+/* ---------- frame, navigation ---------- */
+const RENDER = [render0, render1, render2, render3, render4];
+const UPDATE = [update0, update1, update2, update3, update4];
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function stopTimers() {
+  if (app.playing) { clearInterval(app.playing); app.playing = null; }
+  if (app.eve && app.eve.timer) { clearTimeout(app.eve.timer); app.eve.running = false; }
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + supTxt(ex[1]) + "</div>" + RENDER[app.level]() + "</div>";
+  UPDATE[app.level]();
+  fitSch();
+  if (app.level === 1) renderT3(-1);
+  if (app.level === 3 && app.real6) showReal6();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+}
+function goTo(level) {
+  stopTimers();
+  if (app.level === 1 && level !== 1) app.t3 = app.t3 && app.t3.every(r => r.tries) ? app.t3 : null;
+  if (level === 4 && app.level !== 4) setPowFrom(app.pw.origin || "gA");
+  app.level = level;
+  render();
+  view.scrollTop = 0;
+}
+function zoomIn() { if (app.level < 4) { if (app.level + 1 === 4) app.pw.origin = "gA"; goTo(app.level + 1); } }
+function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+/* "more below" button: shown while part of the page is still below the screen */
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", () => { fitSch(); updateMore(); });
+/* the fixed-width schematics shrink to fit a narrow screen (no horizontal scrollbar) */
+function fitSch() {
+  view.querySelectorAll(".schwrap > .sch, .schwrap > .eg").forEach(el => {
+    const natural = el.classList.contains("eg") ? 958 : parseInt(el.style.width, 10);
+    const avail = el.parentElement.clientWidth;
+    el.style.zoom = avail > 0 && avail < natural ? (avail / natural).toFixed(3) : "";
+  });
+}
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+
+const PRESETS = {
+  slides: { p: "23", g: "5", a: "6", b: "15" },
+  task1: { p: "23", g: "5", a: "4", b: "3" },
+  book: { p: "353", g: "3", a: "97", b: "233" },   // Stallings, the Diffie-Hellman example
+};
+function setField(f, v) {
+  app.f[f] = v;
+  const i = view.querySelector('input[data-field="' + f + '"]');
+  if (i) i.value = v;
+}
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el || el.disabled) return;
+  const a = el.dataset.action;
+  if (a === "zoom") goTo(+el.dataset.to);
+  else if (a === "pow") { setPowFrom(el.dataset.k); stopTimers(); app.level = 4; render(); view.scrollTop = 0; }
+  else if (a === "preset") {
+    const pr = el.dataset.p;
+    if (pr === "real") { app.f.p = RFC3526_P.toString(); app.f.g = "2"; app.f.a = rand256(); app.f.b = rand256(); }
+    else Object.assign(app.f, PRESETS[pr]);
+    render();
+  }
+  else if (a === "rand") {
+    const P = params();
+    if (P.er.p) return;
+    const f = el.dataset.f;
+    setField(f, (P.p === RFC3526_P ? BigInt(rand256()) : randBelow(P.p - 2n)).toString());
+    UPDATE[app.level]();
+  }
+  else if (a === "setg") { setField("g", el.dataset.g); UPDATE[app.level](); }
+  else if (a === "ce") { app.clockE += +el.dataset.d; update1(); }
+  else if (a === "setE") { app.clockE = +el.dataset.e; update1(); }
+  else if (a === "play") {
+    if (app.playing) { clearInterval(app.playing); app.playing = null; el.textContent = L().play; return; }
+    const P = params(); if (P.bad) return;
+    const maxE = Math.min(Number(P.p) - 1, 60);
+    if (app.clockE >= maxE) app.clockE = 0;
+    el.textContent = L().stop;
+    app.playing = setInterval(() => {
+      app.clockE++; update1();
+      if (app.clockE >= maxE) { clearInterval(app.playing); app.playing = null; const b = document.getElementById("c_play"); if (b) b.textContent = L().play; }
+    }, 450);
+  }
+  else if (a === "eve1") eveStep();
+  else if (a === "eveall") eveAll();
+  else if (a === "evereset") { if (app.eve && app.eve.timer) clearTimeout(app.eve.timer); app.eve = null; renderEve(); }
+  else if (a === "t3run") runTask3();
+  else if (a === "mal") { app.malStep = Math.max(1, Math.min(4, app.malStep + +el.dataset.d)); render(); }
+  else if (a === "reuse") { app.reuseSame = el.dataset.v === "1"; view.querySelectorAll('[data-action="reuse"]').forEach(b => b.setAttribute("aria-pressed", String(b === el))); update3(); }
+  else if (a === "real6") { app.real6 = true; showReal6(); }
+  else if (a === "pw0") { app.pw.step = 0; update4(); }
+  else if (a === "pwd") { app.pw.step += +el.dataset.d; update4(); }
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  if (f === "seal") { app.seal = e.target.checked; update2(); return; }
+  if (f === "mmsg") { app.mmsg = e.target.value; update2(); return; }
+  if (f === "clockE") { app.clockE = +e.target.value; update1(); return; }
+  if (f === "pwb" || f === "pwe" || f === "pwm") { app.pw[f.slice(2)] = e.target.value; app.pw.origin = null; app.pw.step = 0; update4(); return; }
+  if (f in app.f) {
+    app.f[f] = e.target.value;
+    if (app.level === 1) { if (app.playing) { clearInterval(app.playing); app.playing = null; } }
+    UPDATE[app.level]();
+  }
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Enter" && tag === "BUTTON") return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
+  else if (app.level === 4 && (e.key === "n" || e.key === " ")) { e.preventDefault(); app.pw.step++; update4(); }
+  else if (app.level === 4 && e.key === "p") { app.pw.step--; update4(); }
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+const startStep = parseInt(location.hash.slice(1), 10);
+if (startStep >= 1 && startStep <= 5) {
+  app.level = startStep - 1;
+  if (app.level === 4) setPowFrom("gA");
+}
+render();
+</script>
+</body>
+</html>

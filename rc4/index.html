@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RC4 explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  --key-b:#E2A60E;   --key-bg:#FDF3DC;
+  --ctr-b:#2FA84F;   --ctr-bg:#E3F4E8;
+  --non-b:#2F6FDB;   --non-bg:#E5EDFB;
+  --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
+  --p:#2F6FDB; --z:#9A6B00; --c:#7446C4;
+  --g0:#2F6FDB; --g1:#2FA84F; --g2:#E5484D; --g3:#E2A60E;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+    --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+    --ct-b:#B596F5; --ct-bg:#2A2142;
+    --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+    --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+  --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+  --ct-b:#B596F5; --ct-bg:#2A2142;
+  --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+  --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea,select{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+select{font-family:var(--sans)}
+.mono{font-family:var(--mono)}
+
+/* frame: the same as the ChaCha20 explorer */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.role-key{border-color:var(--key-b);background:var(--key-bg)}
+.role-pt{border-color:var(--non-b);background:var(--non-bg)}
+.role-ct{border-color:var(--ct-b);background:var(--ct-bg)}
+.role-const{border-color:var(--const-b);background:var(--const-bg)}
+.box{background:var(--ink);color:var(--surface);border:0;border-radius:10px;padding:16px 22px;font-size:21px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px}
+.box:hover{background:var(--ink);box-shadow:0 0 0 3px var(--chg)}
+.box small{font-size:12px;font-weight:400;opacity:.8}
+.rnd{padding:2px 5px;line-height:0;border-radius:5px;color:var(--ink)}
+textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--rule) transparent}
+
+/* step 1: the black box */
+.schwrap{overflow-x:auto}
+.sch{position:relative;width:900px;height:432px;color:var(--muted)}
+.sch .arrows{position:absolute;left:0;top:0;color:var(--ink)}
+.sg-key{position:absolute;left:8px;top:0;width:560px;height:118px;border:1.5px solid;border-radius:8px;padding:6px 10px;color:var(--ink)}
+.sg-key .lblrow{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:600}
+.sg-key input.khex{width:100%;margin-top:3px;font-size:13px}
+.sg-key .krow{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12.5px;font-weight:600}
+.sg-key .krow input{flex:1 1 auto;min-width:0;font-size:13px}
+.sg-key .krow button{padding:3px 8px;font-size:12.5px;font-weight:500;white-space:nowrap}
+.sg-non{position:absolute;left:592px;top:0;width:300px;height:118px;border:2px dashed var(--muted);border-radius:8px;padding:6px 10px;font-size:12.5px;color:var(--ink)}
+.sg-non b{display:flex;align-items:center;gap:6px;font-size:13.5px}
+.sg-non .x{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--chg);color:#fff;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.sg-non p{margin:3px 0 0;color:var(--muted);line-height:1.4}
+.sg-box{position:absolute;left:30px;top:166px;width:180px;height:76px;justify-content:center}
+.node{position:absolute;border-radius:10px;padding:8px 12px;border:1.5px solid;color:var(--ink)}
+.node .nh{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
+.node .nb{font-size:13.5px;margin:4px 0 2px;line-height:1.5}
+.node small{font-size:12px;color:var(--muted)}
+.sg-ks{left:258px;top:151px;width:270px;height:106px;background:var(--key-bg);border-color:var(--key-b)}
+.sg-ks .nh svg{color:var(--key-b)}
+.sg-ct{left:652px;top:151px;width:242px;height:106px;background:var(--ct-bg);border-color:var(--ct-b)}
+.sg-pt{left:400px;top:296px;width:492px;height:132px;background:var(--non-bg);border-color:var(--non-b)}
+.sg-pt textarea{margin-top:6px;font-size:13.5px;resize:none;line-height:19px;height:80px;padding:6px 9px 0}
+.sg-xor{position:absolute;left:562px;top:172px;width:64px;height:64px;border-radius:50%;background:var(--chg);color:#fff;font-size:40px;line-height:62px;text-align:center}
+.tablewrap{overflow-x:auto}
+.btable{border-collapse:collapse;font-family:var(--mono);font-size:13.5px;margin-top:6px}
+.btable td{padding:1px 4px}
+.btable td.lbl{font-weight:600;padding-right:10px;font-family:var(--sans);font-size:13px;white-space:nowrap}
+.btable td.b{padding:1px 2px;text-align:center;min-width:1.9em;font-size:12.5px}
+.btable tr.rt td{color:var(--muted)}
+.btable tr.rp td{color:var(--p)}
+.btable tr.rz td{color:var(--z)}
+.btable tr.rc td{color:var(--c)}
+.btable tr.zrow td.b{background:var(--key-bg)}
+.btable tr.xorrow td{font-family:var(--sans);font-size:12.5px;color:var(--muted);text-align:center;padding:3px 0}
+.btable td.hot{outline:2px solid var(--chg);outline-offset:-2px}
+.btable td.eqz{background:var(--chg-bg);color:var(--chg);font-weight:700}
+.xorline{font-family:var(--mono);font-size:13.5px;margin:8px 0 0;min-height:1.5em}
+.chips8{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.zb{font-family:var(--mono);font-size:13px;min-width:2.3em;text-align:center;padding:2px 4px;border-radius:5px;border:1.5px solid var(--key-b);background:var(--key-bg)}
+.zb.same{background:var(--chg);border-color:var(--chg);color:#fff}
+.zb.new{outline:2.5px solid var(--chg);outline-offset:1px}
+.cmprow{display:flex;gap:10px;align-items:center;margin:4px 0;flex-wrap:wrap}
+.cmprow .lbl{width:17em;font-size:13px;font-weight:600}
+
+/* steps 2 and 3: the flow strip, the 256-cell table */
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flow .arrow{font-size:20px;color:var(--muted)}
+.fchip{border:1.5px solid;border-radius:8px;padding:6px 10px;font-weight:600;font-size:13.5px;display:flex;flex-direction:column;line-height:1.25}
+.fchip small{font-weight:400;font-size:11.5px;color:var(--muted)}
+.fbox{border-radius:9px;padding:6px 14px;font-weight:600;font-size:15px;display:flex;flex-direction:column;align-items:center;line-height:1.25;border:2px solid var(--ink)}
+.fbox small{font-weight:400;font-size:11.5px;opacity:.8}
+.fbox.on{background:var(--ink);color:var(--surface)}
+.fbox.on:hover{background:var(--ink)}
+.fbox.off{background:var(--surface);color:var(--ink)}
+.fbox.off:hover{box-shadow:0 0 0 3px var(--chg)}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.controls input[type=range]{width:200px;accent-color:var(--chg)}
+.pos{font-family:var(--mono);font-weight:600;font-size:14px}
+.split{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.sidepanel{flex:1 1 320px;min-width:320px;max-width:380px;display:flex;flex-direction:column;gap:10px;position:sticky;top:0;align-self:flex-start}
+.sgrid{display:grid;grid-template-columns:28px repeat(16,30px);gap:3px;font-family:var(--mono)}
+.sgrid .hd{font-size:10.5px;color:var(--muted);text-align:center;align-self:end;line-height:1.1}
+.sgrid .rh{font-size:10.5px;color:var(--muted);text-align:right;padding-right:3px;align-self:center}
+.sc{position:relative;height:34px;border:1.5px solid var(--rule);border-radius:5px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05}
+.sc b{font-size:12.5px;font-weight:600}
+.sc i{font-style:normal;font-size:9.5px;color:var(--z);font-weight:600}
+.sc.idle b{color:var(--muted);font-weight:400}
+.sc.sw{background:var(--chg-bg);border-color:var(--chg)}
+.sc.pi{outline:3px solid var(--g1);outline-offset:0;z-index:2}
+.sc.pj{box-shadow:inset 0 0 0 3px var(--g2);z-index:2}
+.sc.pt{background:var(--key-bg);border:2.5px dashed var(--z);z-index:1}
+.sc.ptout{background:var(--z);border-color:var(--z)}
+.sc.ptout b{color:var(--surface)}
+.sc .tag{position:absolute;top:-11px;left:-7px;font-family:var(--sans);font-size:11.5px;font-weight:700;line-height:1;padding:2px 5px;border-radius:4px;color:#fff;z-index:3;white-space:nowrap;box-shadow:0 0 0 1.5px var(--surface)}
+.tag.ti{background:var(--g1)}.tag.tj{background:var(--g2)}.tag.tt{background:var(--z)}
+.tag.tij{background:linear-gradient(90deg,var(--g1) 50%,var(--g2) 50%)}
+.code{font-family:var(--mono);font-size:12px;background:var(--sunken);border-radius:8px;padding:8px 10px;line-height:1.7;white-space:pre;overflow-x:auto}
+.code .ln{display:block;padding:0 6px;border-radius:4px;color:var(--muted)}
+.code .ln.cur{background:var(--chg);color:#fff}
+.code .ln.act{color:var(--ink)}
+.calc{font-family:var(--mono);font-size:13.5px;background:var(--chg-bg);border-left:3px solid var(--chg);border-radius:4px;padding:8px 10px;line-height:1.55;word-break:break-word}
+.vars{display:flex;gap:8px;flex-wrap:wrap}
+.var{font-family:var(--mono);font-size:14px;padding:3px 9px;border-radius:6px;border:2px solid var(--rule);background:var(--surface)}
+.var.vi{border-color:var(--g1)}.var.vj{border-color:var(--g2)}.var.vt{border-color:var(--z);border-style:dashed}.var.vo{border-color:var(--key-b);background:var(--key-bg)}
+.lg-i{border-color:var(--g1)!important}.lg-j{border-color:var(--g2)!important}.lg-t{border-color:var(--z)!important;border-style:dashed!important;background:var(--key-bg)}
+.lg-sw{border-color:var(--chg)!important;background:var(--chg-bg)}.lg-idle{border-color:var(--rule)!important;color:var(--muted)}
+.lg-T{border-color:var(--key-b)!important;color:var(--z);font-weight:600}
+.htable{border-collapse:collapse;font-size:13px;margin-top:6px}
+.htable th{font-weight:600;text-align:left;padding:3px 10px;border-bottom:1.5px solid var(--rule);font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.htable td{padding:2px 10px;font-family:var(--mono);white-space:nowrap}
+.htable tr.now td{background:var(--chg-bg)}
+.htable td.out{background:var(--key-bg);font-weight:600}
+
+/* step 4: the weaknesses */
+.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.mtag{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--chg);border-radius:5px;padding:1px 7px;margin-right:6px;vertical-align:1px}
+.bars{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;max-width:760px;margin-top:8px}
+.bars .bl{font-weight:600;font-size:13.5px;text-align:right;white-space:nowrap}
+.bars .bt{position:relative;height:26px;background:var(--sunken);border-radius:4px}
+.bars .bf{position:absolute;left:0;top:0;bottom:0;background:var(--muted);border-radius:4px;transition:width .25s}
+.bars .bf.hl{background:var(--chg)}
+.bars .bv{position:absolute;top:3px;font-family:var(--mono);font-size:13px;white-space:nowrap}
+.bars .ux{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--non-b)}
+.ulbl{font-size:12.5px;color:var(--non-b);font-weight:600}
+.prog{height:6px;background:var(--sunken);border-radius:3px;overflow:hidden;max-width:420px;margin-top:6px}
+.prog span{display:block;height:100%;background:var(--chg);width:0}
+.wep{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 10px}
+.wep .part{border:1.5px solid;border-radius:8px;padding:6px 12px;font-weight:600;font-size:14px;display:flex;flex-direction:column}
+.wep .part small{font-weight:400;font-size:12px;color:var(--muted)}
+.wep .iv{border:2px solid var(--key-b);background:var(--surface)}
+.wep .op{font-size:22px;font-weight:600}
+.pk{display:grid;grid-template-columns:auto auto 1fr;gap:6px 12px;align-items:center;margin:6px 0}
+.pk input.ivin{width:7.5em}
+.pk .ph{font-weight:600;font-size:13.5px;white-space:nowrap}
+.result{margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--rule)}
+.result.hit{border-color:var(--chg);background:var(--chg-bg)}
+.big{font-family:var(--mono);font-size:15px;font-weight:600}
+.ivruns{font-family:var(--mono);font-size:13px;color:var(--muted)}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== RC4 core ===================== */
+// CORE-BEGIN
+// RC4 exactly as on the slide "All of RC4 on one slide" (Lecture 1): KSA, then PRGA.
+
+// KSA: S starts in order, T is the key repeated, 256 swaps.
+function ksa(key) {
+  const S = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) S[i] = i;
+  let j = 0;
+  for (let i = 0; i < 256; i++) {
+    j = (j + S[i] + key[i % key.length]) % 256;
+    const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+  }
+  return S;
+}
+
+// PRGA: n bytes of keystream from a copy of S, after throwing away the first `skip` bytes.
+function prga(S0, n, skip) {
+  const S = Uint8Array.from(S0);
+  const out = new Uint8Array(n);
+  let i = 0, j = 0;
+  skip = skip || 0;
+  for (let k = 0; k < skip + n; k++) {
+    i = (i + 1) % 256;
+    j = (j + S[i]) % 256;
+    const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+    const t = (S[i] + S[j]) % 256;
+    if (k >= skip) out[k - skip] = S[t];
+  }
+  return out;
+}
+function keystream(key, n, skip) { return prga(ksa(key), n, skip || 0); }
+
+// the helper table T: T[i] = key[i % len(key)]
+function tableT(key) {
+  const T = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) T[i] = key[i % key.length];
+  return T;
+}
+
+// KSA step by step: S and j after the loops i = 0 .. steps-1 (steps = 0 .. 256).
+// row = the loop i = steps: old j, S[i], T[i] and the new j (before its swap).
+function ksaAt(key, steps) {
+  const S = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) S[i] = i;
+  let j = 0;
+  for (let i = 0; i < steps; i++) {
+    j = (j + S[i] + key[i % key.length]) % 256;
+    const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+  }
+  let row = null;
+  if (steps < 256) {
+    const i = steps, ti = key[i % key.length];
+    row = { i: i, jOld: j, si: S[i], ti: ti, j: (j + S[i] + ti) % 256 };
+  }
+  return { S: S, j: j, row: row };
+}
+
+// PRGA step by step: S, i, j after `bytes` full loops, the rows of the loops done,
+// and `next`, the loop that comes now (all its values, computed before its swap).
+function prgaAt(S0, bytes) {
+  const S = Uint8Array.from(S0);
+  let i = 0, j = 0;
+  const rows = [];
+  for (let k = 0; k < bytes; k++) {
+    const r = prgaLoop(S, i, j);
+    rows.push(r);
+    i = r.i; j = r.j;
+  }
+  const before = Uint8Array.from(S);
+  const next = prgaLoop(Uint8Array.from(S), i, j);
+  return { S: before, i: i, j: j, rows: rows, next: next };
+}
+// one PRGA loop on S (changes S); returns everything a slide shows about it
+function prgaLoop(S, i0, j0) {
+  const i = (i0 + 1) % 256;
+  const si = S[i];
+  const j = (j0 + si) % 256;
+  const vi = S[i], vj = S[j];
+  const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+  const a = S[i], b = S[j];
+  const t = (a + b) % 256;
+  return { iOld: i0, i: i, jOld: j0, si: si, j: j, vi: vi, vj: vj, a: a, b: b, t: t, out: S[t] };
+}
+function isPermutation(S) {
+  const seen = new Uint8Array(256);
+  for (let k = 0; k < 256; k++) seen[S[k]]++;
+  for (let k = 0; k < 256; k++) if (seen[k] !== 1) return false;
+  return true;
+}
+
+// statistics, in chunks (the UI calls them with fresh random bytes)
+// mistake 1: how often S[0] == key[0] after the KSA, and after a fair shuffle (Fisher-Yates)
+function countS0(keys16, rnd32, n, res) {
+  const S = new Uint8Array(256);
+  let r = 0;
+  for (let k = 0; k < n; k++) {
+    const o = 16 * k;
+    for (let x = 0; x < 256; x++) S[x] = x;
+    let j = 0;
+    for (let i = 0; i < 256; i++) {
+      j = (j + S[i] + keys16[o + (i % 16)]) % 256;
+      const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+    }
+    if (S[0] === keys16[o]) res.ksa++;
+    for (let x = 0; x < 256; x++) S[x] = x;
+    for (let i = 255; i > 0; i--) {
+      const p = Math.floor(rnd32[r++] / 4294967296 * (i + 1));
+      const tmp = S[i]; S[i] = S[p]; S[p] = tmp;
+    }
+    if (S[0] === keys16[o]) res.shuffle++;
+    res.n++;
+  }
+}
+// mistake 2: how often keystream bytes 1, 2, 3 are 0, and the full count of byte 2 (for "recover a byte")
+function countZeros(keys16, n, res) {
+  const S = new Uint8Array(256);
+  for (let k = 0; k < n; k++) {
+    const o = 16 * k;
+    for (let x = 0; x < 256; x++) S[x] = x;
+    let j = 0;
+    for (let i = 0; i < 256; i++) {
+      j = (j + S[i] + keys16[o + (i % 16)]) % 256;
+      const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+    }
+    let i = 0; j = 0;
+    for (let b = 0; b < 3; b++) {
+      i = (i + 1) % 256;
+      j = (j + S[i]) % 256;
+      const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+      const z = S[(S[i] + S[j]) % 256];
+      if (z === 0) res.zero[b]++;
+      if (b === 1) res.hist2[z]++;
+    }
+    res.n++;
+  }
+}
+// WEP: the RC4 key of a packet is IV (3 public bytes) followed by the secret Wi-Fi key
+function wepKey(iv, secret) {
+  const k = new Uint8Array(iv.length + secret.length);
+  k.set(iv, 0); k.set(secret, iv.length);
+  return k;
+}
+function xorBytes(a, b) {
+  const n = Math.min(a.length, b.length), out = new Uint8Array(n);
+  for (let k = 0; k < n; k++) out[k] = a[k] ^ b[k];
+  return out;
+}
+
+function parseKeyHex(text) {
+  const s = text.replace(/[\s:,]/g, "").replace(/^0x/i, "");
+  if (!/^[0-9a-fA-F]*$/.test(s) || s.length % 2 !== 0 || s.length < 2 || s.length > 512) return null;
+  const b = new Uint8Array(s.length / 2);
+  for (let i = 0; i < b.length; i++) b[i] = parseInt(s.substr(2 * i, 2), 16);
+  return b;
+}
+function bytesHex(b, sep) { return Array.from(b, x => x.toString(16).padStart(2, "0")).join(sep || ""); }
+
+/* Test vectors.
+   RFC 6229 ("Test Vectors for the Stream Cipher RC4", 2011), section 2, keys 0x0102030405 (40 bits),
+   0x0102030405060708 (64 bits) and 0x0102030405060708090a0b0c0d0e0f10 (128 bits), offsets 0, 16, 240, 4080.
+   All copied from the RFC text and also recomputed with an independent Python 3 RC4 (same values).
+   Wikipedia "RC4", test vectors: key "Key", keystream EB9F7781B734CA72A7 (also in the lecture plan, section 7.1).
+   Lecture 1 slides (main.tex), all recomputed in Python 3:
+   - "KSA, step 2": key 01 02 03 04 05, j = 1, 3, 8, 12 for i = 0..3;
+   - "KSA: the result after i = 255": j = 103, S[0..12] = 1 3 8 201 21 27 35 67 242 145 207 89 92, S[254] = 186, S[255] = 88;
+   - "Step 2: PRGA": S[204] = 178;  "PRGA: four bytes": j 3 11 14 35, t 204 97 34 47, output 178 57 99 5;
+   - "Solution: use RC4" (Task 2): key "Kangaroo" -> 69 9d da 7e fe 61 73 62, "Kangarop" -> 97 c5 8c ab f1 d1 2e 8d,
+     the ciphertext decrypts to "Meet me at the library at 5.";
+   - "WEP, packet by packet": Wi-Fi key 1F 8A 3C 77 D2, IV 4F 12 A0 -> keystream EC 56 B2 AC, ciphertext 46 FC B1 AC. */
+const RFC6229 = [
+  { key: "0102030405", off: 0, ks: "b2396305f03dc027ccc3524a0a1118a8" },
+  { key: "0102030405", off: 16, ks: "6982944f18fc82d589c403a47a0d0919" },
+  { key: "0102030405", off: 240, ks: "28cb1132c96ce286421dcaadb8b69eae" },
+  { key: "0102030405", off: 4080, ks: "068326a2118416d21f9d04b2cd1ca050" },
+  { key: "0102030405060708", off: 0, ks: "97ab8a1bf0afb96132f2f67258da15a8" },
+  { key: "0102030405060708090a0b0c0d0e0f10", off: 0, ks: "9ac7cc9a609d1ef7b2932899cde41b97" },
+  { key: "0102030405060708090a0b0c0d0e0f10", off: 240, ks: "065902e4b620f6cc36c8589f66432f2b" },
+];
+const SLIDE_KEY = "0102030405";
+const TASK2_CT = "24F8BF0ADE0C16426D343A28F5558755720EF505F96EB7C0972B61E7";
+const WEP_SECRET = Uint8Array.from([0x1F, 0x8A, 0x3C, 0x77, 0xD2]);   // slides "WEP, packet by packet" and example1
+const SNAP = Uint8Array.from([0xAA, 0xAA, 0x03, 0x00]);               // every WEP data packet starts with this header
+
+function selfTest() {
+  const fails = [];
+  const enc = s => new TextEncoder().encode(s);
+  for (const v of RFC6229)
+    if (bytesHex(keystream(parseKeyHex(v.key), 16, v.off)) !== v.ks) fails.push("RFC 6229, key " + v.key + ", offset " + v.off);
+  if (bytesHex(keystream(enc("Key"), 9)) !== "eb9f7781b734ca72a7") fails.push("key \"Key\"");
+  const k5 = parseKeyHex(SLIDE_KEY);
+  // the KSA on the slides, step by step
+  const js = [0, 1, 2, 3].map(i => ksaAt(k5, i).row.j);
+  if (js.join(" ") !== "1 3 8 12") fails.push("KSA i = 0..3");
+  const end = ksaAt(k5, 256);
+  if (end.j !== 103 || Array.from(end.S.slice(0, 13)).join(" ") !== "1 3 8 201 21 27 35 67 242 145 207 89 92" ||
+      end.S[204] !== 178 || end.S[254] !== 186 || end.S[255] !== 88) fails.push("KSA result");
+  if (bytesHex(end.S) !== bytesHex(ksa(k5)) || !isPermutation(end.S)) fails.push("KSA step by step");
+  // "PRGA: four bytes"
+  const p = prgaAt(end.S, 4).rows;
+  if (p.map(r => r.j).join(" ") !== "3 11 14 35" || p.map(r => r.t).join(" ") !== "204 97 34 47" ||
+      p.map(r => r.out).join(" ") !== "178 57 99 5") fails.push("PRGA, four bytes");
+  if (bytesHex(prgaAt(end.S, 300).rows.map(r => r.out)) !== bytesHex(keystream(k5, 300))) fails.push("PRGA step by step");
+  // Task 2
+  if (bytesHex(keystream(enc("Kangaroo"), 8)) !== "699dda7efe617362" || bytesHex(keystream(enc("Kangarop"), 8)) !== "97c58cabf1d12e8d") fails.push("Task 2 keystreams");
+  const ct = parseKeyHex(TASK2_CT);
+  if (new TextDecoder().decode(xorBytes(ct, keystream(enc("Kangaroo"), ct.length))) !== "Meet me at the library at 5.") fails.push("Task 2 message");
+  // WEP slide
+  const zw = keystream(wepKey(parseKeyHex("4F12A0"), WEP_SECRET), 4);
+  if (bytesHex(zw) !== "ec56b2ac" || bytesHex(xorBytes(zw, SNAP)) !== "46fcb1ac") fails.push("WEP packet");
+  // the statistics code is the same RC4
+  const r = { zero: [0, 0, 0], hist2: new Uint32Array(256), n: 0 };
+  const k16 = parseKeyHex("0102030405060708090a0b0c0d0e0f10");
+  countZeros(k16, 1, r);
+  const z3 = keystream(k16, 3);
+  if (z3[1] !== 0xc7 || r.hist2[z3[1]] !== 1) fails.push("statistics code");
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const NB = " ";
+function fmtInt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NB); }
+function fmtPct(x, d) { const s = (100 * x).toFixed(d === undefined ? 2 : d); return (lang === "pl" ? s.replace(".", ",") : s) + "%"; }
+const T = {
+  en: {
+    title: "RC4 explorer", home: "All simulators",
+    intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
+    stepOf: n => "Step " + n + " of 4 · RC4",
+    steps: [["Black box", "one key in, keystream out"], ["Preparing the key (KSA)", "the key shuffles the table S"],
+            ["Producing the bytes (PRGA)", "one keystream byte per loop"], ["The weaknesses", "three design mistakes, measured"]],
+    explain: [
+      ["One input, one keystream", "RC4 takes only a key, 1 to 256 bytes, and turns it into a keystream as long as we need. Encrypting is XOR of the plaintext with the keystream, byte by byte. There is no nonce input: the same key always gives the same keystream. Click the RC4 box to look inside."],
+      ["Step 1: prepare", "The table S starts in order: 0, 1, 2, …, 255. The helper table T holds the key, repeated. For i = 0 to 255 the key decides j, and S[i] and S[j] change places. This runs once, before the first byte. Then click PRGA."],
+      ["Step 2: produce", "PRGA starts with the S from the KSA and i = j = 0. Every loop moves i by one, lets j jump by S[i], swaps S[i] and S[j], and outputs S[(S[i] + S[j]) mod 256]. One loop gives one keystream byte, and S changes every time."],
+      ["Three design mistakes", "RC4 is simple, and it has three design mistakes that every modern cipher avoids. Measure each one yourself, with real RC4 and random keys."]],
+    selfOk: "✓ checked against RFC 6229 and the slides", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back", fixFirst: "Fix the key in step 1.",
+    keyShort: "secret key, hex (1 to 256 bytes)", keyAsText: "as text", keyNotText: "(not plain text)", keyLen: n => n + " byte" + (n === 1 ? "" : "s"),
+    preset5: "01 02 03 04 05", preset5_s: "the key on the slides (RFC 6229)", presetK: "Kangaroo", presetK_s: "the key of Task 2", randKey: "random 16-byte key",
+    nonceT: "nonce: no such input", nonceP: "RC4 takes only the key. Same key, same keystream, every time. A protocol has to glue a nonce into the key itself (step 4, mistake 3).",
+    boxRC4_s: "click to look inside", nodeKs: "keystream Z", nodePt: "plaintext P", nodeCt: "ciphertext C",
+    ksCap: n => "as many bytes as the message (" + n + ")", ctCap: n => n + " byte" + (n === 1 ? "" : "s"),
+    cardMsg: "Encrypting with RC4", cardDetails: "Details: the XOR byte by byte",
+    rowText: "text", rowP: "P plaintext", rowZ: "Z keystream", rowC: "C ciphertext", xorRow: "XOR, byte by byte",
+    xorHint: "Point at a byte to see how it is encrypted.", xorByte: (i, p, z, c) => "byte " + i + ":  " + p + " XOR " + z + " = " + c,
+    more: k => "… and " + k + " more byte" + (k === 1 ? "" : "s") + ".", typeMsg: "Type a message to encrypt it.",
+    errKey: "The key must be 1 to 256 bytes, written as hex: 2 hex digits per byte.",
+    cardChange: "One small change in the key", keyA: "the key", keyB: "the last byte + 1",
+    sameN: (k, n) => "The same bytes: " + k + " of " + n + ".", changeNote: "One small change in the key changes the whole keystream (Task 2, TODO 3).",
+    cardInside: "Inside the RC4 box", fKey: "key", fKSA_s: "step 1: prepare, once", fState: "S, i, j", fState_s: "internal state", fPRGA_s: "step 2: produce, every byte", fZ: "keystream", clickGo: "click",
+    bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bEnd: "to the end ⏭", bByte: "next byte ⏭", b16: "+16 bytes",
+    ksaPos: (i, j) => "i = " + i + "   j = " + j,
+    ksaStart: "Start: S in order, T full of the key, j = 0. Nothing is swapped yet.",
+    ksaCalc: (jo, si, ti, j) => "j = (j + S[i] + T[i]) mod 256\n  = (" + jo + " + " + si + " + " + ti + ") mod 256 = " + j,
+    ksaSwap: (i, j, a, b) => i === j ? "j = i: S[" + i + "] swaps with itself, nothing changes." : "Swap S[" + i + "] and S[" + j + "]: " + a + " and " + b + " change places.",
+    ksaAfter: (i, j) => "After the swap of i = " + i + ". The new j = " + j + " is where the next step starts.",
+    ksaDone: j => "Done: i = 255, j = " + j + ". T is thrown away. PRGA starts with this S and i = j = 0.",
+    idleN: n => n + " cell" + (n === 1 ? "" : "s") + " still hold their own index (grey: S[x] = x).",
+    perm: "S is still a permutation: every number from 0 to 255 is there exactly once.",
+    gridCap: "the table S, 256 cells. Index = row + column. Small yellow number: T[x], the key byte for that cell.",
+    gridCapP: "the table S, 256 cells. Index = row + column.",
+    lgI: "i", lgJ: "j", lgSw: "swap", lgIdle: "never moved", lgT: "T[x] (key)", lgTp: "t: the output cell",
+    noteKey: k => "The key here: " + k + ". Change it in step 1.",
+    prgaPos: (n, s) => "byte " + n + " · step " + s + " of 5",
+    prgaStart: "S comes from the KSA. i and j start at 0.",
+    subName: ["move i", "move j", "swap", "compute t", "output"],
+    pCalc: [
+      r => "i = (i + 1) % 256 = (" + r.iOld + " + 1) % 256 = " + r.i,
+      r => "j = (j + S[i]) % 256\n  = (" + r.jOld + " + S[" + r.i + "]) % 256\n  = (" + r.jOld + " + " + r.si + ") % 256 = " + r.j,
+      r => r.i === r.j ? "j = i: S[" + r.i + "] swaps with itself." : "swap S[" + r.i + "] and S[" + r.j + "]:\n" + r.vi + " and " + r.vj + " change places",
+      r => "t = (S[i] + S[j]) % 256\n  = (S[" + r.i + "] + S[" + r.j + "]) % 256\n  = (" + r.a + " + " + r.b + ") % 256 = " + r.t,
+      r => "S[t] = S[" + r.t + "] = " + r.out + "   (hex " + r.out.toString(16).padStart(2, "0") + ")\nout.append(" + r.out + ")"],
+    ksSoFar: n => "keystream so far: " + n + " byte" + (n === 1 ? "" : "s"), ksNone: "no bytes yet",
+    ksMore: k => "… +" + k,
+    histHead: ["i", "j = (j + S[i]) mod 256", "swap", "t = (S[i] + S[j]) mod 256", "output"],
+    histCard: "Byte by byte", histNote: n => n > 8 ? "The last 8 bytes. The keystream is the same as in step 1." : "The keystream is the same as in step 1.",
+    rfcNote: "Key 01 02 03 04 05 is in the official RC4 test vectors (RFC 6229). They start with b2 39 63 05: the same bytes.",
+    tabM: ["1: S remembers the key", "2: the second byte", "3: no nonce (WEP)"],
+    m1h: "RC4 mistake 1: the KSA mixes the key badly",
+    m1you: (s0, k0, eq) => "Your key from step 1: after the KSA, S[0] = " + s0 + " and key[0] = " + k0 + ". " + (eq ? "The same number." : "Different this time."),
+    m1why: p => "<b>Why?</b> At i = 0: j = 0 + S[0] + T[0] = key[0], so S[0] gets the value key[0]. Later S[0] changes only if some j hits 0: about 1 chance in 256 at each step. Chance that this never happens in 255 steps: (255/256)<sup>255</sup> = about " + p + ".",
+    m1run: n => "Run " + fmtInt(n) + " random 16-byte keys", m1q: "How often is S[0] == key[0]?",
+    m1ksa: "KSA", m1shuf: "fair shuffle",
+    m1res: (a, n) => fmtInt(a) + " of " + fmtInt(n),
+    m1note: "A fair shuffle is the baseline: about 1 chance in 256. Your numbers change a little with every run (Task 7).",
+    m1wep: "WEP lost its key this way (WEP problem 2): a public IV goes into this weak mixer, and the first keystream bytes still remember the secret key bytes.",
+    m2h: "RC4 mistake 2: the second byte is biased",
+    m2intro: "If keystream bytes are uniform, every value appears with chance 1/256 = 0.39%. Count how often bytes 1, 2 and 3 of the keystream are 0, over many random 16-byte keys (Task 9).",
+    m2keys: "keys:", m2run: "Run", m2running: (k, n) => fmtInt(k) + " of " + fmtInt(n) + " keys …",
+    m2byte: b => "byte " + b, uniform: "uniform: 1/256",
+    m2theory: p => "Mantin and Shamir (2001): the second byte is 0 with chance about 2/256 = " + p + ", twice as often as it should be.",
+    m2small: "With few keys the numbers are noisy. Try 1 000 000.",
+    m2rec: "The same message under many keys", m2recP: "The secret second byte of the message is 61 (the letter a). Each copy uses a different key, so C2 = 61 XOR Z2. When Z2 = 0, C2 = P2. The attacker counts C2 over all copies:",
+    m2top: "most common values of C2",
+    m2exp: e => "Without the bias every value would appear about " + e + " times. The secret byte stands out, and the keys were never touched.",
+    m2wait: "Press Run.",
+    m3h: "RC4 mistake 3: no nonce, so WEP glued one into the key",
+    m3iv: "IV", m3iv_s: "3 bytes, public, new for each packet", m3sec: "shared Wi-Fi key", m3sec_s: "secret, the same for everybody", m3rc4: "RC4 key", m3rc4_s: "IV + key, 8 bytes",
+    m3pk: k => "packet " + k, m3ivLbl: "IV (hex)",
+    m3same: "packet 2: the same IV as packet 1", m3new: "packet 2: a random IV",
+    m3rowP: "P", m3rowZ: "Z", m3rowC: "C",
+    m3ivErr: "An IV is exactly 3 bytes (6 hex digits).",
+    m3x12: "C1 XOR C2", m3p12: "P1 XOR P2",
+    m3hit: "Same IV, same RC4 key, same keystream: C1 XOR C2 = P1 XOR P2. The keystream cancels out.",
+    m3known: "The attacker knows P1 (a status packet of the printer). Then C1 XOR C2 XOR P1 gives P2:",
+    m3miss: "Different IVs give different RC4 keys and completely different keystreams. C1 XOR C2 is not P1 XOR P2 here. Now give packet 2 the same IV.",
+    m3bday: "How soon does an IV repeat?", m3bdayP: (N, n) => "The IV has 3 bytes: " + N + " possible values. With random IVs, a repeat comes after about √(2 ln 2 · 2²⁴) = " + n + " packets (50% chance), not after millions.",
+    m3send: "Send packets with random IVs until one repeats", m3after: n => "IV repeated after " + fmtInt(n) + " packets.",
+    m3runs: "your runs:",
+    pPrinter: "status: the printer is online and ready", pDoor: "the door code is 2580",
+  },
+  pl: {
+    title: "Eksplorator RC4", home: "Wszystkie symulatory",
+    intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
+    stepOf: n => "Krok " + n + " z 4 · RC4",
+    steps: [["Czarna skrzynka", "jeden klucz na wejściu, keystream na wyjściu"], ["Przygotowanie klucza (KSA)", "klucz tasuje tablicę S"],
+            ["Wytwarzanie bajtów (PRGA)", "jeden bajt keystreamu na obieg pętli"], ["Słabości", "trzy błędy projektowe, zmierzone"]],
+    explain: [
+      ["Jedno wejście, jeden keystream", "RC4 przyjmuje tylko klucz, od 1 do 256 bajtów, i robi z niego keystream tak długi, jak trzeba. Szyfrowanie to XOR tekstu jawnego z keystreamem, bajt po bajcie. Nie ma wejścia na nonce: ten sam klucz zawsze daje ten sam keystream. Kliknij pole RC4, żeby zajrzeć do środka."],
+      ["Krok 1: przygotowanie", "Tablica S zaczyna po kolei: 0, 1, 2, …, 255. Tablica pomocnicza T to klucz powtarzany w kółko. Dla i = 0 do 255 klucz wyznacza j, a S[i] i S[j] zamieniają się miejscami. To dzieje się raz, przed pierwszym bajtem. Potem kliknij PRGA."],
+      ["Krok 2: wytwarzanie", "PRGA zaczyna od S z KSA oraz i = j = 0. W każdym obiegu i idzie o jeden, j skacze o S[i], S[i] i S[j] zamieniają się, a na wyjście idzie S[(S[i] + S[j]) mod 256]. Jeden obieg daje jeden bajt keystreamu, a S zmienia się za każdym razem."],
+      ["Trzy błędy projektowe", "RC4 jest prosty i ma trzy błędy projektowe, których unika każdy nowoczesny szyfr. Zmierz każdy z nich sam, na prawdziwym RC4 i losowych kluczach."]],
+    selfOk: "✓ sprawdzone z RFC 6229 i slajdami", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej", fixFirst: "Popraw klucz w kroku 1.",
+    keyShort: "tajny klucz, hex (od 1 do 256 bajtów)", keyAsText: "jako tekst", keyNotText: "(to nie jest zwykły tekst)", keyLen: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
+    preset5: "01 02 03 04 05", preset5_s: "klucz ze slajdów (RFC 6229)", presetK: "Kangaroo", presetK_s: "klucz z Task 2", randKey: "losowy klucz, 16 bajtów",
+    nonceT: "nonce: nie ma takiego wejścia", nonceP: "RC4 bierze tylko klucz. Ten sam klucz to zawsze ten sam keystream. Protokół musi sam wkleić nonce do klucza (krok 4, błąd 3).",
+    boxRC4_s: "kliknij, by zajrzeć", nodeKs: "keystream Z", nodePt: "tekst jawny P", nodeCt: "szyfrogram C",
+    ksCap: n => "tyle bajtów, ile ma wiadomość (" + n + ")", ctCap: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
+    cardMsg: "Szyfrowanie RC4", cardDetails: "Szczegóły: XOR bajt po bajcie",
+    rowText: "tekst", rowP: "P tekst jawny", rowZ: "Z keystream", rowC: "C szyfrogram", xorRow: "XOR, bajt po bajcie",
+    xorHint: "Najedź na bajt, żeby zobaczyć, jak jest szyfrowany.", xorByte: (i, p, z, c) => "bajt " + i + ":  " + p + " XOR " + z + " = " + c,
+    more: k => "… i jeszcze " + k + " " + plN(k, "bajt", "bajty", "bajtów") + ".", typeMsg: "Wpisz wiadomość, żeby ją zaszyfrować.",
+    errKey: "Klucz musi mieć od 1 do 256 bajtów zapisanych w hex: 2 cyfry hex na bajt.",
+    cardChange: "Mała zmiana w kluczu", keyA: "klucz", keyB: "ostatni bajt + 1",
+    sameN: (k, n) => "Te same bajty: " + k + " z " + n + ".", changeNote: "Mała zmiana w kluczu zmienia cały keystream (Task 2, TODO 3).",
+    cardInside: "Wnętrze pudełka RC4", fKey: "klucz", fKSA_s: "krok 1: przygotowanie, raz", fState: "S, i, j", fState_s: "stan wewnętrzny", fPRGA_s: "krok 2: wytwarzanie, co bajt", fZ: "keystream", clickGo: "kliknij",
+    bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bEnd: "do końca ⏭", bByte: "następny bajt ⏭", b16: "+16 bajtów",
+    ksaPos: (i, j) => "i = " + i + "   j = " + j,
+    ksaStart: "Start: S po kolei, T wypełnione kluczem, j = 0. Jeszcze nic nie zamieniono.",
+    ksaCalc: (jo, si, ti, j) => "j = (j + S[i] + T[i]) mod 256\n  = (" + jo + " + " + si + " + " + ti + ") mod 256 = " + j,
+    ksaSwap: (i, j, a, b) => i === j ? "j = i: S[" + i + "] zamienia się sama ze sobą, nic się nie zmienia." : "Zamiana S[" + i + "] i S[" + j + "]: " + a + " i " + b + " zamieniają się miejscami.",
+    ksaAfter: (i, j) => "Po zamianie dla i = " + i + ". Nowe j = " + j + " to punkt startu następnego kroku.",
+    ksaDone: j => "Koniec: i = 255, j = " + j + ". T idzie do kosza. PRGA zaczyna od tego S oraz i = j = 0.",
+    idleN: n => n + " " + plN(n, "komórka nadal ma", "komórki nadal mają", "komórek nadal ma") + " swój własny indeks (szare: S[x] = x).",
+    perm: "S jest nadal permutacją: każda liczba od 0 do 255 występuje dokładnie raz.",
+    gridCap: "tablica S, 256 komórek. Indeks = wiersz + kolumna. Mała żółta liczba: T[x], bajt klucza dla tej komórki.",
+    gridCapP: "tablica S, 256 komórek. Indeks = wiersz + kolumna.",
+    lgI: "i", lgJ: "j", lgSw: "zamiana", lgIdle: "nieruszone", lgT: "T[x] (klucz)", lgTp: "t: komórka wyjścia",
+    noteKey: k => "Klucz: " + k + ". Zmień go w kroku 1.",
+    prgaPos: (n, s) => "bajt " + n + " · krok " + s + " z 5",
+    prgaStart: "S pochodzi z KSA. i oraz j zaczynają od 0.",
+    subName: ["przesuń i", "przesuń j", "zamiana", "policz t", "wyjście"],
+    pCalc: [
+      r => "i = (i + 1) % 256 = (" + r.iOld + " + 1) % 256 = " + r.i,
+      r => "j = (j + S[i]) % 256\n  = (" + r.jOld + " + S[" + r.i + "]) % 256\n  = (" + r.jOld + " + " + r.si + ") % 256 = " + r.j,
+      r => r.i === r.j ? "j = i: S[" + r.i + "] zamienia się sama ze sobą." : "zamiana S[" + r.i + "] i S[" + r.j + "]:\n" + r.vi + " i " + r.vj + " zamieniają się miejscami",
+      r => "t = (S[i] + S[j]) % 256\n  = (S[" + r.i + "] + S[" + r.j + "]) % 256\n  = (" + r.a + " + " + r.b + ") % 256 = " + r.t,
+      r => "S[t] = S[" + r.t + "] = " + r.out + "   (hex " + r.out.toString(16).padStart(2, "0") + ")\nout.append(" + r.out + ")"],
+    ksSoFar: n => "keystream do tej pory: " + n + " " + plN(n, "bajt", "bajty", "bajtów"), ksNone: "jeszcze żadnego bajtu",
+    ksMore: k => "… +" + k,
+    histHead: ["i", "j = (j + S[i]) mod 256", "zamiana", "t = (S[i] + S[j]) mod 256", "wyjście"],
+    histCard: "Bajt po bajcie", histNote: n => n > 8 ? "Ostatnie 8 bajtów. Keystream jest taki sam jak w kroku 1." : "Keystream jest taki sam jak w kroku 1.",
+    rfcNote: "Klucz 01 02 03 04 05 jest w oficjalnych wektorach testowych RC4 (RFC 6229). Zaczynają się od b2 39 63 05: te same bajty.",
+    tabM: ["1: S pamięta klucz", "2: drugi bajt", "3: brak nonce (WEP)"],
+    m1h: "Błąd RC4 nr 1: KSA słabo miesza klucz",
+    m1you: (s0, k0, eq) => "Twój klucz z kroku 1: po KSA S[0] = " + s0 + ", a key[0] = " + k0 + ". " + (eq ? "Ta sama liczba." : "Tym razem inna."),
+    m1why: p => "<b>Dlaczego?</b> Dla i = 0: j = 0 + S[0] + T[0] = key[0], więc S[0] dostaje wartość key[0]. Potem S[0] zmienia się tylko wtedy, gdy jakieś j trafi w 0: mniej więcej 1 szansa na 256 w każdym kroku. Szansa, że nie zdarzy się to w 255 krokach: (255/256)<sup>255</sup>, czyli około " + p + ".",
+    m1run: n => "Uruchom " + fmtInt(n) + " losowych kluczy 16-bajtowych", m1q: "Jak często S[0] == key[0]?",
+    m1ksa: "KSA", m1shuf: "uczciwe tasowanie",
+    m1res: (a, n) => fmtInt(a) + " z " + fmtInt(n),
+    m1note: "Uczciwe tasowanie to punkt odniesienia: około 1 szansa na 256. Liczby zmieniają się trochę przy każdym uruchomieniu (Task 7).",
+    m1wep: "Tak WEP stracił klucz (problem 2 WEP): jawny IV wchodzi do tego słabego miksera, a pierwsze bajty keystreamu nadal pamiętają tajne bajty klucza.",
+    m2h: "Błąd RC4 nr 2: drugi bajt jest skrzywiony",
+    m2intro: "Gdyby bajty keystreamu były jednostajne, każda wartość wypadałaby z szansą 1/256 = 0,39%. Policz, jak często bajty 1, 2 i 3 keystreamu są równe 0, dla wielu losowych kluczy 16-bajtowych (Task 9).",
+    m2keys: "klucze:", m2run: "Uruchom", m2running: (k, n) => fmtInt(k) + " z " + fmtInt(n) + " kluczy …",
+    m2byte: b => "bajt " + b, uniform: "jednostajnie: 1/256",
+    m2theory: p => "Mantin i Shamir (2001): drugi bajt jest równy 0 z szansą około 2/256 = " + p + ", dwa razy częściej, niż powinien.",
+    m2small: "Przy małej liczbie kluczy wyniki mocno skaczą. Spróbuj 1 000 000.",
+    m2rec: "Ta sama wiadomość pod wieloma kluczami", m2recP: "Tajny drugi bajt wiadomości to 61 (litera a). Każda kopia ma inny klucz, więc C2 = 61 XOR Z2. Gdy Z2 = 0, to C2 = P2. Napastnik liczy wartości C2 we wszystkich kopiach:",
+    m2top: "najczęstsze wartości C2",
+    m2exp: e => "Bez skrzywienia każda wartość pojawiłaby się około " + e + " razy. Tajny bajt się wyróżnia, a kluczy nikt nie dotknął.",
+    m2wait: "Naciśnij Uruchom.",
+    m3h: "Błąd RC4 nr 3: brak nonce, więc WEP wkleił go do klucza",
+    m3iv: "IV", m3iv_s: "3 bajty, jawny, nowy dla każdego pakietu", m3sec: "wspólny klucz Wi-Fi", m3sec_s: "tajny, ten sam dla wszystkich", m3rc4: "klucz RC4", m3rc4_s: "IV + klucz, 8 bajtów",
+    m3pk: k => "pakiet " + k, m3ivLbl: "IV (hex)",
+    m3same: "pakiet 2: ten sam IV co pakiet 1", m3new: "pakiet 2: losowy IV",
+    m3rowP: "P", m3rowZ: "Z", m3rowC: "C",
+    m3ivErr: "IV ma dokładnie 3 bajty (6 cyfr hex).",
+    m3x12: "C1 XOR C2", m3p12: "P1 XOR P2",
+    m3hit: "Ten sam IV, ten sam klucz RC4, ten sam keystream: C1 XOR C2 = P1 XOR P2. Keystream się znosi.",
+    m3known: "Napastnik zna P1 (pakiet ze statusem drukarki). Wtedy C1 XOR C2 XOR P1 daje P2:",
+    m3miss: "Różne IV dają różne klucze RC4 i zupełnie różne keystreamy. Tutaj C1 XOR C2 to nie jest P1 XOR P2. Daj teraz pakietowi 2 ten sam IV.",
+    m3bday: "Jak szybko IV się powtórzy?", m3bdayP: (N, n) => "IV ma 3 bajty: " + N + " możliwych wartości. Przy losowych IV powtórka przychodzi po około √(2 ln 2 · 2²⁴) = " + n + " pakietach (szansa 50%), a nie po milionach.",
+    m3send: "Wysyłaj pakiety z losowym IV aż do powtórki", m3after: n => "IV powtórzył się po " + fmtInt(n) + " " + plN(n, "pakiecie", "pakietach", "pakietach") + ".",
+    m3runs: "twoje próby:",
+    pPrinter: "status: the printer is online and ready", pDoor: "the door code is 2580",
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+
+const app = {
+  level: 0,
+  keyText: "01 02 03 04 05", key: parseKeyHex(SLIDE_KEY), keyErr: false,
+  msg: "Meet me at the library at 5.",
+  ksaPos: 0,     // 0 = start; 2i+1 = loop i, j computed; 2i+2 = loop i, after the swap
+  prgaPos: 0,    // 0 = start; 5b + s = byte b+1, sub-step s (1..5)
+  mis: 0,
+  iv1: "4F 12 A0", iv2: "21 E8 55",
+  s1: null, s2: null, s2n: 100000, ivRuns: [],
+};
+const KSA_MAX = 512, PRGA_MAXB = 256, PRGA_MAX = 5 * PRGA_MAXB;
+const hx2 = x => x.toString(16).padStart(2, "0");
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function keyAsText(b) {
+  for (const x of b) if (x < 32 || x > 126) return null;
+  return String.fromCharCode.apply(null, Array.from(b));
+}
+function keyShortHex(b) { return b.length <= 16 ? bytesHex(b, " ") : bytesHex(b.slice(0, 16), " ") + " …"; }
+
+const KEY_SVG = '<svg viewBox="0 0 40 20" width="34" height="17" aria-hidden="true"><circle cx="9" cy="10" r="7.5" fill="currentColor"/><circle cx="9" cy="10" r="2.8" fill="var(--key-bg)"/><path d="M15 7.5h22v5h-3v3h-3v-3h-3v3h-3v-3h-10z" fill="currentColor"/></svg>';
+const DICE_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/></svg>';
+
+/* ---------- the key ---------- */
+function setKey(bytes, fromField) {
+  app.key = bytes; app.keyErr = false;
+  app.keyText = bytesHex(bytes, " ");
+  const h = view.querySelector('input[data-field="khex"]'), t = view.querySelector('input[data-field="ktext"]');
+  if (h && fromField !== "khex") h.value = app.keyText;
+  if (t && fromField !== "ktext") { const s = keyAsText(bytes); t.value = s === null ? "" : s; t.placeholder = s === null ? L().keyNotText : ""; }
+  keyChanged();
+}
+function keyChanged() {
+  const kl = document.getElementById("klen");
+  if (kl) kl.textContent = app.keyErr ? "" : L().keyLen(app.key.length);
+  if (app.level === 0) updateL0();
+}
+
+/* ---------- step 1: black box ---------- */
+let L0DATA = null;
+function render0() {
+  const t = L(), txt = keyAsText(app.key);
+  return '<div class="card"><h3>' + t.cardMsg + '</h3><div class="schwrap"><div class="sch">' +
+      '<svg class="arrows" width="900" height="432" aria-hidden="true"><defs>' +
+        '<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>' +
+        '<marker id="ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--key-b)"/></marker></defs>' +
+        '<polyline fill="none" stroke="var(--key-b)" stroke-width="2.4" marker-end="url(#ahk)" points="120,118 120,162"/>' +
+        '<g stroke="currentColor" stroke-width="2.2" marker-end="url(#ah)">' +
+        '<line x1="210" y1="204" x2="254" y2="204"/><line x1="528" y1="204" x2="558" y2="204"/>' +
+        '<line x1="626" y1="204" x2="648" y2="204"/><line x1="594" y1="294" x2="594" y2="240"/></g></svg>' +
+      '<div class="sg-key role-key"><div class="lblrow"><span>' + t.keyShort + ' · <span id="klen">' + (app.keyErr ? "" : t.keyLen(app.key.length)) + '</span></span>' +
+        '<button class="rnd" data-action="rand-key" title="' + esc(t.randKey) + '" aria-label="' + esc(t.randKey) + '">' + DICE_SVG + "</button></div>" +
+        '<input class="khex" data-field="khex" spellcheck="false" value="' + esc(app.keyText) + '">' +
+        '<div class="krow"><span>' + t.keyAsText + '</span><input data-field="ktext" spellcheck="false" value="' + esc(txt === null ? "" : txt) + '" placeholder="' + esc(txt === null ? t.keyNotText : "") + '">' +
+        '<button data-action="preset-5" title="' + esc(t.preset5_s) + '">' + t.preset5 + '</button><button data-action="preset-k" title="' + esc(t.presetK_s) + '">' + t.presetK + "</button></div></div>" +
+      '<div class="sg-non"><b><span class="x">✕</span>' + t.nonceT + "</b><p>" + t.nonceP + "</p></div>" +
+      '<button class="box sg-box" data-action="zoom">RC4<small>' + t.boxRC4_s + "</small></button>" +
+      '<div class="node sg-ks"><div class="nh">' + KEY_SVG + " " + t.nodeKs + '</div><div class="nb mono" id="ksbytes"></div><small id="kscap"></small></div>' +
+      '<div class="sg-xor" aria-label="XOR">&#8853;</div>' +
+      '<div class="node sg-ct"><div class="nh">' + t.nodeCt + '</div><div class="nb mono" id="ctbytes"></div><small id="ctcap"></small></div>' +
+      '<div class="node sg-pt"><div class="nh">' + t.nodePt + '</div><textarea data-field="msg" rows="3" spellcheck="false">' + esc(app.msg) + "</textarea></div>" +
+    "</div></div></div>" +
+    '<div class="card"><h3>' + t.cardDetails + '</h3><div id="l0out"></div></div>' +
+    '<div class="card"><h3>' + t.cardChange + '</h3><div id="l0chg"></div><p class="note" style="margin:6px 0 0">' + t.changeNote + "</p></div>";
+}
+function updateL0() {
+  const out = document.getElementById("l0out");
+  if (!out) return;
+  const t = L();
+  L0DATA = null;
+  const ids = ["ksbytes", "ctbytes", "kscap", "ctcap"];
+  if (app.keyErr) {
+    ids.forEach(id => { document.getElementById(id).textContent = ""; });
+    out.innerHTML = '<p class="err">' + t.errKey + "</p>";
+    document.getElementById("l0chg").innerHTML = "";
+    return;
+  }
+  // one small change in the key
+  const kb = Uint8Array.from(app.key); kb[kb.length - 1] = (kb[kb.length - 1] + 1) % 256;
+  const za = keystream(app.key, 8), zb = keystream(kb, 8);
+  let same = 0; for (let k = 0; k < 8; k++) if (za[k] === zb[k]) same++;
+  const chips = (z, o) => '<span class="chips8">' + Array.from(z, (x, k) => '<span class="zb' + (x === o[k] ? " same" : "") + '">' + hx2(x) + "</span>").join("") + "</span>";
+  document.getElementById("l0chg").innerHTML =
+    '<div class="cmprow"><span class="lbl">' + t.keyA + ': <span class="mono">' + esc(keyShortHex(app.key)) + "</span></span>" + chips(za, zb) + "</div>" +
+    '<div class="cmprow"><span class="lbl">' + t.keyB + ': <span class="mono">' + esc(keyShortHex(kb)) + "</span></span>" + chips(zb, za) + "</div>" +
+    '<p style="margin:4px 0 0;font-weight:600">' + t.sameN(same, 8) + "</p>";
+  const p = new TextEncoder().encode(app.msg);
+  const n = p.length;
+  if (n === 0) { ids.forEach(id => { document.getElementById(id).textContent = ""; }); out.innerHTML = '<p class="note">' + t.typeMsg + "</p>"; return; }
+  const z = keystream(app.key, n);
+  const c = xorBytes(p, z);
+  const firstBytes = arr => Array.from(arr.slice(0, 16), hx2).join(" ").replace(/^((?:\S+ ){7}\S+) /, "$1<br>") + (arr.length > 16 ? " …" : "");
+  document.getElementById("ksbytes").innerHTML = firstBytes(z);
+  document.getElementById("kscap").textContent = t.ksCap(n);
+  document.getElementById("ctbytes").innerHTML = firstBytes(c);
+  document.getElementById("ctcap").textContent = t.ctCap(n);
+  const SHOW = Math.min(n, 28);
+  const ch = x => x === 32 ? "␣" : (x > 32 && x < 127 ? esc(String.fromCharCode(x)) : "·");
+  const rowOf = (cls, lbl, fn) => '<tr class="' + cls + '"><td class="lbl">' + lbl + "</td>" +
+    Array.from({ length: SHOW }, (_, i) => '<td class="b" data-i="' + i + '">' + fn(i) + "</td>").join("") + "</tr>";
+  const rows = rowOf("rt", t.rowText, i => ch(p[i])) + rowOf("rp", t.rowP, i => hx2(p[i])) + rowOf("rz zrow", t.rowZ, i => hx2(z[i])) +
+    '<tr class="xorrow"><td class="lbl"></td><td colspan="' + SHOW + '">↓ ' + t.xorRow + " ↓</td></tr>" + rowOf("rc", t.rowC, i => hx2(c[i]));
+  out.innerHTML = '<div class="tablewrap"><table class="btable">' + rows + "</table></div>" +
+    (n > SHOW ? '<p class="note">' + t.more(n - SHOW) + "</p>" : "") +
+    '<p class="xorline" id="xorline">' + t.xorHint + "</p>";
+  L0DATA = { p: p, z: z, c: c };
+}
+
+/* ---------- the flow strip of steps 2 and 3 ---------- */
+function flowHTML(phase) {
+  const t = L();
+  const fb = (name, sub, on, lvl) => '<button class="fbox ' + (on ? "on" : "off") + '"' + (on ? "" : ' data-action="goto" data-l="' + lvl + '" title="' + esc(t.clickGo) + '"') + ">" + name + "<small>" + sub + "</small></button>";
+  return '<div class="card"><h3>' + t.cardInside + '</h3><div class="flow">' +
+    '<span class="fchip role-key">' + t.fKey + '<small class="mono">' + esc(keyShortHex(app.key)) + "</small></span><span class=\"arrow\">→</span>" +
+    fb("KSA", t.fKSA_s, phase === 1, 1) + '<span class="arrow">→</span>' +
+    '<span class="fchip role-const">' + t.fState + "<small>" + t.fState_s + '</small></span><span class="arrow">→</span>' +
+    fb("PRGA", t.fPRGA_s, phase === 2, 2) + '<span class="arrow">→</span>' +
+    '<span class="fchip role-key">' + t.fZ + '<small class="mono" id="flowZ"></small></span></div></div>';
+}
+
+/* ---------- the 256-cell table ---------- */
+// marks: { i, j, t, sw: [x, y], tout } ; T: the helper table or null ; idle: grey the cells with S[x] = x
+function sgridHTML(S, T, marks) {
+  let h = '<div class="sgrid"><span></span>';
+  for (let c = 0; c < 16; c++) h += '<span class="hd">' + c + "</span>";
+  for (let r = 0; r < 16; r++) {
+    h += '<span class="rh">' + (16 * r) + "</span>";
+    for (let c = 0; c < 16; c++) {
+      const x = 16 * r + c;
+      let cls = "sc", tag = "";
+      if (marks.idle && S[x] === x) cls += " idle";
+      if (marks.sw && marks.sw.indexOf(x) >= 0) cls += " sw";
+      if (marks.t === x) cls += marks.tout ? " pt ptout" : " pt";
+      if (marks.i === x) cls += " pi";
+      if (marks.j === x) cls += " pj";
+      if (marks.i === x && marks.j === x) tag = '<span class="tag tij">i,j</span>';
+      else if (marks.i === x) tag = '<span class="tag ti">i</span>';
+      else if (marks.j === x) tag = '<span class="tag tj">j</span>';
+      else if (marks.t === x) tag = '<span class="tag tt">t</span>';
+      h += '<div class="' + cls + '" title="S[' + x + "] = " + S[x] + (T ? ", T[" + x + "] = " + T[x] : "") + '">' + tag + "<b>" + S[x] + "</b>" + (T ? "<i>" + T[x] + "</i>" : "") + "</div>";
+    }
+  }
+  return h + "</div>";
+}
+function codeHTML(lines, cur, act) {
+  return '<div class="code">' + lines.map((l, k) => '<span class="ln' + (cur.indexOf(k) >= 0 ? " cur" : act && act.indexOf(k) >= 0 ? " act" : "") + '">' + esc(l) + "</span>").join("") + "</div>";
+}
+
+/* ---------- step 2: KSA ---------- */
+const KSA_CODE = ["S = list(range(256))", "T = [key[i % len(key)] for i in range(256)]", "j = 0", "for i in range(256):", "    j = (j + S[i] + T[i]) % 256", "    S[i], S[j] = S[j], S[i]"];
+function render1() {
+  const t = L();
+  if (app.keyErr) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  return flowHTML(1) +
+    '<div class="card"><div class="split"><figure style="margin:0"><div id="ksagrid"></div><figcaption class="note" style="max-width:556px;margin-top:6px">' + t.gridCap + "</figcaption></figure>" +
+      '<div class="sidepanel"><div class="controls">' +
+      '<button data-action="ksa-reset">' + t.bReset + '</button><button data-action="ksa-prev">' + t.bPrev + "</button>" +
+      '<button class="dark" data-action="ksa-next">' + t.bNext + '</button><button data-action="ksa-end">' + t.bEnd + "</button>" +
+      '<input type="range" min="0" max="' + KSA_MAX + '" data-field="ksapos" value="' + app.ksaPos + '" aria-label="i" style="width:100%"></div><span class="pos" id="ksapos"></span>' +
+      '<div id="ksacode"></div><div class="calc" id="ksacalc"></div><div class="note" id="ksanote"></div></div></div>' +
+      '<div class="legend"><span class="lg-i">' + t.lgI + '</span><span class="lg-j">' + t.lgJ + '</span><span class="lg-sw">' + t.lgSw + "</span>" +
+      '<span class="lg-idle">' + t.lgIdle + '</span><span class="lg-T">' + t.lgT + "</span></div></div>";
+}
+function renderL1Body() {
+  const g = document.getElementById("ksagrid");
+  if (!g) return;
+  const t = L(), p = app.ksaPos;
+  const Ttab = tableT(app.key);
+  let st, marks, cur, calc, note;
+  if (p === 0) {
+    st = ksaAt(app.key, 0);
+    marks = { idle: true };
+    cur = [0, 1, 2]; calc = t.ksaStart; note = "";
+    document.getElementById("ksapos").textContent = "j = 0";
+  } else {
+    const i = (p - 1) >> 1, after = p % 2 === 0;
+    const pre = ksaAt(app.key, i);
+    const r = pre.row;
+    if (!after) {
+      st = pre;
+      marks = { idle: true, i: i, j: r.j, sw: [i, r.j] };
+      cur = [4];
+      calc = t.ksaCalc(r.jOld, r.si, r.ti, r.j);
+      note = t.ksaSwap(i, r.j, pre.S[i], pre.S[r.j]);
+    } else {
+      st = ksaAt(app.key, i + 1);
+      marks = { idle: true, i: i, j: r.j, sw: [i, r.j] };
+      cur = [5];
+      calc = t.ksaCalc(r.jOld, r.si, r.ti, r.j);
+      note = i === 255 ? t.ksaDone(r.j) : t.ksaAfter(i, r.j);
+    }
+    document.getElementById("ksapos").textContent = t.ksaPos(i, r.j);
+  }
+  let idle = 0; for (let x = 0; x < 256; x++) if (st.S[x] === x) idle++;
+  g.innerHTML = sgridHTML(st.S, Ttab, marks);
+  document.getElementById("ksacode").innerHTML = codeHTML(KSA_CODE, cur, [3, 4, 5]);
+  document.getElementById("ksacalc").textContent = calc;
+  document.getElementById("ksacalc").style.whiteSpace = "pre-wrap";
+  document.getElementById("ksanote").innerHTML = (note ? "<b>" + esc(note) + "</b><br>" : "") + esc(t.idleN(idle)) +
+    (isPermutation(st.S) ? '<br><span class="okline">✓ ' + esc(t.perm) + "</span>" : "");
+  const sl = view.querySelector('input[data-field="ksapos"]'); if (sl) sl.value = p;
+  document.getElementById("flowZ").textContent = bytesHex(keystream(app.key, 4), " ") + " …";
+}
+function ksaGo(p) { app.ksaPos = Math.max(0, Math.min(KSA_MAX, p)); renderL1Body(); }
+
+/* ---------- step 3: PRGA ---------- */
+const PRGA_CODE = ["i = j = 0", "out = []", "for _ in range(n):", "    i = (i + 1) % 256", "    j = (j + S[i]) % 256", "    S[i], S[j] = S[j], S[i]", "    t = (S[i] + S[j]) % 256", "    out.append(S[t])"];
+function render2() {
+  const t = L();
+  if (app.keyErr) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  return flowHTML(2) +
+    '<div class="card"><div class="split"><figure style="margin:0"><div id="prgagrid"></div><figcaption class="note" style="max-width:556px;margin-top:6px">' + t.gridCapP + "</figcaption></figure>" +
+      '<div class="sidepanel"><div class="controls">' +
+      '<button data-action="prga-reset">' + t.bReset + '</button><button data-action="prga-prev">' + t.bPrev + "</button>" +
+      '<button class="dark" data-action="prga-next">' + t.bNext + '</button><button data-action="prga-byte">' + t.bByte + "</button>" +
+      '<button data-action="prga-16">' + t.b16 + '</button></div><span class="pos" id="prgapos"></span>' +
+      '<div id="prgacode"></div><div class="vars" id="prgavars"></div><div class="calc" id="prgacalc" style="white-space:pre-wrap"></div>' +
+      '<div><b id="kshead"></b><div class="chips8" id="kschips" style="margin-top:4px"></div><p class="note" id="rfcnote" style="margin:6px 0 0"></p></div></div></div>' +
+      '<div class="legend"><span class="lg-i">' + t.lgI + '</span><span class="lg-j">' + t.lgJ + '</span><span class="lg-sw">' + t.lgSw + '</span><span class="lg-t">' + t.lgTp + "</span></div></div>" +
+    '<div class="card"><h3>' + t.histCard + '</h3><div class="tablewrap" id="prgahist"></div><p class="note" id="histnote" style="margin:6px 0 0"></p></div>';
+}
+function renderL2Body() {
+  const g = document.getElementById("prgagrid");
+  if (!g) return;
+  const t = L(), q = app.prgaPos;
+  const S0 = ksa(app.key);
+  const done = q === 0 ? 0 : Math.floor((q - 1) / 5);   // full bytes before the current one
+  const sub = q === 0 ? 0 : (q - 1) % 5 + 1;
+  const st = prgaAt(S0, done);
+  const r = st.next;
+  let S = st.S, marks, cur, calc, vars;
+  const v = (cls, txt) => '<span class="var ' + cls + '">' + txt + "</span>";
+  const outs = st.rows.map(x => x.out);
+  if (sub === 0) {
+    marks = { i: 0, j: 0 }; cur = [0, 1]; calc = t.prgaStart;
+    vars = v("vi", "i = 0") + v("vj", "j = 0");
+    document.getElementById("prgapos").textContent = "";
+  } else {
+    if (sub >= 3) { S = Uint8Array.from(st.S); const tmp = S[r.i]; S[r.i] = S[r.j]; S[r.j] = tmp; }
+    marks = { i: r.i, j: sub >= 2 ? r.j : st.j };
+    if (sub >= 3) marks.sw = [r.i, r.j];
+    if (sub >= 4) marks.t = r.t;
+    if (sub === 5) { marks.tout = true; outs.push(r.out); }
+    cur = [sub + 2];
+    calc = t.subName[sub - 1] + ":\n" + t.pCalc[sub - 1](r);
+    vars = v("vi", "i = " + r.i) + v("vj", "j = " + (sub >= 2 ? r.j : st.j)) + (sub >= 4 ? v("vt", "t = " + r.t) : "") + (sub === 5 ? v("vo", "out = " + r.out) : "");
+    document.getElementById("prgapos").textContent = t.prgaPos(done + 1, sub) + ": " + t.subName[sub - 1];
+  }
+  g.innerHTML = sgridHTML(S, null, marks);
+  document.getElementById("prgacode").innerHTML = codeHTML(PRGA_CODE, cur, [2, 3, 4, 5, 6, 7]);
+  document.getElementById("prgavars").innerHTML = vars;
+  document.getElementById("prgacalc").textContent = calc;
+  // keystream so far
+  const SHOWK = 32;
+  document.getElementById("kshead").textContent = outs.length ? t.ksSoFar(outs.length) : t.ksNone;
+  const from = Math.max(0, outs.length - SHOWK);
+  document.getElementById("kschips").innerHTML = (from > 0 ? '<span class="note">' + t.ksMore(from) + "</span>" : "") +
+    outs.slice(from).map((x, k) => '<span class="zb' + (sub === 5 && from + k === outs.length - 1 ? " new" : "") + '" title="' + x + '">' + hx2(x) + "</span>").join("");
+  document.getElementById("rfcnote").textContent = bytesHex(app.key) === SLIDE_KEY && outs.length >= 4 ? t.rfcNote : "";
+  // the table of the bytes done (the slide "PRGA: four bytes")
+  const rows = st.rows.map((x, k) => ({ x: x, k: k, now: false }));
+  if (sub === 5) rows.push({ x: r, k: done, now: true });
+  const last = rows.slice(-8);
+  const hh = t.histHead;
+  let h = '<table class="htable"><tr>' + hh.map(s => "<th>" + esc(s) + "</th>").join("") + "</tr>";
+  for (const o of last) {
+    const x = o.x;
+    h += '<tr' + (o.now ? ' class="now"' : "") + "><td>" + x.i + "</td><td>(" + x.jOld + " + " + x.si + ") mod 256 = " + x.j + "</td><td>S[" + x.i + "] ↔ S[" + x.j + "]</td><td>(" + x.a + " + " + x.b + ") mod 256 = " + x.t +
+      '</td><td class="out">' + x.out + " (" + hx2(x.out) + ")</td></tr>";
+  }
+  h += "</table>";
+  document.getElementById("prgahist").innerHTML = rows.length ? h : '<p class="note">' + t.ksNone + "</p>";
+  document.getElementById("histnote").textContent = rows.length ? t.histNote(rows.length) : "";
+  document.getElementById("flowZ").textContent = outs.length ? bytesHex(outs.slice(-4), " ") : "…";
+}
+function prgaGo(q) { app.prgaPos = Math.max(0, Math.min(PRGA_MAX, q)); renderL2Body(); }
+
+/* ---------- step 4: the weaknesses ---------- */
+function render3() {
+  const t = L();
+  const pressed = c => ' aria-pressed="' + (c ? "true" : "false") + '"';
+  let h = '<div class="card" style="padding:10px 14px"><span class="tabs">' +
+    t.tabM.map((s, k) => '<button data-action="mis" data-m="' + k + '"' + pressed(app.mis === k) + ">" + s + "</button>").join("") + "</span></div>";
+  if (app.mis === 0) h += renderM1();
+  else if (app.mis === 1) h += renderM2();
+  else h += renderM3();
+  return h;
+}
+function barsHTML(items, maxV, ux, uxLbl) {
+  // items: [{ l, v, txt, hl }]; ux: position (value) of the dashed "uniform" line
+  let h = '<div class="bars">';
+  for (const it of items) {
+    const w = Math.min(100, 100 * it.v / maxV);
+    h += '<span class="bl">' + it.l + '</span><div class="bt"><div class="bf' + (it.hl ? " hl" : "") + '" style="width:' + w + '%"></div>' +
+      (ux !== undefined ? '<div class="ux" style="left:' + (100 * ux / maxV) + '%"></div>' : "") +
+      '<span class="bv" style="left:calc(' + Math.min(w, 80) + '% + 8px)">' + it.txt + "</span></div>";
+  }
+  h += "</div>";
+  if (uxLbl) h += '<div class="ulbl" style="margin-top:4px">┆ ' + uxLbl + "</div>";
+  return h;
+}
+
+// mistake 1
+function renderM1() {
+  const t = L();
+  let mine = "";
+  if (!app.keyErr) {
+    const S = ksa(app.key);
+    mine = '<p style="margin:0 0 8px">' + esc(t.m1you(S[0], app.key[0], S[0] === app.key[0])) + "</p>";
+  }
+  const p = Math.pow(255 / 256, 255);
+  return '<div class="card"><h3><span class="mtag">1/3</span>' + t.m1h + "</h3>" + mine +
+    '<div class="why" style="margin:0 0 12px">' + t.m1why(fmtPct(p, 1)) + "</div>" +
+    "<b>" + t.m1q + '</b><div class="btns" style="margin-top:6px"><button class="dark" data-action="run1">' + t.m1run(10000) + '</button></div><div class="prog"><span id="prog1"></span></div>' +
+    '<div id="m1out"></div><p class="note">' + t.m1note + "</p>" +
+    '<p style="margin:8px 0 0">' + t.m1wep + "</p></div>";
+}
+function updateM1() {
+  const o = document.getElementById("m1out");
+  if (!o) return;
+  const t = L(), s = app.s1;
+  const pg = document.getElementById("prog1");
+  if (!s) { o.innerHTML = '<p class="note">' + t.m2wait + "</p>"; if (pg) pg.style.width = "0"; return; }
+  if (pg) pg.style.width = (100 * s.n / s.total) + "%";
+  const pk = s.ksa / Math.max(1, s.n), ps = s.shuffle / Math.max(1, s.n);
+  o.innerHTML = barsHTML([
+    { l: t.m1ksa, v: pk, txt: fmtPct(pk) + " (" + t.m1res(s.ksa, s.n) + ")", hl: true },
+    { l: t.m1shuf, v: ps, txt: fmtPct(ps) + " (" + t.m1res(s.shuffle, s.n) + ")" }], 0.5, 1 / 256, t.uniform + " = " + fmtPct(1 / 256));
+}
+let RUN1 = 0;
+function run1() {
+  const total = 10000, CH = 2000, id = ++RUN1;
+  app.s1 = { ksa: 0, shuffle: 0, n: 0, total: total };
+  const step = () => {
+    if (id !== RUN1) return;
+    const n = Math.min(CH, total - app.s1.n);
+    const keys = new Uint8Array(16 * n); crypto.getRandomValues(keys);
+    const rnd = new Uint32Array(255 * n); for (let o = 0; o < rnd.length; o += 16384) crypto.getRandomValues(rnd.subarray(o, Math.min(rnd.length, o + 16384)));
+    countS0(keys, rnd, n, app.s1);
+    updateM1();
+    if (app.s1.n < total) setTimeout(step, 0);
+  };
+  step();
+}
+
+// mistake 2
+function renderM2() {
+  const t = L();
+  const opts = [10000, 100000, 1000000].map(n => '<option value="' + n + '"' + (n === app.s2n ? " selected" : "") + ">" + fmtInt(n) + "</option>").join("");
+  return '<div class="card"><h3><span class="mtag">2/3</span>' + t.m2h + "</h3><p style=\"margin:0 0 8px\">" + t.m2intro + "</p>" +
+    '<div class="btns"><label>' + t.m2keys + ' <select data-field="s2n">' + opts + '</select></label><button class="dark" data-action="run2">' + t.m2run + '</button><span class="note" id="m2status"></span></div>' +
+    '<div class="prog"><span id="prog2"></span></div><div id="m2out"></div>' +
+    '<p class="note" style="margin:8px 0 0">' + t.m2theory(fmtPct(2 / 256)) + "</p></div>" +
+    '<div class="card"><h3>' + t.m2rec + "</h3><p style=\"margin:0 0 6px\">" + t.m2recP + '</p><div id="m2rec"></div></div>';
+}
+function updateM2() {
+  const o = document.getElementById("m2out"), rc = document.getElementById("m2rec");
+  if (!o) return;
+  const t = L(), s = app.s2;
+  const pg = document.getElementById("prog2"), stt = document.getElementById("m2status");
+  if (!s) { o.innerHTML = '<p class="note">' + t.m2wait + "</p>"; rc.innerHTML = '<p class="note">' + t.m2wait + "</p>"; if (pg) pg.style.width = "0"; if (stt) stt.textContent = ""; return; }
+  if (pg) pg.style.width = (100 * s.n / s.total) + "%";
+  if (stt) stt.textContent = s.n < s.total ? t.m2running(s.n, s.total) : "";
+  const pr = b => s.zero[b] / Math.max(1, s.n);
+  o.innerHTML = barsHTML([0, 1, 2].map(b => ({ l: t.m2byte(b + 1), v: pr(b), txt: fmtPct(pr(b), 3) + " (" + fmtInt(s.zero[b]) + ")", hl: b === 1 })), 0.01, 1 / 256, t.uniform + " = " + fmtPct(1 / 256, 3)) +
+    (s.n < 1000000 && s.n === s.total ? '<p class="note" style="margin:6px 0 0">' + t.m2small + "</p>" : "");
+  // the same message under many keys: C2 = 0x61 XOR Z2
+  const c2 = new Uint32Array(256);
+  for (let z = 0; z < 256; z++) c2[0x61 ^ z] = s.hist2[z];
+  const order = Array.from({ length: 256 }, (_, k) => k).sort((a, b) => c2[b] - c2[a] || a - b).slice(0, 4);
+  const mx = Math.max(1, c2[order[0]]) * 1.25;
+  rc.innerHTML = "<b>" + t.m2top + "</b>" + barsHTML(order.map(v => ({ l: '<span class="mono">' + hx2(v).toUpperCase() + "</span>", v: c2[v], txt: fmtInt(c2[v]), hl: v === 0x61 })), mx, s.n / 256) +
+    '<p class="note" style="margin:6px 0 0">┆ ' + t.m2exp(fmtInt(Math.round(s.n / 256))) + "</p>";
+}
+let RUN2 = 0;
+function run2() {
+  const total = app.s2n, CH = 4000, id = ++RUN2;
+  app.s2 = { zero: [0, 0, 0], hist2: new Uint32Array(256), n: 0, total: total };
+  let lastDraw = 0;
+  const step = () => {
+    if (id !== RUN2) return;
+    const t0 = performance.now();
+    while (app.s2.n < total && performance.now() - t0 < 40) {
+      const n = Math.min(CH, total - app.s2.n);
+      const keys = new Uint8Array(16 * n); crypto.getRandomValues(keys);
+      countZeros(keys, n, app.s2);
+    }
+    if (app.s2.n >= total || performance.now() - lastDraw > 120) { updateM2(); lastDraw = performance.now(); }
+    if (app.s2.n < total) setTimeout(step, 0);
+  };
+  step();
+}
+
+// mistake 3
+function parseIV(s) { const b = parseKeyHex(s); return b && b.length === 3 ? b : null; }
+function renderM3() {
+  const t = L();
+  const N = Math.pow(2, 24), n50 = Math.round(Math.sqrt(2 * Math.log(2) * N));
+  const pkRow = k => '<span class="ph">' + t.m3pk(k) + '</span><label class="note">' + t.m3ivLbl + ' <input class="ivin mono" data-field="iv' + k + '" spellcheck="false" value="' + esc(k === 1 ? app.iv1 : app.iv2) + '"></label><span id="pk' + k + 'key" class="note mono"></span>';
+  return '<div class="card"><h3><span class="mtag">3/3</span>' + t.m3h + "</h3>" +
+    '<div class="wep"><span class="part iv">' + t.m3iv + "<small>" + t.m3iv_s + '</small></span><span class="op">+</span>' +
+      '<span class="part role-key">' + KEY_SVG.replace('width="34"', 'width="26"') + " " + t.m3sec + ' <span class="mono" style="font-weight:400">' + bytesHex(WEP_SECRET, " ").toUpperCase() + "</span><small>" + t.m3sec_s + '</small></span><span class="op">=</span>' +
+      '<span class="part role-key">' + t.m3rc4 + "<small>" + t.m3rc4_s + "</small></span></div>" +
+    '<div class="pk">' + pkRow(1) + pkRow(2) + "</div>" +
+    '<div class="btns"><button data-action="iv-same">' + t.m3same + '</button><button data-action="iv-rand">' + t.m3new + "</button></div>" +
+    '<div id="m3out"></div></div>' +
+    '<div class="card"><h3>' + t.m3bday + "</h3><p style=\"margin:0 0 8px\">" + t.m3bdayP(fmtInt(N), fmtInt(n50)) + "</p>" +
+    '<div class="btns"><button class="dark" data-action="ivrun">' + t.m3send + '</button></div><div id="m3bd" style="margin-top:8px"></div></div>';
+}
+function updateM3() {
+  const o = document.getElementById("m3out");
+  if (!o) return;
+  const t = L();
+  const iv1 = parseIV(app.iv1), iv2 = parseIV(app.iv2);
+  ["1", "2"].forEach(k => { const e = document.getElementById("pk" + k + "key"); const iv = k === "1" ? iv1 : iv2;
+    e.textContent = iv ? t.m3rc4 + ": " + bytesHex(wepKey(iv, WEP_SECRET), " ").toUpperCase() : ""; });
+  if (!iv1 || !iv2) { o.innerHTML = '<p class="err">' + t.m3ivErr + "</p>"; return; }
+  const enc = s => { const b = new TextEncoder().encode(s), p = new Uint8Array(4 + b.length); p.set(SNAP, 0); p.set(b, 4); return p; };
+  const P1 = enc(t.pPrinter), P2 = enc(t.pDoor);
+  const Z1 = keystream(wepKey(iv1, WEP_SECRET), P1.length), Z2 = keystream(wepKey(iv2, WEP_SECRET), P2.length);
+  const C1 = xorBytes(P1, Z1), C2 = xorBytes(P2, Z2);
+  const n = P2.length;   // the shorter packet
+  const X = xorBytes(C1, C2), PX = xorBytes(P1, P2);
+  let equal = true; for (let k = 0; k < n; k++) if (X[k] !== PX[k]) equal = false;
+  const SH = 16;
+  const ch = x => x === 32 ? "␣" : (x > 32 && x < 127 ? esc(String.fromCharCode(x)) : "·");
+  const row = (cls, lbl, arr, fn) => '<tr class="' + cls + '"><td class="lbl">' + lbl + "</td>" + Array.from(arr.slice(0, SH), (x, k) => '<td class="b' + (fn ? fn(k) : "") + '">' + hx2(x) + "</td>").join("") + '<td class="b">…</td></tr>';
+  const txtRow = arr => '<tr class="rt"><td class="lbl"></td>' + Array.from(arr.slice(0, SH), x => '<td class="b">' + ch(x) + "</td>").join("") + "<td></td></tr>";
+  const gap = '<tr><td style="height:8px"></td></tr>';
+  let h = '<div class="tablewrap"><table class="btable">' +
+    txtRow(P1) + row("rp", t.m3rowP + "1", P1) + row("rz zrow", t.m3rowZ + "1", Z1) + row("rc", t.m3rowC + "1", C1) + gap +
+    txtRow(P2) + row("rp", t.m3rowP + "2", P2) + row("rz zrow", t.m3rowZ + "2", Z2) + row("rc", t.m3rowC + "2", C2) + gap +
+    row("", t.m3x12, X, k => equal && X[k] === 0 ? " eqz" : "") + row("", t.m3p12, PX, k => equal && PX[k] === 0 ? " eqz" : "") + "</table></div>";
+  if (equal) {
+    const rec = xorBytes(xorBytes(C1, C2), P1);
+    let s = ""; for (let k = 4; k < rec.length; k++) s += String.fromCharCode(rec[k]);
+    h += '<div class="result hit"><b>' + t.m3hit + "</b><br>" + t.m3known + '<div class="big" style="margin-top:4px">P2 = AA AA 03 00 + “' + esc(s) + "”</div></div>";
+  } else h += '<div class="result">' + t.m3miss + "</div>";
+  o.innerHTML = h;
+}
+function ivRun() {
+  const seen = new Set();
+  const buf = new Uint8Array(3 * 8192);
+  let n = 0;
+  for (;;) {
+    crypto.getRandomValues(buf);
+    for (let k = 0; k < 8192; k++) {
+      const v = (buf[3 * k] << 16) | (buf[3 * k + 1] << 8) | buf[3 * k + 2];
+      n++;
+      if (seen.has(v)) { app.ivRuns.push(n); if (app.ivRuns.length > 12) app.ivRuns.shift(); updateBd(); return; }
+      seen.add(v);
+    }
+  }
+}
+function updateBd() {
+  const o = document.getElementById("m3bd");
+  if (!o) return;
+  const t = L(), r = app.ivRuns;
+  if (!r.length) { o.innerHTML = ""; return; }
+  o.innerHTML = '<div class="big">' + t.m3after(r[r.length - 1]) + "</div>" +
+    (r.length > 1 ? '<div class="ivruns">' + t.m3runs + " " + r.map(fmtInt).join(", ") + "</div>" : "");
+}
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
+    [render0, render1, render2, render3][app.level]() + "</div>";
+  if (app.level === 0) updateL0();
+  if (app.level === 1) renderL1Body();
+  if (app.level === 2) renderL2Body();
+  if (app.level === 3) { updateM1(); updateM2(); updateM3(); updateBd(); }
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+}
+function goTo(level) {
+  app.level = level;
+  render();
+  view.scrollTop = 0;
+}
+function zoomIn() { if (app.level < 3) goTo(app.level + 1); }
+function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "zoom") zoomIn();
+  else if (a === "goto") goTo(+el.dataset.l);
+  else if (a === "rand-key") { const b = new Uint8Array(16); crypto.getRandomValues(b); setKey(b); }
+  else if (a === "preset-5") setKey(parseKeyHex(SLIDE_KEY));
+  else if (a === "preset-k") setKey(new TextEncoder().encode("Kangaroo"));
+  else if (a === "ksa-reset") ksaGo(0);
+  else if (a === "ksa-prev") ksaGo(app.ksaPos - 1);
+  else if (a === "ksa-next") ksaGo(app.ksaPos + 1);
+  else if (a === "ksa-end") ksaGo(KSA_MAX);
+  else if (a === "prga-reset") prgaGo(0);
+  else if (a === "prga-prev") prgaGo(app.prgaPos - 1);
+  else if (a === "prga-next") prgaGo(app.prgaPos + 1);
+  else if (a === "prga-byte") prgaGo(app.prgaPos === 0 ? 5 : 5 * Math.ceil(app.prgaPos / 5) + (app.prgaPos % 5 === 0 ? 5 : 0));
+  else if (a === "prga-16") prgaGo(5 * (Math.floor(app.prgaPos / 5) + 16));
+  else if (a === "mis") { app.mis = +el.dataset.m; render(); }
+  else if (a === "run1") run1();
+  else if (a === "run2") run2();
+  else if (a === "iv-same") { app.iv2 = app.iv1; const i2 = view.querySelector('input[data-field="iv2"]'); if (i2) i2.value = app.iv2; updateM3(); }
+  else if (a === "iv-rand") { const b = new Uint8Array(3); crypto.getRandomValues(b); app.iv2 = bytesHex(b, " ").toUpperCase(); const i2 = view.querySelector('input[data-field="iv2"]'); if (i2) i2.value = app.iv2; updateM3(); }
+  else if (a === "ivrun") ivRun();
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  const v = e.target.value;
+  if (f === "khex") {
+    const b = parseKeyHex(v);
+    app.keyText = v;
+    if (b) setKey(b, "khex"); else { app.keyErr = true; keyChanged(); }
+  } else if (f === "ktext") {
+    const b = new TextEncoder().encode(v);
+    if (b.length >= 1 && b.length <= 256) setKey(b, "ktext");
+    else { app.keyErr = true; keyChanged(); }
+  }
+  else if (f === "msg") { app.msg = v; updateL0(); }
+  else if (f === "ksapos") ksaGo(+v);
+  else if (f === "iv1" || f === "iv2") { app[f] = v; updateM3(); }
+  else if (f === "s2n") app.s2n = +v;
+});
+view.addEventListener("mouseover", e => {
+  const td = e.target.closest("td[data-i]");
+  if (!td || !L0DATA) return;
+  const i = +td.dataset.i;
+  view.querySelectorAll("td.hot").forEach(x => x.classList.remove("hot"));
+  view.querySelectorAll('td[data-i="' + i + '"]').forEach(x => x.classList.add("hot"));
+  const xl = document.getElementById("xorline");
+  if (xl) xl.textContent = L().xorByte(i, hx2(L0DATA.p[i]), hx2(L0DATA.z[i]), hx2(L0DATA.c[i]));
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Enter" && tag === "BUTTON") return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
+  else if (app.level === 1 && (e.key === "n" || e.key === " ")) { e.preventDefault(); ksaGo(app.ksaPos + 1); }
+  else if (app.level === 1 && e.key === "p") ksaGo(app.ksaPos - 1);
+  else if (app.level === 2 && (e.key === "n" || e.key === " ")) { e.preventDefault(); prgaGo(app.prgaPos + 1); }
+  else if (app.level === 2 && e.key === "p") prgaGo(app.prgaPos - 1);
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+const startStep = parseInt(location.hash.slice(1), 10);
+if (startStep >= 1 && startStep <= 4) app.level = startStep - 1;
+render();
+</script>
+</body>
+</html>

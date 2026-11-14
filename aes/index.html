@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AES explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  --key-b:#E2A60E;   --key-bg:#FDF3DC;
+  --ctr-b:#2FA84F;   --ctr-bg:#E3F4E8;
+  --non-b:#2F6FDB;   --non-bg:#E5EDFB;
+  --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
+  --tag-b:#0E8F9A;  --tag-bg:#DDF2F4;
+  --p:#2F6FDB; --z:#9A6B00; --c:#7446C4;
+  --g0:#2F6FDB; --g1:#2FA84F; --g2:#E5484D; --g3:#E2A60E;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+    --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+    --ct-b:#B596F5; --ct-bg:#2A2142; --tag-b:#4FCFDA; --tag-bg:#12343A;
+    --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+    --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+  --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+  --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
+  --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
+  --ct-b:#B596F5; --ct-bg:#2A2142; --tag-b:#4FCFDA; --tag-bg:#12343A;
+  --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
+  --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+.mono{font-family:var(--mono)}
+sub,sup{line-height:0}
+
+/* frame: the same as the ChaCha20 explorer */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more:hover{filter:brightness(1.08)}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+/* cards and the explanation box */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.err{color:var(--bad);font-weight:600}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+.schwrap{overflow-x:auto}
+.role-pt{border-color:var(--const-b);background:var(--const-bg)}
+.role-key{border-color:var(--key-b);background:var(--key-bg)}
+.role-key2{border-color:var(--key-b);background:var(--key-bg);border-style:dashed}
+.role-ctr{border-color:var(--ctr-b);background:var(--ctr-bg)}
+.role-nonce{border-color:var(--non-b);background:var(--non-bg)}
+.role-ct{border-color:var(--ct-b);background:var(--ct-bg)}
+.role-tag{border-color:var(--tag-b);background:var(--tag-bg)}
+.role-ks{border-color:var(--key-b);background:var(--key-bg)}
+.role-aad{border-color:var(--const-b);background:var(--surface);border-style:dashed}
+.box{background:var(--ink);color:var(--surface);border:0;border-radius:10px;padding:16px 22px;font-size:21px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px}
+.box:hover{background:var(--ink);box-shadow:0 0 0 3px var(--chg)}
+.box small{font-size:12px;font-weight:400;opacity:.8}
+.rnd{position:absolute;top:4px;right:6px;padding:2px 5px;line-height:0;border-radius:5px;color:var(--ink)}
+.node{position:absolute;border-radius:10px;padding:8px 12px;border:1.5px solid;color:var(--ink)}
+.node .nh{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
+.node .nb{font-size:14px;margin:4px 0 2px;line-height:1.5}
+.node small{font-size:12px;color:var(--muted)}
+.inbox{position:absolute;top:0;min-height:70px;border:1.5px solid;border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600}
+.inbox label{display:block}
+.inbox input{display:block;margin-top:3px;width:100%}
+.inbox .tline{display:flex;align-items:center;gap:8px;margin-top:5px;font-weight:600}
+.inbox .tline input{display:inline-block;margin:0;width:24ch}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.tabs button.soonbtn{border-style:dashed;color:var(--muted);cursor:default}
+.tabs button.soonbtn:hover{background:var(--surface)}
+.soonb{font-size:11px;padding:1px 7px;margin-left:4px;border-radius:999px;border:1px dashed var(--muted);color:var(--muted)}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rlabel{font-weight:600;margin-top:8px}
+.pips{display:inline-flex;gap:3px;flex-wrap:wrap}
+.pip{min-width:30px;height:30px;padding:0 6px;font-size:12.5px;font-family:var(--mono);border-radius:6px}
+.pip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.opnow{font-family:var(--mono);background:var(--chg);color:#fff;border-radius:5px;padding:2px 8px}
+.btable{border-collapse:collapse;font-family:var(--mono);font-size:13.5px}
+.btable td,.btable th{padding:3px 8px;text-align:left}
+.btable th{font-family:var(--sans);font-size:12.5px;color:var(--muted);font-weight:600}
+.btable td.lbl{font-family:var(--sans);font-weight:600;font-size:13px;white-space:nowrap}
+.btable tr.click{cursor:pointer}
+.btable tr.click:hover td{background:var(--sunken)}
+.btable tr.on td{background:var(--chg-bg)}
+.tablewrap{overflow-x:auto}
+.inline{font-family:var(--mono);font-size:13.5px}
+.dim{opacity:.4}
+
+/* the 4x4 state */
+figure{margin:0;text-align:center}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:4px}
+.bgrid{display:inline-grid;grid-template-columns:repeat(4,auto);gap:4px}
+.bgrid.lbl5{grid-template-columns:repeat(4,auto) 3.6em}
+.bc{font-family:var(--mono);font-size:14px;width:2.7em;padding:4px 0;border-radius:5px;border:1.5px solid var(--rule);background:var(--surface);text-align:center;cursor:pointer}
+.bgrid.sm .bc{font-size:12.5px;width:2.5em;padding:2px 0}
+.bc.chgd{background:var(--chg-bg);border-color:var(--chg)}
+.bc.bsel{outline:2.5px solid var(--chg);outline-offset:1px;font-weight:700}
+.bc.colsel{border-color:var(--chg);border-width:2px}
+.bc.g0{box-shadow:inset 0 -4px 0 var(--g0)}.bc.g1{box-shadow:inset 0 -4px 0 var(--g1)}
+.bc.g2{box-shadow:inset 0 -4px 0 var(--g2)}.bc.g3{box-shadow:inset 0 -4px 0 var(--g3)}
+.bc.role-pt{border-color:var(--const-b);background:var(--const-bg)}
+.bc.role-key{border-color:var(--key-b);background:var(--key-bg)}
+.bc.role-ct{border-color:var(--ct-b);background:var(--ct-bg)}
+.rowl{font-size:12px;color:var(--chg);font-weight:600;align-self:center;text-align:left;padding-left:4px;white-space:nowrap}
+.rflow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
+.arrow{font-size:24px;color:var(--muted)}
+.mid{display:flex;flex-direction:column;align-items:center;gap:4px}
+.rbox{font-size:17px;padding:12px 20px;align-items:stretch;min-width:200px}
+.rbox .op{font-size:14px;font-weight:500;text-align:left;padding:1px 6px;border-radius:4px}
+.rbox .op:hover{background:var(--chg);color:#fff}
+.rbox .op.off{text-decoration:line-through;opacity:.55}
+.rbox .rt{text-align:center}
+.sign{font-size:28px;font-weight:600}
+.sign.op{width:42px;height:42px;border-radius:50%;background:var(--chg);color:#fff;line-height:40px;text-align:center}
+.oppill{background:var(--chg);color:#fff;border-radius:8px;padding:8px 14px;font-weight:600;font-size:15px;text-align:center}
+.oppill small{display:block;font-weight:400;font-size:12px;opacity:.9}
+
+/* S-box */
+.sbox{border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+.sbox td,.sbox th{width:25px;height:20px;text-align:center;padding:0}
+.sbox th{color:var(--muted);font-weight:600}
+.sbox th.hl{color:var(--chg)}
+.sbox td{border:1px solid var(--rule)}
+.sbox td.rowhl,.sbox td.colhl{background:var(--sunken)}
+.sbox td.hit{background:var(--chg);color:#fff;font-weight:700}
+.sbrow{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.eqtab{font-family:var(--mono);font-size:14px;border-collapse:collapse}
+.eqtab td{padding:3px 6px;white-space:nowrap}
+.eqtab td.res{font-weight:700;color:var(--chg)}
+
+/* step 1 schematic */
+.sch1{position:relative;width:900px;height:300px;color:var(--muted)}
+.sch1 .arrows,.schx .arrows{position:absolute;left:0;top:0}
+.s1-key{left:0;width:410px}
+.s1-pt{left:426px;width:474px}
+.s1-box{position:absolute;left:300px;top:170px;width:200px;height:80px;justify-content:center}
+.s1-ct{left:560px;top:158px;width:340px;height:104px}
+.s1-bob{position:absolute;left:0;top:268px;width:900px;font-size:13.5px;color:var(--ink)}
+.hexrow{font-family:var(--mono);font-size:14px;letter-spacing:.02em}
+.hexrow .d{background:var(--chg);color:#fff;border-radius:3px}
+.flipctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.flipctl input{width:5em}
+
+/* step 4: modes */
+.minputs{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+.mi{position:relative;border:1.5px solid;border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600}
+.mi label{display:block}
+.mi input,.mi textarea{display:block;margin-top:3px}
+.mi textarea{width:100%;resize:none;height:44px;font-size:13.5px}
+.mi .ctrline{display:flex;gap:4px;align-items:center;margin-top:3px}
+.mi .ctrline button{padding:3px 10px}
+.mi input[type=number]{width:8em}
+.mcols{display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:4px}
+.mcol{flex:none;width:212px;display:flex;flex-direction:column;align-items:stretch}
+.vb{border:1.5px solid;border-radius:8px;padding:4px 8px;font-size:12px;color:var(--ink)}
+.vb b{display:block;font-size:12.5px}
+.vb .hx{font-family:var(--mono);font-size:12.5px;line-height:1.45;white-space:nowrap}
+.vb .tx{font-family:var(--mono);font-size:12.5px;white-space:pre;color:var(--muted)}
+.vb.same{outline:3px solid var(--chg);outline-offset:1px}
+.vb .pad{text-decoration:underline dotted;opacity:.6}
+.va{text-align:center;color:var(--muted);font-size:17px;line-height:20px}
+.aesb{background:var(--ink);color:var(--surface);border-radius:8px;text-align:center;padding:5px 6px;font-weight:600;font-size:14px}
+.ktag{display:inline-block;background:var(--key-bg);color:var(--ink);border:1.5px solid var(--key-b);border-radius:4px;padding:0 6px;font-size:12px;margin-left:6px;font-weight:600}
+.ktag.k2{border-style:dashed}
+.xorc{width:30px;height:30px;border-radius:50%;background:var(--chg);color:#fff;text-align:center;line-height:29px;font-size:21px;margin:3px auto}
+.eqs{text-align:center;font-weight:700;font-size:17px;line-height:20px;color:var(--muted)}
+span.bn{background:var(--non-bg);color:var(--ink);border-radius:2px}
+span.bk{background:var(--ctr-bg);color:var(--ink);border-radius:2px;font-weight:700}
+span.hit{background:var(--chg);color:#fff;border-radius:2px}
+.hflow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
+.hflow .vb{min-width:200px}
+.pics{display:flex;gap:18px;flex-wrap:wrap}
+.pics canvas{width:288px;height:180px;image-rendering:pixelated;border:1px solid var(--rule);border-radius:6px;display:block}
+.bullets{margin:6px 0 0;padding-left:20px;font-size:13.5px}
+.bullets li{margin:3px 0}
+.mstrip{display:grid;grid-template-columns:repeat(16,auto);gap:3px;justify-content:start;margin:6px 0}
+.mb{font-family:var(--mono);font-size:12.5px;padding:2px 4px;border-color:var(--ct-b);background:var(--ct-bg)}
+.mb.on{background:var(--chg);color:#fff;border-color:var(--chg)}
+.tagbig{font-family:var(--mono);font-size:15px;font-weight:600}
+.verdict{margin-top:8px;font-weight:600}
+
+/* step 5: comparison */
+.cmp{border-collapse:collapse;font-size:13.5px;width:100%}
+.cmp th,.cmp td{border:1px solid var(--rule);padding:6px 8px;vertical-align:top;text-align:left}
+.cmp th.rh{font-weight:600;background:var(--sunken);width:150px}
+.cmp thead th{background:var(--sunken)}
+.cmp thead button{font-weight:700;padding:4px 10px}
+.cmp thead th.ref{color:var(--muted);font-weight:600}
+.cmp td.g{background:var(--ctr-bg)}
+.cmp td.b{background:var(--chg-bg)}
+.cmp td.ref{color:var(--muted)}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== AES core ===================== */
+// CORE-BEGIN
+/* AES-128 (FIPS-197) and four modes: ECB and CTR (NIST SP 800-38A), GCM (NIST SP 800-38D, the original
+   McGrew and Viega spec), XTS (IEEE 1619, NIST SP 800-38E). Written plainly, with loops, for reading,
+   not for speed. Bytes are Uint8Array. The state is 16 bytes; byte i sits in row i % 4, column i / 4
+   (the 16 bytes fill the 4x4 table column by column, as in FIPS-197). */
+
+// multiply by x (= 02) in GF(2^8) with the AES polynomial x^8 + x^4 + x^3 + x + 1 (0x11b)
+function xtime(a) { a = a << 1; if (a & 0x100) a ^= 0x11b; return a; }
+// multiply two bytes in GF(2^8): add (XOR) a shifted copy of a for every 1 bit of b
+function gmul(a, b) { let r = 0; while (b) { if (b & 1) r ^= a; a = xtime(a); b >>= 1; } return r; }
+function rotl8(x, n) { return ((x << n) | (x >> (8 - n))) & 255; }
+
+// The S-box is computed, not typed in: the inverse in GF(2^8) (0 stays 0), then the affine map of FIPS-197 5.1.1.
+const SBOX = new Uint8Array(256), INV_SBOX = new Uint8Array(256), GF_INV = new Uint8Array(256);
+(function makeSbox() {
+  // powers of 03 run through all 255 non-zero bytes: if a = 03^k then 1/a = 03^(255-k)
+  const exp = new Uint8Array(256), log = new Uint8Array(256);
+  let x = 1;
+  for (let k = 0; k < 255; k++) { exp[k] = x; log[x] = k; x = x ^ xtime(x); }
+  for (let a = 0; a < 256; a++) {
+    const inv = a === 0 ? 0 : exp[(255 - log[a]) % 255];
+    GF_INV[a] = inv;
+    const s = inv ^ rotl8(inv, 1) ^ rotl8(inv, 2) ^ rotl8(inv, 3) ^ rotl8(inv, 4) ^ 0x63;
+    SBOX[a] = s; INV_SBOX[s] = a;
+  }
+})();
+
+// key schedule (FIPS-197 5.2): 16-byte key -> 11 round keys of 16 bytes; round key 0 is the key itself
+function expandKey(key) {
+  const w = new Uint8Array(176);
+  for (let i = 0; i < 16; i++) w[i] = key[i];
+  let rcon = 1;
+  for (let i = 4; i < 44; i++) {
+    let t0 = w[4 * i - 4], t1 = w[4 * i - 3], t2 = w[4 * i - 2], t3 = w[4 * i - 1];
+    if (i % 4 === 0) {                       // RotWord, SubWord, XOR Rcon
+      const u = t0;
+      t0 = SBOX[t1] ^ rcon; t1 = SBOX[t2]; t2 = SBOX[t3]; t3 = SBOX[u];
+      rcon = xtime(rcon);
+    }
+    w[4 * i] = w[4 * i - 16] ^ t0; w[4 * i + 1] = w[4 * i - 15] ^ t1;
+    w[4 * i + 2] = w[4 * i - 14] ^ t2; w[4 * i + 3] = w[4 * i - 13] ^ t3;
+  }
+  const rk = [];
+  for (let r = 0; r <= 10; r++) rk.push(w.slice(16 * r, 16 * r + 16));
+  return rk;
+}
+
+// the four round steps, in place on the state s
+function subBytes(s) { for (let i = 0; i < 16; i++) s[i] = SBOX[s[i]]; }
+function shiftRows(s) {                      // row r moves r places to the left
+  const t = s.slice();
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) s[r + 4 * c] = t[r + 4 * ((c + r) % 4)];
+}
+function mixColumns(s) {                     // each column times the matrix [2 3 1 1; 1 2 3 1; 1 1 2 3; 3 1 1 2]
+  for (let c = 0; c < 4; c++) {
+    const a0 = s[4 * c], a1 = s[4 * c + 1], a2 = s[4 * c + 2], a3 = s[4 * c + 3];
+    s[4 * c]     = xtime(a0) ^ (xtime(a1) ^ a1) ^ a2 ^ a3;
+    s[4 * c + 1] = a0 ^ xtime(a1) ^ (xtime(a2) ^ a2) ^ a3;
+    s[4 * c + 2] = a0 ^ a1 ^ xtime(a2) ^ (xtime(a3) ^ a3);
+    s[4 * c + 3] = (xtime(a0) ^ a0) ^ a1 ^ a2 ^ xtime(a3);
+  }
+}
+function addRoundKey(s, k) { for (let i = 0; i < 16; i++) s[i] ^= k[i]; }
+// the inverse steps (FIPS-197 5.3), used to decrypt
+function invSubBytes(s) { for (let i = 0; i < 16; i++) s[i] = INV_SBOX[s[i]]; }
+function invShiftRows(s) {
+  const t = s.slice();
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) s[r + 4 * ((c + r) % 4)] = t[r + 4 * c];
+}
+function invMixColumns(s) {
+  for (let c = 0; c < 4; c++) {
+    const a0 = s[4 * c], a1 = s[4 * c + 1], a2 = s[4 * c + 2], a3 = s[4 * c + 3];
+    s[4 * c]     = gmul(a0, 14) ^ gmul(a1, 11) ^ gmul(a2, 13) ^ gmul(a3, 9);
+    s[4 * c + 1] = gmul(a0, 9) ^ gmul(a1, 14) ^ gmul(a2, 11) ^ gmul(a3, 13);
+    s[4 * c + 2] = gmul(a0, 13) ^ gmul(a1, 9) ^ gmul(a2, 14) ^ gmul(a3, 11);
+    s[4 * c + 3] = gmul(a0, 11) ^ gmul(a1, 13) ^ gmul(a2, 9) ^ gmul(a3, 14);
+  }
+}
+
+// one block, with the round keys already made
+function encryptBlock(rk, inp) {
+  const s = Uint8Array.from(inp);
+  addRoundKey(s, rk[0]);
+  for (let r = 1; r <= 10; r++) {
+    subBytes(s); shiftRows(s);
+    if (r < 10) mixColumns(s);               // no MixColumns in the last round
+    addRoundKey(s, rk[r]);
+  }
+  return s;
+}
+function decryptBlock(rk, inp) {
+  const s = Uint8Array.from(inp);
+  addRoundKey(s, rk[10]);
+  for (let r = 9; r >= 0; r--) {
+    invShiftRows(s); invSubBytes(s); addRoundKey(s, rk[r]);
+    if (r > 0) invMixColumns(s);
+  }
+  return s;
+}
+// the same encryption, but keeping the state after every step (for steps 2 and 3 of the page)
+function aesTrace(key, inp) {
+  const rk = expandKey(key);
+  const s = Uint8Array.from(inp);
+  addRoundKey(s, rk[0]);
+  const rounds = [{ out: s.slice() }];       // "round 0": P XOR K0
+  for (let r = 1; r <= 10; r++) {
+    const start = s.slice();
+    subBytes(s); const sb = s.slice();
+    shiftRows(s); const sr = s.slice();
+    if (r < 10) mixColumns(s);
+    const mc = s.slice();
+    addRoundKey(s, rk[r]);
+    rounds.push({ start: start, sb: sb, sr: sr, mc: mc, out: s.slice() });
+  }
+  return { rk: rk, rounds: rounds, out: s.slice() };
+}
+
+// ---- modes ----
+function pkcs7(p) {                          // PKCS#7: add n bytes of value n, n = 1..16
+  const n = 16 - (p.length % 16);
+  const out = new Uint8Array(p.length + n);
+  out.set(p);
+  for (let i = p.length; i < out.length; i++) out[i] = n;
+  return out;
+}
+function ecbEncrypt(key, p) {                // p must be a whole number of blocks
+  const rk = expandKey(key), c = new Uint8Array(p.length);
+  for (let i = 0; i < p.length; i += 16) c.set(encryptBlock(rk, p.subarray(i, i + 16)), i);
+  return c;
+}
+// +1 on the last 4 bytes of the counter block, big-endian, mod 2^32 (inc32 of SP 800-38D)
+function inc32(cb) {
+  const o = Uint8Array.from(cb);
+  for (let i = 15; i >= 12; i--) { o[i] = (o[i] + 1) & 255; if (o[i] !== 0) break; }
+  return o;
+}
+function counterBlock(nonce12, ctr) {        // nonce (12 bytes) followed by a 32-bit counter
+  const b = new Uint8Array(16);
+  b.set(nonce12);
+  b[12] = (ctr >>> 24) & 255; b[13] = (ctr >>> 16) & 255; b[14] = (ctr >>> 8) & 255; b[15] = ctr & 255;
+  return b;
+}
+// CTR: keystream block j = AES_K(counter block j); C = P XOR keystream; any length, no padding
+function ctrEncrypt(key, cb0, p) {
+  const rk = expandKey(key), c = new Uint8Array(p.length), z = new Uint8Array(p.length);
+  let cb = Uint8Array.from(cb0);
+  for (let i = 0; i < p.length; i += 16) {
+    const k = encryptBlock(rk, cb);
+    for (let j = 0; j < 16 && i + j < p.length; j++) { z[i + j] = k[j]; c[i + j] = p[i + j] ^ k[j]; }
+    cb = inc32(cb);
+  }
+  return { c: c, z: z };
+}
+
+// GF(2^128) for GHASH, with BigInt; bit 0 is the leftmost bit of the block (SP 800-38D 6.3, Algorithm 1)
+function toBig(b) { let x = 0n; for (let i = 0; i < b.length; i++) x = (x << 8n) | BigInt(b[i]); return x; }
+function fromBig(x) { const b = new Uint8Array(16); for (let i = 15; i >= 0; i--) { b[i] = Number(x & 255n); x >>= 8n; } return b; }
+const GCM_R = 0xe1n << 120n;
+function gfMul(X, Y) {
+  let Z = 0n, V = Y;
+  for (let i = 127; i >= 0; i--) {
+    if ((X >> BigInt(i)) & 1n) Z ^= V;
+    V = (V & 1n) ? (V >> 1n) ^ GCM_R : V >> 1n;
+  }
+  return Z;
+}
+// GHASH_H(A, C): X = 0; for every 16-byte block (A, then C, zero-filled; then the lengths): X = (X XOR block) * H
+function ghash(H, a, c) {
+  const h = toBig(H);
+  let X = 0n;
+  const steps = [];
+  function feed(kind, n, blk) { X = gfMul(X ^ toBig(blk), h); steps.push({ kind: kind, n: n, block: blk, x: fromBig(X) }); }
+  for (let i = 0; i < a.length; i += 16) { const b = new Uint8Array(16); b.set(a.subarray(i, i + 16)); feed("a", i / 16 + 1, b); }
+  for (let i = 0; i < c.length; i += 16) { const b = new Uint8Array(16); b.set(c.subarray(i, i + 16)); feed("c", i / 16 + 1, b); }
+  const len = new Uint8Array(16), la = a.length * 8, lc = c.length * 8;   // 64-bit bit lengths, big-endian
+  for (let i = 0; i < 4; i++) { len[7 - i] = (la >>> (8 * i)) & 255; len[15 - i] = (lc >>> (8 * i)) & 255; }
+  feed("len", 0, len);
+  return { x: fromBig(X), steps: steps };
+}
+function xor16(a, b) { const o = new Uint8Array(16); for (let i = 0; i < 16; i++) o[i] = a[i] ^ b[i]; return o; }
+// GCM with a 12-byte nonce: H = AES_K(0), J0 = nonce || 1, data from counter 2, tag = GHASH XOR AES_K(J0)
+function gcmEncrypt(key, iv, p, a) {
+  const rk = expandKey(key);
+  const H = encryptBlock(rk, new Uint8Array(16));
+  const j0 = counterBlock(iv, 1);
+  const S = encryptBlock(rk, j0);
+  const e = ctrEncrypt(key, inc32(j0), p);
+  const g = ghash(H, a, e.c);
+  return { c: e.c, z: e.z, H: H, S: S, steps: g.steps, x: g.x, tag: xor16(g.x, S) };
+}
+function gcmTag(key, iv, c, a) {            // what Bob computes before he decrypts
+  const rk = expandKey(key);
+  return xor16(ghash(encryptBlock(rk, new Uint8Array(16)), a, c).x, encryptBlock(rk, counterBlock(iv, 1)));
+}
+
+// XTS: the tweak is a 128-bit number stored little-endian; times alpha = shift left by 1, XOR 0x87 on overflow
+function mulAlpha(t) {
+  const o = new Uint8Array(16);
+  let carry = 0;
+  for (let i = 0; i < 16; i++) { o[i] = ((t[i] << 1) | carry) & 255; carry = t[i] >> 7; }
+  if (carry) o[0] ^= 0x87;
+  return o;
+}
+function sectorBytes(n) {                    // the sector number as 16 bytes, little-endian
+  const b = new Uint8Array(16);
+  let x = BigInt(n);
+  for (let i = 0; i < 16; i++) { b[i] = Number(x & 255n); x >>= 8n; }
+  return b;
+}
+// XTS-AES-128 on whole blocks (this page does not need ciphertext stealing): C_j = AES_K1(P_j XOR T_j) XOR T_j
+function xtsEncrypt(k1, k2, tweak16, p) {
+  const rk1 = expandKey(k1), rk2 = expandKey(k2);
+  let T = encryptBlock(rk2, tweak16);
+  const T0 = T.slice(), tweaks = [], c = new Uint8Array(p.length);
+  for (let i = 0; i < p.length; i += 16) {
+    tweaks.push(T);
+    const y = encryptBlock(rk1, xor16(p.subarray(i, i + 16), T));
+    c.set(xor16(y, T), i);
+    T = mulAlpha(T);
+  }
+  return { c: c, T0: T0, tweaks: tweaks };
+}
+function xtsDecrypt(k1, k2, tweak16, c) {
+  const rk1 = expandKey(k1), rk2 = expandKey(k2);
+  let T = encryptBlock(rk2, tweak16);
+  const p = new Uint8Array(c.length);
+  for (let i = 0; i < c.length; i += 16) {
+    p.set(xor16(decryptBlock(rk1, xor16(c.subarray(i, i + 16), T)), T), i);
+    T = mulAlpha(T);
+  }
+  return p;
+}
+
+function parseHex(text, n) {
+  const s = text.replace(/[\s:]/g, "");
+  if (!/^[0-9a-fA-F]*$/.test(s) || s.length !== 2 * n) return null;
+  const b = new Uint8Array(n);
+  for (let i = 0; i < n; i++) b[i] = parseInt(s.substr(2 * i, 2), 16);
+  return b;
+}
+function hexB(s) { const b = new Uint8Array(s.length / 2); for (let i = 0; i < b.length; i++) b[i] = parseInt(s.substr(2 * i, 2), 16); return b; }
+function bytesHex(b) { return Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); }
+
+/* Test vectors. Every expected value below was also recomputed on 2026-11-14, in two independent ways:
+   OpenSSL 3.0.13 ("openssl enc -aes-128-ecb / -aes-128-ctr -nopad -K -iv") and the Python package
+   "cryptography" 41 (OpenSSL backend, AESGCM and modes.XTS), plus a separate pure-Python AES/GHASH/XTS
+   written for the check. The only vector OpenSSL refuses (XTS vector 1: K1 = K2) came from the pure-Python
+   code alone; it gives the published value. */
+// FIPS-197 Appendix C.1 (AES-128)
+const FIPS_C1 = { key: "000102030405060708090a0b0c0d0e0f", pt: "00112233445566778899aabbccddeeff", ct: "69c4e0d86a7b0430d8cdb78070b4c55a" };
+// FIPS-197 Appendix B (the example also used as the start values of this page): states at the start of round 1,
+// after SubBytes, ShiftRows, MixColumns; round key 1; start of round 2; round key 10; output
+const FIPS_B = { key: "2b7e151628aed2a6abf7158809cf4f3c", pt: "3243f6a8885a308d313198a2e0370734",
+  r1: ["193de3bea0f4e22b9ac68d2ae9f84808", "d42711aee0bf98f1b8b45de51e415230", "d4bf5d30e0b452aeb84111f11e2798e5", "046681e5e0cb199a48f8d37a2806264c"],
+  rk1: "a0fafe1788542cb123a339392a6c7605", r2start: "a49c7ff2689f352b6b5bea43026a5049",
+  rk10: "d014f9a8c9ee2589e13f0cc8b6630ca6", ct: "3925841d02dc09fbdc118597196a0b32" };
+// NIST SP 800-38A, F.1.1 (ECB-AES128.Encrypt) and F.5.1 (CTR-AES128.Encrypt); same key as FIPS-197 Appendix B
+const SP_PT = "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e5130c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710";
+const SP_ECB = "3ad77bb40d7a3660a89ecaf32466ef97f5d3d58503b9699de785895a96fdbaaf43b1cd7f598ece23881b00e3ed0306887b0c785e27e8ad3f8223207104725dd4";
+const SP_CTR_IV = "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";   // the 4 increments never carry past the last 32 bits, so inc32 = SP 800-38A's +1
+const SP_CTR = "874d6191b620e3261bef6864990db6ce9806f66b7970fdff8617187bb9fffdff5ae4df3edbd5d35e5b4f09020db03eab1e031dda2fbe03d1792170a0f3009cee";
+// McGrew and Viega, "The Galois/Counter Mode of Operation (GCM)", Appendix B, test cases 1 to 4 (AES-128)
+const GCM_K3 = "feffe9928665731c6d6a8f9467308308", GCM_IV3 = "cafebabefacedbaddecaf888";
+const GCM_P3 = "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a721c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255";
+const GCM_C3 = "42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091473f5985";
+const GCM_TESTS = [
+  { n: 1, k: "00000000000000000000000000000000", iv: "000000000000000000000000", p: "", a: "", c: "", t: "58e2fccefa7e3061367f1d57a4e7455a" },
+  { n: 2, k: "00000000000000000000000000000000", iv: "000000000000000000000000", p: "00000000000000000000000000000000", a: "",
+    c: "0388dace60b6a392f328c2b971b2fe78", t: "ab6e47d42cec13bdf53a67b21257bddf", h: "66e94bd4ef8a2c3b884cfa59ca342b2e" },
+  { n: 3, k: GCM_K3, iv: GCM_IV3, p: GCM_P3, a: "", c: GCM_C3, t: "4d5c2af327cd64a62cf35abd2ba6fab4" },
+  { n: 4, k: GCM_K3, iv: GCM_IV3, p: GCM_P3.slice(0, 120), a: "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+    c: GCM_C3.slice(0, 120), t: "5bc94fbc3221a5db94fae95ae7121a47" },
+];
+// IEEE P1619/D16 Annex B (XTS-AES-128), vectors 1, 2, 3 and the first 48 bytes of vector 4 (512 bytes of 00..ff twice);
+// the tweak is the data unit sequence number, little-endian
+const XTS_TESTS = [
+  { n: 1, k1: "00000000000000000000000000000000", k2: "00000000000000000000000000000000", tw: "00000000000000000000000000000000",
+    p: "00".repeat(32), c: "917cf69ebd68b2ec9b9fe9a3eadda692cd43d2f59598ed858c02c2652fbf922e" },
+  { n: 2, k1: "11".repeat(16), k2: "22".repeat(16), tw: "33333333330000000000000000000000",
+    p: "44".repeat(32), c: "c454185e6a16936e39334038acef838bfb186fff7480adc4289382ecd6d394f0" },
+  { n: 3, k1: "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0", k2: "22".repeat(16), tw: "33333333330000000000000000000000",
+    p: "44".repeat(32), c: "af85336b597afc1a900b2eb21ec949d292df4c047e0b21532186a5971a227a89" },
+  { n: 4, k1: "27182818284590452353602874713526", k2: "31415926535897932384626433832795", tw: "00000000000000000000000000000000",
+    p: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+    c: "27a7479befa1d476489f308cd4cfa6e2a96e4bbe3208ff25287dd3819616e89cc78cf7f5e543445f8333d8fa7f560000" },
+];
+
+function selfTest() {
+  const fails = [];
+  if (SBOX[0x00] !== 0x63 || SBOX[0x53] !== 0xed) fails.push("S-box");                      // FIPS-197 5.1.1 and Fig. 7
+  for (let a = 1; a < 256; a++) if (gmul(a, GF_INV[a]) !== 1) { fails.push("GF(2^8) inverse"); break; }
+  const rk1 = expandKey(hexB(FIPS_C1.key));
+  if (bytesHex(encryptBlock(rk1, hexB(FIPS_C1.pt))) !== FIPS_C1.ct) fails.push("AES-128 (FIPS-197 C.1)");
+  if (bytesHex(decryptBlock(rk1, hexB(FIPS_C1.ct))) !== FIPS_C1.pt) fails.push("AES-128 decryption (C.1)");
+  const tr = aesTrace(hexB(FIPS_B.key), hexB(FIPS_B.pt)), R1 = tr.rounds[1];
+  if ([R1.start, R1.sb, R1.sr, R1.mc].some((s, i) => bytesHex(s) !== FIPS_B.r1[i]) || bytesHex(tr.rk[1]) !== FIPS_B.rk1 ||
+      bytesHex(tr.rounds[2].start) !== FIPS_B.r2start || bytesHex(tr.rk[10]) !== FIPS_B.rk10 || bytesHex(tr.out) !== FIPS_B.ct)
+    fails.push("rounds (FIPS-197 B)");
+  if (bytesHex(ecbEncrypt(hexB(FIPS_B.key), hexB(SP_PT))) !== SP_ECB) fails.push("ECB (SP 800-38A F.1.1)");
+  if (bytesHex(ctrEncrypt(hexB(FIPS_B.key), hexB(SP_CTR_IV), hexB(SP_PT)).c) !== SP_CTR) fails.push("CTR (SP 800-38A F.5.1)");
+  for (const t of GCM_TESTS) {
+    const g = gcmEncrypt(hexB(t.k), hexB(t.iv), hexB(t.p), hexB(t.a));
+    if (bytesHex(g.c) !== t.c || bytesHex(g.tag) !== t.t || (t.h && bytesHex(g.H) !== t.h) ||
+        bytesHex(gcmTag(hexB(t.k), hexB(t.iv), g.c, hexB(t.a))) !== t.t) fails.push("GCM test case " + t.n);
+  }
+  for (const t of XTS_TESTS) {
+    const x = xtsEncrypt(hexB(t.k1), hexB(t.k2), hexB(t.tw), hexB(t.p));
+    if (bytesHex(x.c) !== t.c || bytesHex(xtsDecrypt(hexB(t.k1), hexB(t.k2), hexB(t.tw), x.c)) !== t.p) fails.push("XTS vector " + t.n);
+  }
+  if (bytesHex(sectorBytes(0x3333333333)) !== XTS_TESTS[1].tw) fails.push("XTS sector number");
+  const pad = pkcs7(new Uint8Array(13));
+  if (pad.length !== 16 || pad[15] !== 3 || pkcs7(new Uint8Array(16)).length !== 32) fails.push("PKCS#7");
+  return fails;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+function plN(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n === 1) return one;
+  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return few;
+  return many;
+}
+const OPS = ["SubBytes", "ShiftRows", "MixColumns", "AddRoundKey"];
+const T = {
+  en: {
+    title: "AES explorer", home: "All simulators",
+    intro: "From the outside in: one block, the rounds inside, then the modes that turn AES into real encryption.",
+    stepOf: n => "Step " + n + " of 5 · AES",
+    steps: [["Black box", "16-byte key and block in, 16 bytes out"], ["Inside", "10 rounds, 11 round keys"],
+            ["One round", "SubBytes, ShiftRows, MixColumns, AddRoundKey"], ["Modes", "ECB, CTR, GCM, XTS on a message"],
+            ["Comparison", "which mode for what"]],
+    explain: [
+      ["One block in, one block out", "AES-128 takes a 16-byte key K and exactly one 16-byte block P, and gives one 16-byte block C. Bob, with the same key, runs it backwards and gets P back. That is all a block cipher does: on its own it is not a way to encrypt a message. Click the AES box to look inside."],
+      ["Ten rounds on a 4×4 table", "The 16 bytes are written into a 4×4 table, the state, column by column. First the key is XORed in, then 10 rounds mix the state, each with its own round key made from K. Pick a round, or click the round box to see its four steps."],
+      ["Four simple steps", "Every round does four things to the state: SubBytes swaps each byte using a fixed table, ShiftRows moves the rows, MixColumns mixes each column, AddRoundKey XORs in the round key. Changed bytes are orange. Click a byte to follow it."],
+      ["Modes: from one block to a message", "A mode says how to use the one-block AES on a message of any length. Pick a mode. All four use the same key K and the same message P, and every value is computed live."],
+      ["Which mode for what", "The four modes side by side, with ChaCha20-Poly1305 from Lecture 2 as a reference. Click a mode name to open it."]],
+    selfOk: "✓ checked against FIPS-197, NIST SP 800-38A, the GCM spec and IEEE 1619 test vectors", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back",
+    randKey: "random key", randNonce: "random nonce",
+    keyShort: "secret key K (16 bytes = 128 bits, hex)", ptShort: "plaintext block P (16 bytes, hex)", asText: "as text:", txtPh: "type 16 characters",
+    boxAES_s: "click to look inside", nodeCt: "ciphertext block C", ctCap: "16 bytes, always",
+    errKey: "The key must be exactly 16 bytes (32 hex digits).", errPt: "The block must be exactly 16 bytes (32 hex digits).",
+    bob: (c, p) => "Bob: AES⁻¹ with the same K turns C = " + c + " back into P = " + p + " ✓",
+    startNote: "The start values are the example from the AES standard (FIPS-197, Appendix B), so every round can be compared with the standard.",
+    cardFlip: "Change one bit of P", flipLbl: "flip bit", flipNote: "Pick any bit of P (0 is the leftmost). About half of the 128 bits of C change, and in no pattern you could predict: that is what a good block cipher does.",
+    rowP: "P", rowP2: "P, one bit flipped", rowC: "C", rowC2: "new C", flipCount: n => n + " of 128 bits of C changed",
+    cardOne: "Only one block", oneTxt: "AES alone encrypts exactly 16 bytes, and the same block with the same key always gives the same C. A longer message has to be cut into blocks, and how you do that matters: encrypt each block alone (ECB) and equal blocks give equal ciphertext; run AES on a counter (CTR) and you get a keystream, just like ChaCha20. That is what the modes in step 4 are for.",
+    goModes: "Go to the modes (step 4) →",
+    usesLine: (k, p) => "Key K = " + k + " and block P = " + p + " come from step 1.",
+    rN: r => r === 0 ? "start: P XOR the first round key K0" : "round " + r + " of 10" + (r === 10 ? ": the last round, without MixColumns" : ""),
+    pipNote: "Round 0 is only the first AddRoundKey (P XOR K0). AES-128 has 10 rounds; AES-192 and AES-256 have 12 and 14.",
+    cardRound: r => r === 0 ? "The start: AddRoundKey with K0 = K" : "Round " + r + " of 10",
+    before: r => r === 0 ? "plaintext P" : r === 1 ? "start of round 1 (P XOR K0)" : "after round " + (r - 1),
+    after: r => r === 0 ? "after round 0" : r === 10 ? "after round 10 = ciphertext C" : "after round " + r,
+    rkCap: r => "round key K" + r, roundBox: r => r === 0 ? "start" : "round " + r, onlyARK: "AddRoundKey only",
+    boxHint: "click a step to see it", cardAll: "All rounds at a glance (click a row)",
+    thRound: "round", thKey: "round key", thState: "state after the round", rowStart: "0 (start)", isC: " = C",
+    ksNote: "The key schedule makes 11 round keys of 16 bytes from K (K0 = K). Each new 4-byte word is the word before it XOR the word 4 places back; every fourth word is first rotated, put through the S-box and XORed with a round constant.",
+    layout: "The 16 bytes fill the table column by column: bytes 0 to 3 are the first column.",
+    aesni: "<b>AES-NI.</b> Modern Intel and AMD processors have an instruction (AESENC) that runs one whole round on 16 bytes, and ARM processors have similar ones. That is why AES-CTR is so fast on a laptop: about 5.8 GB/s with these instructions and 0.6 GB/s without (Lecture 2).",
+    rN3: r => "round " + r + " of 10" + (r === 10 ? " (the last round has no MixColumns)" : ""),
+    bPrev: "◀ previous", bNext: "next ▶", opK: k => "step " + k + " / 4",
+    cardOp: (r, op) => "Round " + r + ", step " + (op + 1) + ": " + OPS[op],
+    capBefore: "before", capAfter: "after", noMC: "(not in round 10)",
+    exSB: "Every byte is replaced by another byte from a fixed table, the S-box. This is the one step that is not linear, and it is what makes AES hard to undo without the key. Click any byte to see its lookup.",
+    sbLook: (b, hi, lo, out, r, c) => "The byte in row " + r + ", column " + c + " is " + b + ": look in row " + hi + ", column " + lo + " of the S-box and you get " + out + ".",
+    sboxCap: "the AES S-box: row = first hex digit, column = second hex digit",
+    timing: "<b>Why this table matters.</b> Fast AES in software reads big tables like this one, and which entry it reads depends on the key. The processor cache remembers which parts were read, so an attacker who measures time can learn the key (a cache-timing attack). AES-NI does the round in hardware without tables, and ChaCha20 has no tables at all: that is why both are safe here.",
+    exSR: "Row 0 stays. Row 1 moves 1 place to the left, row 2 moves 2, row 3 moves 3; bytes that fall off the left come back on the right. The coloured line under a byte shows its old column: afterwards every column holds one byte from each old column.",
+    shiftL: n => n === 0 ? "stays" : "← " + n,
+    exMC: "Each column of 4 bytes is mixed into 4 new bytes, so every byte of the column depends on all 4 old ones. Together with ShiftRows, after two rounds every byte depends on every input byte. Click a column.",
+    mcRule: "· multiplies two bytes in GF(2⁸): 02·x moves x one bit to the left and, if a bit falls off the top, XORs in 1b; 03·x = 02·x ⊕ x. ⊕ is XOR. There are no carries: the result is always one byte.",
+    mcCol: c => "column " + c, mcSkip: "The last round has no MixColumns: the state goes through unchanged.",
+    exARK: "The round key is XORed into the state, byte by byte. The other three steps are the same for everybody: this is where the key comes in. Click a byte.",
+    arkLine: (i, a, k, o) => "byte " + i + ":  " + a + " ⊕ " + k + " = " + o,
+    toModes: "From one block to a message: the modes (step 4) →",
+    modeNames: { ecb: "Electronic Codebook", ctr: "Counter mode", gcm: "Galois/Counter Mode", xts: "for disks" },
+    cbcName: "Cipher Block Chaining", soonBadge: "coming soon", cbcSoon: "CBC and the padding-oracle attack will be added here.",
+    cardInputs: "Inputs", msgShort: "message P (at most 63 bytes here)", nonceShort: "nonce (12 bytes): new for every message",
+    aadShort: "associated data A: sent in clear, protected by the tag", k2Short: "tweak key K2 (16 bytes, hex)", k1Note: "data key K1 = the key K above",
+    sectorShort: "sector number", errNonce: "The nonce must be exactly 12 bytes (24 hex digits).", errK2: "K2 must be exactly 16 bytes (32 hex digits).",
+    cut: n => "Only the first " + n + " bytes are used.",
+    blk: (l, j) => l + "<sub>" + j + "</sub>",
+    pLbl: j => "P<sub>" + j + "</sub>", cLbl: j => "C<sub>" + j + "</sub>", zLbl: j => "Z<sub>" + j + "</sub>",
+    ecbTitle: "ECB: every block is encrypted alone",
+    padNote: n => "PKCS#7 padding (dotted): the last block is filled up with " + n + " " + (n === 1 ? "byte" : "bytes") + " of value " + n.toString(16).padStart(2, "0") + ". A message that already ends on a block boundary gets a whole extra block of 16 × 10, so the padding can always be taken off.",
+    sameBlocks: (a, b) => "Blocks " + a + " and " + b + " are the same plaintext, so their ciphertexts are the same too (orange). Eve sees this without the key.",
+    noSame: "No two plaintext blocks are equal now. Type the same 16 characters twice to see what ECB leaks.",
+    sameAs: j => "= block " + j,
+    picTitle: "The picture test", picCaps: ["the picture", "encrypted with ECB", "encrypted with CTR"],
+    picNote: "The picture is 256 × 160 pixels, one byte per pixel, so each row of 16 pixels is one block (2560 blocks), encrypted with the key K and, for CTR, the nonce from the CTR tab. Where the picture is one flat colour the blocks are equal, so ECB gives equal ciphertext blocks and the shape stays. CTR uses a new keystream block for every block, so it looks like noise. Real ECB-encrypted images look just like this: never use ECB for data.",
+    ctrTitle: "CTR: AES of a counter is a keystream", cbLbl: "nonce ‖ counter",
+    ctrNotes: ["The same idea as ChaCha20: a nonce and a counter go in, a keystream Z comes out, C = P XOR Z. Only the engine differs: AES gives 16 bytes per counter, ChaCha20 gives 64.",
+      "No padding: the last block uses only as many keystream bytes as it needs (dim bytes are not used).",
+      "Random access and speed: block j needs only counter j, so any block can be decrypted alone and all blocks can be done in parallel. Bob decrypts with the same steps: P = C XOR Z.",
+      "Never reuse a nonce with the same key: the keystream repeats, and Eve gets C1 XOR C2 = P1 XOR P2.",
+      "No integrity: if Mallory flips a bit of C, the same bit of P flips and nobody notices. GCM adds a tag."],
+    extraTitle: "GCM, part 1: two extra AES blocks with the same key", hLbl: "hash key H", sLbl: "tag mask S", zero: "16 zero bytes",
+    hNote: "H is the key of GHASH. S hides the GHASH result. Counter 1 is used only for S, so the data starts at counter 2 (ChaCha20-Poly1305 does the same: its block 0 makes the Poly1305 key).",
+    gcmCtrTitle: "GCM, part 2: CTR encryption from counter 2",
+    ghTitle: "GCM, part 3: GHASH over A and C, then the tag", ghCols: ["input", "16-byte block (zero-filled)", "X = (X ⊕ block) · H"],
+    ghRow: (k, n) => k === "len" ? "lengths" : (k === "a" ? "A" : "C") + n,
+    ghNote: "X starts at 0. For each block: XOR it into X, then multiply X by H in GF(2¹²⁸), a field of 128-bit numbers where adding is XOR and multiplying works like multiplying polynomials, with no carries. The last block holds the lengths of A and C in bits.",
+    tagEq: "tag T = X ⊕ S =", sends: "Alice sends: the nonce, A, C and T.",
+    malTitle: "Mallory changes one byte", malHint: "Click any byte of C: Mallory flips its last bit on the way to Bob.",
+    malChanged: (i, a, b) => "Mallory changed byte " + i + " of C: " + a + " → " + b + ".",
+    bobCalc: "Bob computes the tag of what he received:", bobGot: "the tag that came with it:",
+    bobOk: "✓ The tags are equal: Bob accepts and decrypts.", bobBad: "✗ The tags differ: Bob rejects the message and decrypts nothing.",
+    noTag: "Without the tag (plain CTR), Bob would read:", undo: "undo",
+    gcmNonce: "Never reuse a nonce: as in CTR the keystream repeats, and worse, from two messages with the same nonce Eve can work out H, and then Mallory can make valid tags for her own messages.",
+    xtsTop: "XTS, part 1: one tweak per sector", secAs: "sector number, 16 bytes (little-endian)", tweakT: "tweak T",
+    xtsTitle: "XTS, part 2: every block gets its own tweak", tjLbl: j => j === 0 ? "T" : "T·α" + (j === 1 ? "" : "<sup>" + j + "</sup>"),
+    alphaNote: "·α moves the 128-bit tweak one bit to the left; if a bit falls off, 87 is XORed into the lowest byte. So every position in the sector has its own tweak, and C<sub>j</sub> = AES<sub>K1</sub>(P<sub>j</sub> ⊕ T<sub>j</sub>) ⊕ T<sub>j</sub>.",
+    sectorNote: "A sector here is 64 bytes: your message, filled up with zero bytes. Real sectors are 512 or 4096 bytes (32 or 256 blocks). For data that is not a whole number of blocks XTS uses ciphertext stealing; this page always uses whole blocks.",
+    sameTitle: "Same data, different place",
+    sameTxt: "Unlike ECB, equal plaintext blocks at different positions give different ciphertext. And block 1 written into other sectors:",
+    sameEq: (a, b) => "Blocks " + a + " and " + b + " hold the same plaintext, and their ciphertexts differ.",
+    secN: n => "sector " + n,
+    noTagTitle: "No tag, no extra space",
+    noTagTxt: "A disk sector must keep exactly its size, so there is no room for a tag. Click a block: Mallory changes one byte of it on the disk.",
+    malBlock: j => "change C" + j, bobReads: "Bob's computer decrypts the sector:",
+    garbled: j => "Block " + j + " decrypts to 16 random-looking bytes; the other blocks are fine, and nothing tells Bob. That is the price of no tag.",
+    determ: "One more limit: the same data written again in the same place gives the same ciphertext, so Eve, who copies the disk twice, learns which blocks changed.",
+    cmpRows: ["needs", "padding", "ciphertext length", "parallel encrypt", "parallel decrypt", "random access", "integrity (tag)",
+              "equal plaintext blocks", "nonce used twice", "typical use"],
+    cmp: [
+      ["only the key", "nonce: never repeat it", "nonce (12 bytes): never repeat it", "tweak = sector number (repeats by design)", "nonce (12 bytes): never repeat it"],
+      ["yes (PKCS#7)", "no", "no", "no (ciphertext stealing)", "no"],
+      ["rounded up to 16 bytes", "same as P", "P + 16-byte tag", "same as P", "P + 16-byte tag"],
+      ["yes", "yes", "yes", "yes", "yes"],
+      ["yes", "yes", "yes", "yes", "yes"],
+      ["yes", "yes", "decrypt yes, but the tag needs all of C", "yes (that is its point)", "decrypt yes, but the tag needs all of C"],
+      ["no", "no", "yes, 16 bytes (GHASH)", "no", "yes, 16 bytes (Poly1305)"],
+      ["equal ciphertext: leaks", "different", "different", "different per position; same place rewritten: same", "different"],
+      ["no nonce: it always leaks equal blocks", "same keystream: C1 ⊕ C2 = P1 ⊕ P2", "same keystream, and tags can be forged", "not a nonce: Eve sees which blocks changed", "same keystream, and tags can be forged"],
+      ["never for data", "a building block (inside GCM)", "TLS 1.3, HTTPS, SSH, IPsec", "disk encryption: BitLocker, FileVault, LUKS", "TLS 1.3, WireGuard, SSH"]],
+    refHead: "ChaCha20-Poly1305 (Lecture 2)",
+    cmpNote: "Green: good for this row; orange: a weakness to know. Only GCM and ChaCha20-Poly1305 notice if Mallory changes the ciphertext. ECB is shown so you recognise it, not to use it.",
+  },
+  pl: {
+    title: "Eksplorator AES", home: "Wszystkie symulatory",
+    intro: "Od ogółu do szczegółu: jeden blok, rundy w środku, potem tryby, które robią z AES prawdziwe szyfrowanie.",
+    stepOf: n => "Krok " + n + " z 5 · AES",
+    steps: [["Czarna skrzynka", "16-bajtowy klucz i blok na wejściu, 16 bajtów na wyjściu"], ["W środku", "10 rund, 11 kluczy rundy"],
+            ["Jedna runda", "SubBytes, ShiftRows, MixColumns, AddRoundKey"], ["Tryby", "ECB, CTR, GCM, XTS na wiadomości"],
+            ["Porównanie", "który tryb do czego"]],
+    explain: [
+      ["Jeden blok na wejściu, jeden na wyjściu", "AES-128 bierze 16-bajtowy klucz K i dokładnie jeden 16-bajtowy blok P, a oddaje jeden 16-bajtowy blok C. Bob, z tym samym kluczem, liczy w drugą stronę i dostaje P z powrotem. Tyle robi szyfr blokowy: sam w sobie nie jest jeszcze sposobem na zaszyfrowanie wiadomości. Kliknij pole AES, żeby zajrzeć do środka."],
+      ["Dziesięć rund na tabeli 4×4", "16 bajtów trafia do tabeli 4×4, stanu, kolumna po kolumnie. Najpierw dochodzi XOR z kluczem, potem 10 rund miesza stan, każda z własnym kluczem rundy zrobionym z K. Wybierz rundę albo kliknij pole rundy, żeby zobaczyć jej cztery kroki."],
+      ["Cztery proste kroki", "Każda runda robi ze stanem cztery rzeczy: SubBytes podmienia każdy bajt według stałej tablicy, ShiftRows przesuwa wiersze, MixColumns miesza każdą kolumnę, AddRoundKey dodaje (XOR) klucz rundy. Zmienione bajty są pomarańczowe. Kliknij bajt, żeby go śledzić."],
+      ["Tryby: od jednego bloku do wiadomości", "Tryb mówi, jak użyć jednoblokowego AES do wiadomości dowolnej długości. Wybierz tryb. Wszystkie cztery używają tego samego klucza K i tej samej wiadomości P, a każda wartość jest liczona na bieżąco."],
+      ["Który tryb do czego", "Cztery tryby obok siebie, a dla porównania ChaCha20-Poly1305 z wykładu 2. Kliknij nazwę trybu, żeby go otworzyć."]],
+    selfOk: "✓ sprawdzone z wektorami testowymi FIPS-197, NIST SP 800-38A, specyfikacji GCM i IEEE 1619", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: następny krok · ← / Esc: wstecz",
+    randKey: "losowy klucz", randNonce: "losowy nonce",
+    keyShort: "tajny klucz K (16 bajtów = 128 bitów, hex)", ptShort: "blok tekstu jawnego P (16 bajtów, hex)", asText: "jako tekst:", txtPh: "wpisz 16 znaków",
+    boxAES_s: "kliknij, by zajrzeć", nodeCt: "blok szyfrogramu C", ctCap: "zawsze 16 bajtów",
+    errKey: "Klucz musi mieć dokładnie 16 bajtów (32 cyfry hex).", errPt: "Blok musi mieć dokładnie 16 bajtów (32 cyfry hex).",
+    bob: (c, p) => "Bob: AES⁻¹ z tym samym K zamienia C = " + c + " z powrotem w P = " + p + " ✓",
+    startNote: "Wartości startowe to przykład ze standardu AES (FIPS-197, dodatek B), więc każdą rundę można porównać ze standardem.",
+    cardFlip: "Zmień jeden bit P", flipLbl: "odwróć bit", flipNote: "Wybierz dowolny bit P (0 to skrajny lewy). Zmienia się mniej więcej połowa ze 128 bitów C, bez wzoru, który dałoby się przewidzieć: tak działa dobry szyfr blokowy.",
+    rowP: "P", rowP2: "P z odwróconym bitem", rowC: "C", rowC2: "nowe C", flipCount: n => "zmieniło się " + n + " ze 128 bitów C",
+    cardOne: "Tylko jeden blok", oneTxt: "Sam AES szyfruje dokładnie 16 bajtów, a ten sam blok z tym samym kluczem zawsze daje to samo C. Dłuższą wiadomość trzeba pociąć na bloki i to, jak się to zrobi, ma duże znaczenie: zaszyfruj każdy blok osobno (ECB), a równe bloki dadzą równy szyfrogram; puść AES na liczniku (CTR), a dostaniesz keystream, tak jak w ChaCha20. Do tego służą tryby z kroku 4.",
+    goModes: "Przejdź do trybów (krok 4) →",
+    usesLine: (k, p) => "Klucz K = " + k + " i blok P = " + p + " pochodzą z kroku 1.",
+    rN: r => r === 0 ? "start: P XOR pierwszy klucz rundy K0" : "runda " + r + " z 10" + (r === 10 ? ": ostatnia runda, bez MixColumns" : ""),
+    pipNote: "Runda 0 to tylko pierwsze AddRoundKey (P XOR K0). AES-128 ma 10 rund; AES-192 i AES-256 mają 12 i 14.",
+    cardRound: r => r === 0 ? "Start: AddRoundKey z K0 = K" : "Runda " + r + " z 10",
+    before: r => r === 0 ? "tekst jawny P" : r === 1 ? "początek rundy 1 (P XOR K0)" : "po rundzie " + (r - 1),
+    after: r => r === 0 ? "po rundzie 0" : r === 10 ? "po rundzie 10 = szyfrogram C" : "po rundzie " + r,
+    rkCap: r => "klucz rundy K" + r, roundBox: r => r === 0 ? "start" : "runda " + r, onlyARK: "tylko AddRoundKey",
+    boxHint: "kliknij krok, by go zobaczyć", cardAll: "Wszystkie rundy naraz (kliknij wiersz)",
+    thRound: "runda", thKey: "klucz rundy", thState: "stan po rundzie", rowStart: "0 (start)", isC: " = C",
+    ksNote: "Harmonogram klucza robi z K 11 kluczy rundy po 16 bajtów (K0 = K). Każde nowe słowo 4-bajtowe to poprzednie słowo XOR słowo o 4 miejsca wcześniej; co czwarte słowo jest najpierw obrócone, przepuszczone przez S-box i zxorowane ze stałą rundy.",
+    layout: "16 bajtów wypełnia tabelę kolumna po kolumnie: bajty 0 do 3 to pierwsza kolumna.",
+    aesni: "<b>AES-NI.</b> Współczesne procesory Intel i AMD mają instrukcję (AESENC), która wykonuje całą jedną rundę na 16 bajtach, a procesory ARM mają podobne. Dlatego AES-CTR jest tak szybki na laptopie: około 5,8 GB/s z tymi instrukcjami i 0,6 GB/s bez nich (wykład 2).",
+    rN3: r => "runda " + r + " z 10" + (r === 10 ? " (ostatnia runda nie ma MixColumns)" : ""),
+    bPrev: "◀ poprzedni", bNext: "następny ▶", opK: k => "krok " + k + " / 4",
+    cardOp: (r, op) => "Runda " + r + ", krok " + (op + 1) + ": " + OPS[op],
+    capBefore: "przed", capAfter: "po", noMC: "(nie w rundzie 10)",
+    exSB: "Każdy bajt jest zastępowany innym bajtem ze stałej tablicy, S-boksu. To jedyny krok, który nie jest liniowy, i to on sprawia, że AES trudno odwrócić bez klucza. Kliknij dowolny bajt, żeby zobaczyć, gdzie go szukać.",
+    sbLook: (b, hi, lo, out, r, c) => "Bajt w wierszu " + r + ", kolumnie " + c + " to " + b + ": w S-boksie wiersz " + hi + ", kolumna " + lo + " daje " + out + ".",
+    sboxCap: "S-box AES: wiersz = pierwsza cyfra hex, kolumna = druga cyfra hex",
+    timing: "<b>Czemu ta tablica ma znaczenie.</b> Szybki AES w programie czyta duże tablice takie jak ta, a to, którą komórkę czyta, zależy od klucza. Pamięć podręczna procesora pamięta, które części były czytane, więc napastnik, który mierzy czas, może poznać klucz (atak cache-timing). AES-NI liczy rundę sprzętowo, bez tablic, a ChaCha20 w ogóle nie ma tablic: dlatego oba są tu bezpieczne.",
+    exSR: "Wiersz 0 zostaje. Wiersz 1 przesuwa się o 1 miejsce w lewo, wiersz 2 o 2, wiersz 3 o 3; bajty, które wypadają z lewej, wracają z prawej. Kolorowa kreska pod bajtem pokazuje jego starą kolumnę: potem każda kolumna ma po jednym bajcie z każdej starej kolumny.",
+    shiftL: n => n === 0 ? "zostaje" : "← " + n,
+    exMC: "Każda kolumna 4 bajtów jest mieszana w 4 nowe bajty, więc każdy bajt kolumny zależy od wszystkich 4 starych. Razem z ShiftRows po dwóch rundach każdy bajt zależy od każdego bajtu wejścia. Kliknij kolumnę.",
+    mcRule: "· mnoży dwa bajty w GF(2⁸): 02·x przesuwa x o jeden bit w lewo i, jeśli bit wypadnie z góry, xoruje 1b; 03·x = 02·x ⊕ x. ⊕ to XOR. Nie ma przeniesień: wynik to zawsze jeden bajt.",
+    mcCol: c => "kolumna " + c, mcSkip: "Ostatnia runda nie ma MixColumns: stan przechodzi bez zmian.",
+    exARK: "Klucz rundy jest xorowany ze stanem, bajt po bajcie. Pozostałe trzy kroki są takie same dla wszystkich: to tutaj wchodzi klucz. Kliknij bajt.",
+    arkLine: (i, a, k, o) => "bajt " + i + ":  " + a + " ⊕ " + k + " = " + o,
+    toModes: "Od jednego bloku do wiadomości: tryby (krok 4) →",
+    modeNames: { ecb: "Electronic Codebook", ctr: "tryb licznika", gcm: "Galois/Counter Mode", xts: "do dysków" },
+    cbcName: "Cipher Block Chaining", soonBadge: "wkrótce", cbcSoon: "Tutaj pojawi się tryb CBC i atak padding oracle.",
+    cardInputs: "Wejścia", msgShort: "wiadomość P (tutaj najwyżej 63 bajty)", nonceShort: "nonce (12 bajtów): nowy dla każdej wiadomości",
+    aadShort: "dane powiązane A: jawne, chronione znacznikiem", k2Short: "klucz tweaku K2 (16 bajtów, hex)", k1Note: "klucz danych K1 = klucz K powyżej",
+    sectorShort: "numer sektora", errNonce: "Nonce musi mieć dokładnie 12 bajtów (24 cyfry hex).", errK2: "K2 musi mieć dokładnie 16 bajtów (32 cyfry hex).",
+    cut: n => "Używane są tylko pierwsze " + n + " " + plN(n, "bajt", "bajty", "bajtów") + ".",
+    blk: (l, j) => l + "<sub>" + j + "</sub>",
+    pLbl: j => "P<sub>" + j + "</sub>", cLbl: j => "C<sub>" + j + "</sub>", zLbl: j => "Z<sub>" + j + "</sub>",
+    ecbTitle: "ECB: każdy blok szyfrowany osobno",
+    padNote: n => "Dopełnienie PKCS#7 (kropkowane): ostatni blok jest dopełniany " + n + " " + plN(n, "bajtem", "bajtami", "bajtami") + " o wartości " + n.toString(16).padStart(2, "0") + ". Wiadomość, która już kończy się na granicy bloku, dostaje cały dodatkowy blok 16 × 10, więc dopełnienie zawsze da się zdjąć.",
+    sameBlocks: (a, b) => "Bloki " + a + " i " + b + " to ten sam tekst jawny, więc ich szyfrogramy też są takie same (pomarańczowe). Ewa widzi to bez klucza.",
+    noSame: "Teraz żadne dwa bloki tekstu jawnego nie są równe. Wpisz dwa razy te same 16 znaków, żeby zobaczyć, co zdradza ECB.",
+    sameAs: j => "= blok " + j,
+    picTitle: "Test obrazka", picCaps: ["obrazek", "zaszyfrowany ECB", "zaszyfrowany CTR"],
+    picNote: "Obrazek ma 256 × 160 pikseli, jeden bajt na piksel, więc każdy rząd 16 pikseli to jeden blok (2560 bloków), szyfrowany kluczem K, a dla CTR także nonce z zakładki CTR. Tam, gdzie obrazek ma jednolity kolor, bloki są równe, więc ECB daje równe bloki szyfrogramu i kształt zostaje. CTR używa nowego bloku keystreamu dla każdego bloku, więc wygląda jak szum. Prawdziwe obrazy szyfrowane ECB wyglądają dokładnie tak: nigdy nie używaj ECB do danych.",
+    ctrTitle: "CTR: AES licznika to keystream", cbLbl: "nonce ‖ licznik",
+    ctrNotes: ["Ten sam pomysł co w ChaCha20: na wejściu nonce i licznik, na wyjściu keystream Z, C = P XOR Z. Różni się tylko silnik: AES daje 16 bajtów na licznik, ChaCha20 daje 64.",
+      "Bez dopełnienia: ostatni blok bierze tylko tyle bajtów keystreamu, ile potrzebuje (wyblakłe bajty nie są używane).",
+      "Dostęp do dowolnego bloku i szybkość: blok j potrzebuje tylko licznika j, więc każdy blok da się odszyfrować osobno, a wszystkie można liczyć równolegle. Bob odszyfrowuje tymi samymi krokami: P = C XOR Z.",
+      "Nigdy nie używaj dwa razy tego samego nonce z tym samym kluczem: keystream się powtarza, a Ewa dostaje C1 XOR C2 = P1 XOR P2.",
+      "Brak integralności: jeśli Mallory odwróci bit w C, odwraca się ten sam bit P i nikt tego nie zauważa. GCM dodaje znacznik."],
+    extraTitle: "GCM, część 1: dwa dodatkowe bloki AES z tym samym kluczem", hLbl: "klucz skrótu H", sLbl: "maska znacznika S", zero: "16 bajtów zerowych",
+    hNote: "H to klucz GHASH. S zakrywa wynik GHASH. Licznik 1 służy tylko do S, więc dane zaczynają się od licznika 2 (ChaCha20-Poly1305 robi tak samo: jego blok 0 daje klucz Poly1305).",
+    gcmCtrTitle: "GCM, część 2: szyfrowanie CTR od licznika 2",
+    ghTitle: "GCM, część 3: GHASH po A i C, potem znacznik", ghCols: ["wejście", "blok 16 bajtów (dopełniony zerami)", "X = (X ⊕ blok) · H"],
+    ghRow: (k, n) => k === "len" ? "długości" : (k === "a" ? "A" : "C") + n,
+    ghNote: "X zaczyna od 0. Dla każdego bloku: XOR do X, potem X razy H w GF(2¹²⁸), ciele liczb 128-bitowych, w którym dodawanie to XOR, a mnożenie działa jak mnożenie wielomianów, bez przeniesień. Ostatni blok zawiera długości A i C w bitach.",
+    tagEq: "znacznik T = X ⊕ S =", sends: "Alicja wysyła: nonce, A, C i T.",
+    malTitle: "Mallory zmienia jeden bajt", malHint: "Kliknij dowolny bajt C: Mallory odwraca jego ostatni bit po drodze do Boba.",
+    malChanged: (i, a, b) => "Mallory zmienił bajt " + i + " szyfrogramu C: " + a + " → " + b + ".",
+    bobCalc: "Bob liczy znacznik tego, co dostał:", bobGot: "znacznik, który przyszedł z wiadomością:",
+    bobOk: "✓ Znaczniki są równe: Bob przyjmuje wiadomość i ją odszyfrowuje.", bobBad: "✗ Znaczniki się różnią: Bob odrzuca wiadomość i niczego nie odszyfrowuje.",
+    noTag: "Bez znacznika (zwykły CTR) Bob przeczytałby:", undo: "cofnij",
+    gcmNonce: "Nigdy nie powtarzaj nonce: jak w CTR keystream się powtarza, a co gorsza, z dwóch wiadomości z tym samym nonce Ewa może wyliczyć H, a wtedy Mallory umie robić poprawne znaczniki do własnych wiadomości.",
+    xtsTop: "XTS, część 1: jeden tweak na sektor", secAs: "numer sektora, 16 bajtów (little-endian)", tweakT: "tweak T",
+    xtsTitle: "XTS, część 2: każdy blok dostaje własny tweak", tjLbl: j => j === 0 ? "T" : "T·α" + (j === 1 ? "" : "<sup>" + j + "</sup>"),
+    alphaNote: "·α przesuwa 128-bitowy tweak o jeden bit w lewo; jeśli bit wypadnie, najniższy bajt jest xorowany z 87. Tak każde miejsce w sektorze ma własny tweak, a C<sub>j</sub> = AES<sub>K1</sub>(P<sub>j</sub> ⊕ T<sub>j</sub>) ⊕ T<sub>j</sub>.",
+    sectorNote: "Sektor ma tu 64 bajty: twoja wiadomość dopełniona bajtami zerowymi. Prawdziwe sektory mają 512 albo 4096 bajtów (32 albo 256 bloków). Dla danych, które nie są całą liczbą bloków, XTS używa kradzieży szyfrogramu (ciphertext stealing); ta strona zawsze używa całych bloków.",
+    sameTitle: "Te same dane, inne miejsce",
+    sameTxt: "Inaczej niż w ECB, równe bloki tekstu jawnego na różnych pozycjach dają różny szyfrogram. A blok 1 zapisany w innych sektorach:",
+    sameEq: (a, b) => "Bloki " + a + " i " + b + " mają ten sam tekst jawny, a ich szyfrogramy się różnią.",
+    secN: n => "sektor " + n,
+    noTagTitle: "Bez znacznika, bez dodatkowego miejsca",
+    noTagTxt: "Sektor dysku musi zachować dokładnie swój rozmiar, więc nie ma miejsca na znacznik. Kliknij blok: Mallory zmienia na dysku jeden jego bajt.",
+    malBlock: j => "zmień C" + j, bobReads: "Komputer Boba odszyfrowuje sektor:",
+    garbled: j => "Blok " + j + " odszyfrowuje się do 16 bajtów, które wyglądają losowo; pozostałe bloki są w porządku i nic nie ostrzega Boba. Taka jest cena braku znacznika.",
+    determ: "Jeszcze jedno ograniczenie: te same dane zapisane znowu w tym samym miejscu dają ten sam szyfrogram, więc Ewa, która skopiuje dysk dwa razy, wie, które bloki się zmieniły.",
+    cmpRows: ["potrzebuje", "dopełnienie", "długość szyfrogramu", "szyfrowanie równoległe", "odszyfrowanie równoległe", "dostęp do dowolnego bloku", "integralność (znacznik)",
+              "równe bloki tekstu jawnego", "nonce użyty dwa razy", "typowe użycie"],
+    cmp: [
+      ["tylko klucz", "nonce: nigdy go nie powtarzaj", "nonce (12 bajtów): nigdy go nie powtarzaj", "tweak = numer sektora (powtarza się z założenia)", "nonce (12 bajtów): nigdy go nie powtarzaj"],
+      ["tak (PKCS#7)", "nie", "nie", "nie (kradzież szyfrogramu)", "nie"],
+      ["zaokrąglona w górę do 16 bajtów", "taka jak P", "P + 16-bajtowy znacznik", "taka jak P", "P + 16-bajtowy znacznik"],
+      ["tak", "tak", "tak", "tak", "tak"],
+      ["tak", "tak", "tak", "tak", "tak"],
+      ["tak", "tak", "odszyfrowanie tak, ale znacznik wymaga całego C", "tak (po to jest)", "odszyfrowanie tak, ale znacznik wymaga całego C"],
+      ["nie", "nie", "tak, 16 bajtów (GHASH)", "nie", "tak, 16 bajtów (Poly1305)"],
+      ["równy szyfrogram: wyciek", "różne", "różne", "różne na różnych pozycjach; to samo miejsce zapisane znowu: takie same", "różne"],
+      ["nie ma nonce: zawsze zdradza równe bloki", "ten sam keystream: C1 ⊕ C2 = P1 ⊕ P2", "ten sam keystream, a znaczniki da się podrobić", "to nie nonce: Ewa widzi, które bloki się zmieniły", "ten sam keystream, a znaczniki da się podrobić"],
+      ["nigdy do danych", "cegiełka (wewnątrz GCM)", "TLS 1.3, HTTPS, SSH, IPsec", "szyfrowanie dysków: BitLocker, FileVault, LUKS", "TLS 1.3, WireGuard, SSH"]],
+    refHead: "ChaCha20-Poly1305 (wykład 2)",
+    cmpNote: "Zielone: dobre w tym wierszu; pomarańczowe: słabość, o której trzeba wiedzieć. Tylko GCM i ChaCha20-Poly1305 zauważają, że Mallory zmienił szyfrogram. ECB jest tu po to, żeby go rozpoznać, nie żeby go używać.",
+  },
+};
+// grades for the comparison table: g = good, b = weakness, "" = neutral (rows as in cmp, columns ECB CTR GCM XTS ChaCha)
+const CMP_GRADE = [
+  ["", "", "", "", ""], ["b", "g", "g", "g", "g"], ["b", "g", "", "g", ""], ["g", "g", "g", "g", "g"], ["g", "g", "g", "g", "g"],
+  ["g", "g", "", "g", ""], ["b", "b", "g", "b", "g"], ["b", "g", "g", "", "g"], ["b", "b", "b", "", "b"], ["b", "", "g", "g", "g"]];
+
+/* ===================== the app ===================== */
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+const MODES = ["ecb", "ctr", "gcm", "xts"];
+const NSTEPS = 5;
+
+const app = {
+  level: 0,
+  keyText: FIPS_B.key, key: hexB(FIPS_B.key), keyErr: false,
+  ptText: FIPS_B.pt, pt: hexB(FIPS_B.pt), ptErr: false,
+  flip: 0,
+  round: 1, op: 0, sel: 0, mcCol: 0,
+  mode: "ecb",
+  msg: "Meet me at noon.Meet me at noon.Bob, bring the key.",
+  nonceText: GCM_IV3, nonce: hexB(GCM_IV3), nonceErr: false,
+  aad: "from Alice to Bob",
+  k2Text: FIPS_C1.key, k2: hexB(FIPS_C1.key), k2Err: false,
+  sector: 7, tamper: -1, xtsTamper: -1,
+};
+
+const hx2 = x => x.toString(16).padStart(2, "0");
+const sp = b => Array.from(b, hx2).join(" ");
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+const enc = s => new TextEncoder().encode(s);
+const MAXMSG = 63;
+function msgBytes() { const b = enc(app.msg); return b.length > MAXMSG ? b.slice(0, MAXMSG) : b; }
+function chars(b) { return Array.from(b, x => (x >= 32 && x < 127) ? String.fromCharCode(x) : "·").join(""); }
+function sameBytes(a, b) { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+
+/* the 4x4 state: byte i is in row i % 4, column i / 4 */
+function bgrid(b, o) {
+  o = o || {};
+  let h = '<div class="bgrid' + (o.sm ? " sm" : "") + (o.rowLbl ? " lbl5" : "") + '">';
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const i = r + 4 * c;
+      let cls = "bc";
+      if (o.role) cls += " role-" + o.role;
+      if (o.chg && o.chg[i]) cls += " chgd";
+      if (o.col !== undefined && c === o.col) cls += " colsel";
+      if (o.sel === i) cls += " bsel";
+      if (o.colorBy) cls += " g" + o.colorBy(r, c);
+      h += '<div class="' + cls + '" data-action="byte" data-i="' + i + '">' + hx2(b[i]) + "</div>";
+    }
+    if (o.rowLbl) h += '<div class="rowl">' + o.rowLbl(r) + "</div>";
+  }
+  return h + "</div>";
+}
+const fig = (inner, cap) => "<figure>" + inner + "<figcaption>" + cap + "</figcaption></figure>";
+function diff(a, b) { const d = []; for (let i = 0; i < 16; i++) d.push(a[i] !== b[i]); return d; }
+
+/* arrows */
+const mk = (id, c) => '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="' + c + '"/></marker>';
+const ln = (pts, c, m) => '<polyline fill="none" stroke="' + c + '" stroke-width="2.4" marker-end="url(#' + m + ')" points="' + pts + '"/>';
+const DICE_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/></svg>';
+const rndBtn = f => { const t = f === "nonce" ? L().randNonce : L().randKey; return '<button class="rnd" data-action="rand" data-f="' + f + '" title="' + esc(t) + '" aria-label="' + esc(t) + '">' + DICE_SVG + "</button>"; };
+function randomize(f) {
+  const n = f === "nonce" ? 12 : 16;
+  const b = new Uint8Array(n);
+  crypto.getRandomValues(b);
+  const hex = bytesHex(b);
+  if (f === "key") { app.key = b; app.keyText = hex; app.keyErr = false; }
+  else if (f === "k2") { app.k2 = b; app.k2Text = hex; app.k2Err = false; }
+  else { app.nonce = b; app.nonceText = hex; app.nonceErr = false; }
+  view.querySelectorAll('input[data-field="' + f + '"]').forEach(inp => { inp.value = hex; });
+  app.tamper = -1; app.xtsTamper = -1;
+  inputsChanged();
+}
+
+/* ---------- step 1: black box ---------- */
+function render0() {
+  const t = L();
+  return '<div class="card"><div class="schwrap"><div class="sch1">' +
+      '<svg class="arrows" width="900" height="300" aria-hidden="true"><defs>' + mk("m1k", "var(--key-b)") + mk("m1p", "var(--muted)") + mk("m1i", "var(--ink)") + "</defs>" +
+        ln("190,74 190,140 350,140 350,166", "var(--key-b)", "m1k") + ln("660,110 660,150 450,150 450,166", "var(--muted)", "m1p") +
+        ln("500,210 556,210", "var(--ink)", "m1i") + "</svg>" +
+      '<div class="inbox role-key s1-key">' + rndBtn("key") + "<label>" + t.keyShort + '<input data-field="key" spellcheck="false" value="' + esc(app.keyText) + '"></label></div>' +
+      '<div class="inbox role-pt s1-pt"><label>' + t.ptShort + '<input data-field="pt" spellcheck="false" value="' + esc(app.ptText) + '"></label>' +
+        '<div class="tline">' + t.asText + '<input data-field="pttxt" maxlength="16" spellcheck="false" placeholder="' + esc(t.txtPh) + '" value="' + esc(ptAsText()) + '"></div></div>' +
+      '<button class="box s1-box" data-action="zoom">AES-128<small>' + t.boxAES_s + "</small></button>" +
+      '<div class="node role-ct s1-ct"><div class="nh">' + t.nodeCt + '</div><div class="nb mono" id="ctbytes"></div><small>' + t.ctCap + "</small></div>" +
+      '<div class="s1-bob" id="bobline"></div>' +
+    '</div></div><p class="note" style="margin:6px 0 0">' + t.startNote + "</p></div>" +
+    '<div class="card"><h3>' + t.cardFlip + '</h3><div class="flipctl"><button data-action="flip-dec">&minus;</button><label>' + t.flipLbl +
+      ' <input type="number" min="0" max="127" data-field="flip" value="' + app.flip + '"></label><button data-action="flip-inc">+</button></div>' +
+      '<div id="flipbody"></div><p class="note" style="margin:8px 0 0">' + t.flipNote + "</p></div>" +
+    '<div class="card"><h3>' + t.cardOne + "</h3><p style=\"margin:0\">" + t.oneTxt + '</p><div class="btns"><button class="dark" data-action="goto" data-s="3">' + t.goModes + "</button></div></div>";
+}
+function ptAsText() {
+  let s = "";
+  for (const x of app.pt) { if (x === 0) break; if (x < 32 || x > 126) return ""; s += String.fromCharCode(x); }
+  return s;
+}
+function hexDiffHTML(a, b) {          // b printed, the hex digits that differ from a in orange
+  let h = "";
+  for (let i = 0; i < 16; i++) {
+    const x = hx2(a[i]), y = hx2(b[i]);
+    for (let k = 0; k < 2; k++) h += x[k] !== y[k] ? '<span class="d">' + y[k] + "</span>" : y[k];
+    if (i < 15) h += " ";
+  }
+  return h;
+}
+function updateL0() {
+  const ct = document.getElementById("ctbytes");
+  if (!ct) return;
+  const t = L(), fb = document.getElementById("flipbody"), bl = document.getElementById("bobline");
+  if (app.keyErr || app.ptErr) {
+    ct.innerHTML = ""; fb.innerHTML = "";
+    bl.innerHTML = '<span class="err">' + (app.keyErr ? t.errKey + " " : "") + (app.ptErr ? t.errPt : "") + "</span>";
+    return;
+  }
+  const rk = expandKey(app.key);
+  const c = encryptBlock(rk, app.pt);
+  ct.innerHTML = sp(c.slice(0, 8)) + "<br>" + sp(c.slice(8));
+  const back = decryptBlock(rk, c);
+  bl.innerHTML = '<span class="okline">' + esc(t.bob(bytesHex(c).slice(0, 8) + "…", bytesHex(back).slice(0, 8) + "…")) + "</span>";
+  const p2 = app.pt.slice();
+  p2[app.flip >> 3] ^= 0x80 >> (app.flip & 7);
+  const c2 = encryptBlock(rk, p2);
+  let n = 0;
+  for (let i = 0; i < 16; i++) { let x = c[i] ^ c2[i]; while (x) { n += x & 1; x >>= 1; } }
+  const row = (l, html) => '<tr><td class="lbl">' + l + '</td><td class="hexrow">' + html + "</td></tr>";
+  fb.innerHTML = '<table class="btable">' + row(t.rowP, sp(app.pt)) + row(t.rowP2, hexDiffHTML(app.pt, p2)) +
+    row(t.rowC, sp(c)) + row(t.rowC2, hexDiffHTML(c, c2)) + "</table>" + '<p class="verdict" style="color:var(--chg)">' + t.flipCount(n) + "</p>";
+}
+
+/* ---------- step 2: inside ---------- */
+function curTrace() { return aesTrace(app.key, app.pt); }
+function badBlock() { return app.keyErr || app.ptErr; }
+function fixFirst() { const t = L(); return '<div class="card"><p class="err">' + (app.keyErr ? t.errKey + " " : "") + (app.ptErr ? t.errPt : "") + "</p></div>"; }
+function pipsHTML(lo, cur) {
+  let h = "";
+  for (let i = lo; i <= 10; i++) h += '<button class="pip' + (i === cur ? " on" : "") + '" data-action="round-set" data-r="' + i + '">' + i + "</button>";
+  return h;
+}
+function render1() {
+  const t = L();
+  if (badBlock()) return fixFirst();
+  const tr = curTrace(), r = app.round, R = tr.rounds[r];
+  const beforeB = r === 0 ? app.pt : R.start;
+  let box = '<button class="box rbox" data-action="zoom"><span class="rt">' + t.roundBox(r) + "</span>";
+  if (r === 0) box += '<span class="op" data-action="op-go" data-op="3">' + t.onlyARK + "</span>";
+  else OPS.forEach((o, k) => { box += '<span class="op' + (k === 2 && r === 10 ? " off" : "") + '" data-action="op-go" data-op="' + k + '">' + (k + 1) + ". " + o + "</span>"; });
+  box += "<small>" + t.boxHint + "</small></button>";
+  let rows = "";
+  for (let i = 0; i <= 10; i++)
+    rows += '<tr class="click' + (i === r ? " on" : "") + '" data-action="round-set" data-r="' + i + '"><td class="lbl">' + (i === 0 ? t.rowStart : i) + "</td>" +
+      '<td style="color:var(--z)">' + bytesHex(tr.rk[i]) + "</td><td>" + bytesHex(tr.rounds[i].out) + (i === 10 ? '<b style="color:var(--c)">' + t.isC + "</b>" : "") + "</td></tr>";
+  return '<p class="note" style="margin:0 0 10px">' + esc(t.usesLine(app.keyText.slice(0, 8) + "…", app.ptText.slice(0, 8) + "…")) + "</p>" +
+    '<div class="card"><div class="controls"><button data-action="round-dec" aria-label="−">&minus;</button><span class="pips">' + pipsHTML(0, r) + "</span>" +
+      '<button data-action="round-inc" aria-label="+">+</button></div><div class="rlabel">' + t.rN(r) + '</div><p class="note" style="margin:2px 0 0">' + t.pipNote + "</p></div>" +
+    '<div class="card"><h3>' + t.cardRound(r) + '</h3><div class="rflow">' +
+      fig(bgrid(beforeB, { role: r === 0 ? "pt" : "" }), t.before(r)) + '<span class="arrow">&#8594;</span>' +
+      '<div class="mid">' + box + '<span class="arrow" style="color:var(--key-b)">&#8593;</span>' + fig(bgrid(tr.rk[r], { role: "key", sm: true }), t.rkCap(r)) + "</div>" +
+      '<span class="arrow">&#8594;</span>' + fig(bgrid(R.out, { role: r === 10 ? "ct" : "", chg: diff(beforeB, R.out) }), t.after(r)) +
+    '</div><p class="note" style="margin:10px 0 0">' + t.layout + "</p></div>" +
+    '<div class="card"><h3>' + t.cardAll + '</h3><div class="tablewrap"><table class="btable"><tr><th>' + t.thRound + "</th><th>" + t.thKey + "</th><th>" + t.thState + "</th></tr>" + rows + "</table></div>" +
+      '<p class="note" style="margin:8px 0 0">' + t.ksNote + '</p><div class="why">' + t.aesni + "</div></div>";
+}
+
+/* ---------- step 3: one round ---------- */
+function render2() {
+  const t = L();
+  if (badBlock()) return fixFirst();
+  if (app.round < 1) app.round = 1;
+  const r = app.round, op = app.op;
+  if (r === 10 && op === 2) {}  // MixColumns is shown as "skipped"
+  const tr = curTrace(), R = tr.rounds[r];
+  const pairs = [[R.start, R.sb], [R.sb, R.sr], [R.sr, R.mc], [R.mc, R.out]];
+  const a = pairs[op][0], b = pairs[op][1];
+  const pressed = c => ' aria-pressed="' + (c ? "true" : "false") + '"';
+  let h = '<div class="card"><div class="controls"><button data-action="round-dec" aria-label="−">&minus;</button><span class="pips">' + pipsHTML(1, r) + "</span>" +
+    '<button data-action="round-inc" aria-label="+">+</button></div><div class="rlabel">' + t.rN3(r) + "</div>" +
+    '<div class="btns"><span class="tabs">' + OPS.map((o, k) => '<button data-action="op-set" data-op="' + k + '"' + pressed(k === op) + ">" + (k + 1) + ". " + o + (k === 2 && r === 10 ? " " + t.noMC : "") + "</button>").join("") + "</span>" +
+    '<button data-action="op-prev">' + t.bPrev + '</button><button class="dark" data-action="op-next">' + t.bNext + "</button> <b>" + t.opK(op + 1) + "</b></div></div>";
+  h += '<div class="card"><h3>' + t.cardOp(r, op) + '</h3><div class="rflow">';
+  const chg = diff(a, b);
+  if (op === 0) {
+    h += fig(bgrid(a, { sel: app.sel }), t.capBefore) + '<div class="oppill">SubBytes<small>S-box</small></div>' + fig(bgrid(b, { sel: app.sel, chg: chg }), t.capAfter);
+  } else if (op === 1) {
+    h += fig(bgrid(a, { colorBy: (rr, c) => c, sel: app.sel }), t.capBefore) + '<div class="oppill">ShiftRows</div>' +
+      fig(bgrid(b, { colorBy: (rr, c) => (c + rr) % 4, chg: chg, rowLbl: t.shiftL, sel: shiftedIndex(app.sel) }), t.capAfter);
+  } else if (op === 2) {
+    h += fig(bgrid(a, { col: r < 10 ? app.mcCol : undefined }), t.capBefore) + '<div class="oppill">MixColumns' + (r === 10 ? "<small>" + t.noMC + "</small>" : "") + "</div>" +
+      fig(bgrid(b, { col: r < 10 ? app.mcCol : undefined, chg: chg }), t.capAfter);
+  } else {
+    h += fig(bgrid(a, { sel: app.sel }), t.capBefore) + '<span class="sign op">&#8853;</span>' + fig(bgrid(tr.rk[r], { role: "key", sel: app.sel }), t.rkCap(r)) +
+      '<span class="sign">=</span>' + fig(bgrid(b, { sel: app.sel, chg: chg, role: r === 10 ? "ct" : "" }), t.capAfter);
+  }
+  h += "</div>";
+  // the detail for this step
+  if (op === 0) {
+    const x = a[app.sel], y = b[app.sel];
+    h += '<p style="margin:12px 0 6px">' + t.exSB + "</p>" + '<p class="verdict">' + esc(t.sbLook(hx2(x), (x >> 4).toString(16), (x & 15).toString(16), hx2(y), app.sel % 4, app.sel >> 2)) + "</p></div>" +
+      '<div class="card"><div class="sbrow"><div>' + sboxTable(x) + '<p class="note" style="margin:4px 0 0">' + t.sboxCap + '</p></div><div class="why" style="flex:1 1 300px;margin-top:0">' + t.timing + "</div></div>";
+  } else if (op === 1) {
+    h += '<p style="margin:12px 0 0">' + t.exSR + "</p>";
+  } else if (op === 2) {
+    if (r === 10) h += '<p style="margin:12px 0 0">' + t.mcSkip + "</p>";
+    else h += '<p style="margin:12px 0 6px">' + t.exMC + "</p>" + mcTable(a, b, app.mcCol) + '<p class="note" style="margin:6px 0 0">' + t.mcRule + "</p>";
+  } else {
+    h += '<p style="margin:12px 0 6px">' + t.exARK + '</p><p class="verdict inline">' + esc(t.arkLine(app.sel, hx2(a[app.sel]), hx2(tr.rk[r][app.sel]), hx2(b[app.sel]))) + "</p>";
+  }
+  h += "</div>";
+  if (op === 3 && r === 10) h += '<div class="btns" style="margin:0"><button class="dark" data-action="goto" data-s="3">' + t.toModes + "</button></div>";
+  return h;
+}
+function shiftedIndex(i) {             // where the byte at index i before ShiftRows ends up
+  const r = i % 4, c = i >> 2;
+  return r + 4 * ((c - r + 4) % 4);
+}
+function sboxTable(x) {
+  const hi = x >> 4, lo = x & 15;
+  let h = '<table class="sbox"><tr><th></th>';
+  for (let c = 0; c < 16; c++) h += '<th class="' + (c === lo ? "hl" : "") + '">' + c.toString(16) + "</th>";
+  h += "</tr>";
+  for (let r = 0; r < 16; r++) {
+    h += '<tr><th class="' + (r === hi ? "hl" : "") + '">' + r.toString(16) + "</th>";
+    for (let c = 0; c < 16; c++) {
+      const cls = r === hi && c === lo ? "hit" : r === hi ? "rowhl" : c === lo ? "colhl" : "";
+      h += "<td" + (cls ? ' class="' + cls + '"' : "") + ">" + hx2(SBOX[16 * r + c]) + "</td>";
+    }
+    h += "</tr>";
+  }
+  return h + "</table>";
+}
+const MC_M = [[2, 3, 1, 1], [1, 2, 3, 1], [1, 1, 2, 3], [3, 1, 1, 2]];
+function mcTable(a, b, c) {
+  const col = [a[4 * c], a[4 * c + 1], a[4 * c + 2], a[4 * c + 3]];
+  let h = '<p class="verdict" style="margin:0 0 4px">' + L().mcCol(c) + '</p><table class="eqtab">';
+  for (let r = 0; r < 4; r++) {
+    const terms = [], prods = [];
+    for (let k = 0; k < 4; k++) { terms.push(hx2(MC_M[r][k]) + "·" + hx2(col[k])); prods.push(hx2(gmul(MC_M[r][k], col[k]))); }
+    h += '<tr><td class="res">' + hx2(b[4 * c + r]) + "</td><td>=</td><td>" + terms.join(" ⊕ ") + "</td><td>=</td><td>" + prods.join(" ⊕ ") + "</td></tr>";
+  }
+  return h + "</table>";
+}
+
+/* ---------- step 4: modes ---------- */
+function render3() {
+  const t = L();
+  const pressed = c => ' aria-pressed="' + (c ? "true" : "false") + '"';
+  const m = app.mode;
+  let inp = '<div class="minputs">' +
+    '<div class="mi role-key" style="flex:0 0 330px">' + rndBtn("key") + "<label>" + (m === "xts" ? t.k1Note : t.keyShort) + '<input data-field="key" spellcheck="false" style="width:100%" value="' + esc(app.keyText) + '"></label></div>';
+  if (m === "ctr" || m === "gcm")
+    inp += '<div class="mi role-nonce" style="flex:0 0 340px">' + rndBtn("nonce") + "<label>" + t.nonceShort + '<input data-field="nonce" spellcheck="false" style="width:100%" value="' + esc(app.nonceText) + '"></label></div>';
+  if (m === "xts")
+    inp += '<div class="mi role-key2" style="flex:0 0 330px">' + rndBtn("k2") + "<label>" + t.k2Short + '<input data-field="k2" spellcheck="false" style="width:100%" value="' + esc(app.k2Text) + '"></label></div>' +
+      '<div class="mi role-nonce"><span>' + t.sectorShort + '</span><span class="ctrline"><button data-action="sec-dec">&minus;</button><input data-field="sector" type="number" min="0" value="' + app.sector + '"><button data-action="sec-inc">+</button></span></div>';
+  inp += '<div class="mi role-pt" style="flex:1 1 300px"><label>' + t.msgShort + '<textarea data-field="msg" maxlength="' + MAXMSG + '" spellcheck="false">' + esc(app.msg) + "</textarea></label></div>";
+  if (m === "gcm") inp += '<div class="mi role-aad" style="flex:1 1 300px"><label>' + t.aadShort + '<input data-field="aad" maxlength="32" spellcheck="false" style="width:100%" value="' + esc(app.aad) + '"></label></div>';
+  inp += "</div>";
+  return '<div class="card"><div class="tabs" style="margin-bottom:12px">' +
+      MODES.map(x => '<button data-action="mode" data-m="' + x + '"' + pressed(x === m) + "><b>" + x.toUpperCase() + "</b> <small>" + t.modeNames[x] + "</small></button>").join("") +
+      // CBC is planned, not implemented: a dashed tab that only shows a short note
+      '<button class="soonbtn" data-action="cbc-soon" aria-disabled="true" aria-controls="cbcnote" title="' + t.cbcSoon + '"><b>CBC</b> <small>' + t.cbcName + '</small><span class="soonb">' + t.soonBadge + "</span></button></div>" +
+      '<p class="note" id="cbcnote" hidden style="margin:-4px 0 10px">' + t.cbcSoon + "</p>" + inp +
+    '<p class="note" id="cutnote" style="margin:4px 0 0"></p></div><div id="modebody"></div>';
+}
+function hexLines(b, o) {
+  o = o || {};
+  let h = "";
+  for (let i = 0; i < b.length; i++) {
+    if (i && i % 8 === 0) h += "<br>"; else if (i) h += " ";
+    let cls = o.cls ? o.cls(i) : "";
+    if (o.n !== undefined && i >= o.n) cls += " dim";
+    h += cls ? '<span class="' + cls.trim() + '">' + hx2(b[i]) + "</span>" : hx2(b[i]);
+  }
+  return h;
+}
+const vb = (role, title, inner, extra) => '<div class="vb role-' + role + (extra || "") + '"><b>' + title + "</b>" + inner + "</div>";
+const hxd = (b, o) => '<div class="hx">' + hexLines(b, o) + "</div>";
+const txd = s => '<div class="tx">"' + esc(s) + '"</div>';
+const va = '<div class="va">&#8595;</div>';
+const aesBox = k2 => '<div class="aesb">AES<span class="ktag' + (k2 ? " k2" : "") + '">' + (k2 === 1 ? "K2" : k2 === 2 ? "K1" : "K") + "</span></div>";
+const xorC = '<div class="xorc">&#8853;</div>';
+const cbCls = i => i < 12 ? "bn" : "bk";
+
+function updateL3() {
+  const body = document.getElementById("modebody");
+  if (!body) return;
+  const t = L();
+  const raw = enc(app.msg);
+  document.getElementById("cutnote").textContent = raw.length > MAXMSG ? t.cut(MAXMSG) : "";
+  const errs = [];
+  if (app.keyErr) errs.push(t.errKey);
+  if ((app.mode === "ctr" || app.mode === "gcm") && app.nonceErr) errs.push(t.errNonce);
+  if (app.mode === "xts" && app.k2Err) errs.push(t.errK2);
+  if (errs.length) { body.innerHTML = '<div class="card"><p class="err">' + errs.join(" ") + "</p></div>"; return; }
+  body.innerHTML = ({ ecb: modeECB, ctr: modeCTR, gcm: modeGCM, xts: modeXTS })[app.mode]();
+  if (app.mode === "ecb") drawPictures();
+}
+
+function modeECB() {
+  const t = L(), p = msgBytes(), pp = pkcs7(p), c = ecbEncrypt(app.key, pp), nb = pp.length / 16, padN = pp.length - p.length;
+  const blocks = [];
+  for (let j = 0; j < nb; j++) blocks.push({ p: pp.slice(16 * j, 16 * j + 16), c: c.slice(16 * j, 16 * j + 16) });
+  const twin = j => { for (let k = 0; k < nb; k++) if (k !== j && sameBytes(blocks[k].p, blocks[j].p)) return k; return -1; };
+  let cols = "", firstPair = null;
+  for (let j = 0; j < nb; j++) {
+    const tw = twin(j);
+    if (tw >= 0 && !firstPair) firstPair = [Math.min(j, tw) + 1, Math.max(j, tw) + 1];
+    const lim = 16 * j + 16 <= p.length ? 16 : p.length - 16 * j;      // bytes of the message in this block
+    cols += '<div class="mcol">' +
+      vb("pt", t.pLbl(j + 1), hxd(blocks[j].p, { cls: i => i >= lim ? "pad" : "" }) + txd(chars(blocks[j].p.slice(0, Math.max(0, lim)))), tw >= 0 ? " same" : "") + va + aesBox(0) + va +
+      vb("ct", t.cLbl(j + 1) + (tw >= 0 ? ' <span style="color:var(--chg)">' + t.sameAs(tw + 1) + "</span>" : ""), hxd(blocks[j].c), tw >= 0 ? " same" : "") + "</div>";
+  }
+  return '<div class="card"><h3>' + t.ecbTitle + '</h3><div class="mcols">' + cols + "</div>" +
+      '<p class="verdict" style="color:' + (firstPair ? "var(--chg)" : "var(--muted)") + '">' + (firstPair ? t.sameBlocks(firstPair[0], firstPair[1]) : t.noSame) + "</p>" +
+      '<p class="note" style="margin:4px 0 0">' + t.padNote(padN) + "</p></div>" +
+    '<div class="card"><h3>' + t.picTitle + '</h3><div class="pics">' +
+      [0, 1, 2].map(i => fig('<canvas id="pic' + i + '" width="256" height="160"></canvas>', t.picCaps[i])).join("") + "</div>" +
+      '<p class="note" style="margin:8px 0 0">' + t.picNote + "</p></div>";
+}
+
+/* the ECB picture: 256 x 160 pixels, one byte per pixel; a padlock drawn with flat colours */
+const PW = 256, PH = 160;
+function lockPicture() {
+  const img = new Uint8Array(PW * PH);
+  for (let y = 0; y < PH; y++) for (let x = 0; x < PW; x++) {
+    let v = 0xe6;                                                     // background
+    const dx = x - 128, dy = y - 66, d2 = dx * dx + dy * dy;
+    if (y <= 66 && d2 <= 50 * 50 && d2 >= 30 * 30) v = 0x8c;          // shackle (upper half of a ring)
+    if (y > 66 && y < 80 && ((x >= 78 && x < 98) || (x >= 158 && x < 178))) v = 0x8c;
+    if (x >= 64 && x < 192 && y >= 78 && y < 150) v = 0x30;           // body
+    const kx = x - 128, ky = y - 102;
+    if (kx * kx + ky * ky <= 11 * 11 || (x >= 123 && x < 133 && y >= 102 && y < 132)) v = 0xe6;   // keyhole
+    if (y >= 40 && y < 56 && x >= 16 && x < 48) v = 0xb4;             // two small squares, block-aligned
+    if (y >= 40 && y < 56 && x >= 208 && x < 240) v = 0xb4;
+    img[y * PW + x] = v;
+  }
+  return img;
+}
+let PIC = null;
+function drawPictures() {
+  const cvs = [0, 1, 2].map(i => document.getElementById("pic" + i));
+  if (!cvs[0] || app.keyErr) return;
+  const nonce = app.nonceErr ? new Uint8Array(12) : app.nonce;
+  const tag = bytesHex(app.key) + bytesHex(nonce);
+  if (!PIC || PIC.tag !== tag) {
+    const img = lockPicture();
+    PIC = { tag: tag, imgs: [img, ecbEncrypt(app.key, img), ctrEncrypt(app.key, counterBlock(nonce, 1), img).c] };
+  }
+  cvs.forEach((cv, k) => {
+    const ctx = cv.getContext("2d"), id = ctx.createImageData(PW, PH), src = PIC.imgs[k];
+    for (let i = 0; i < src.length; i++) { const v = src[i]; id.data[4 * i] = v; id.data[4 * i + 1] = v; id.data[4 * i + 2] = v; id.data[4 * i + 3] = 255; }
+    ctx.putImageData(id, 0, 0);
+  });
+}
+
+function ctrColumns(p, z, c, ctr0) {
+  const t = L(), nb = Math.max(1, Math.ceil(p.length / 16));
+  let cols = "";
+  for (let j = 0; j < nb; j++) {
+    const n = Math.min(16, p.length - 16 * j), ctr = ctr0 + j;
+    const zb = encryptBlock(expandKey(app.key), counterBlock(app.nonce, ctr));
+    cols += '<div class="mcol">' +
+      vb("nonce", t.cbLbl + " = " + ctr, hxd(counterBlock(app.nonce, ctr), { cls: cbCls })) + va + aesBox(0) + va +
+      vb("ks", t.zLbl(j + 1), hxd(zb, { n: n })) + xorC +
+      vb("pt", t.pLbl(j + 1), hxd(p.slice(16 * j, 16 * j + n)) + txd(chars(p.slice(16 * j, 16 * j + n)))) + '<div class="eqs">=</div>' +
+      vb("ct", t.cLbl(j + 1), hxd(c.slice(16 * j, 16 * j + n))) + "</div>";
+  }
+  return '<div class="mcols">' + cols + "</div>";
+}
+function modeCTR() {
+  const t = L(), p = msgBytes(), e = ctrEncrypt(app.key, counterBlock(app.nonce, 1), p);
+  return '<div class="card"><h3>' + t.ctrTitle + "</h3>" + ctrColumns(p, e.z, e.c, 1) +
+    '<div class="legend"><span class="role-nonce">nonce</span><span class="role-ctr">counter</span><span class="role-key">K, Z</span><span class="role-pt">P</span><span class="role-ct">C</span></div>' +
+    '<ul class="bullets">' + t.ctrNotes.map(s => "<li>" + s + "</li>").join("") + "</ul></div>";
+}
+function modeGCM() {
+  const t = L(), p = msgBytes(), a = enc(app.aad), g = gcmEncrypt(app.key, app.nonce, p, a);
+  let h = '<div class="card"><h3>' + t.extraTitle + "</h3>" +
+    '<div class="hflow">' + vb("pt", t.zero, hxd(new Uint8Array(16))) + '<span class="arrow">&#8594;</span>' + aesBox(0) + '<span class="arrow">&#8594;</span>' + vb("key2", t.hLbl, hxd(g.H)) + "</div>" +
+    '<div class="hflow">' + vb("nonce", t.cbLbl + " = 1", hxd(counterBlock(app.nonce, 1), { cls: cbCls })) + '<span class="arrow">&#8594;</span>' + aesBox(0) + '<span class="arrow">&#8594;</span>' + vb("tag", t.sLbl, hxd(g.S)) + "</div>" +
+    '<p class="note" style="margin:4px 0 0">' + t.hNote + "</p></div>";
+  h += '<div class="card"><h3>' + t.gcmCtrTitle + "</h3>" + (p.length ? ctrColumns(p, g.z, g.c, 2) : "") + "</div>";
+  let rows = '<tr><th>' + t.ghCols[0] + "</th><th>" + t.ghCols[1] + "</th><th>" + t.ghCols[2] + "</th></tr>";
+  for (const s of g.steps) rows += '<tr><td class="lbl">' + t.ghRow(s.kind, s.n) + '</td><td style="color:' + (s.kind === "c" ? "var(--c)" : "var(--muted)") + '">' + bytesHex(s.block) + "</td><td>" + bytesHex(s.x) + "</td></tr>";
+  h += '<div class="card"><h3>' + t.ghTitle + '</h3><div class="tablewrap"><table class="btable">' + rows + "</table></div>" +
+    '<p class="note" style="margin:6px 0 8px">' + t.ghNote + "</p>" +
+    '<div class="hflow"><span class="verdict" style="margin:0">' + t.tagEq + "</span>" + vb("tag", "T", '<div class="tagbig">' + bytesHex(g.tag) + "</div>") + "</div>" +
+    '<p style="margin:4px 0 0">' + t.sends + "</p></div>";
+  // Mallory
+  let strip = "";
+  for (let i = 0; i < g.c.length; i++) strip += '<button class="mb' + (i === app.tamper ? " on" : "") + '" data-action="tamper" data-i="' + i + '">' + hx2(i === app.tamper ? g.c[i] ^ 1 : g.c[i]) + "</button>";
+  h += '<div class="card"><h3>' + t.malTitle + '</h3><p class="note" style="margin:0">' + t.malHint + '</p><div class="mstrip">' + strip + "</div>";
+  if (app.tamper >= 0 && app.tamper < g.c.length) {
+    const c2 = g.c.slice(); c2[app.tamper] ^= 1;
+    const t2 = gcmTag(app.key, app.nonce, c2, a);
+    const p2 = c2.map((x, i) => x ^ g.z[i]);
+    const ok = sameBytes(t2, g.tag);
+    const txt = chars(p2), i0 = app.tamper;
+    h += "<p>" + t.malChanged(i0, hx2(g.c[i0]), hx2(c2[i0])) + ' <button data-action="tamper" data-i="-1">' + t.undo + "</button></p>" +
+      '<table class="btable"><tr><td class="lbl">' + t.bobCalc + '</td><td>' + hexDiffHTML(g.tag, t2) + '</td></tr><tr><td class="lbl">' + t.bobGot + "</td><td>" + bytesHex(g.tag).replace(/(..)(?!$)/g, "$1 ") + "</td></tr></table>" +
+      '<p class="verdict ' + (ok ? "okline" : "badline") + '">' + (ok ? t.bobOk : t.bobBad) + "</p>" +
+      '<p class="note" style="margin:6px 0 0">' + t.noTag + ' <span class="inline">"' + esc(txt.slice(0, i0)) + '<span class="hit">' + esc(txt[i0]) + "</span>" + esc(txt.slice(i0 + 1)) + '"</span></p>';
+  } else {
+    h += '<table class="btable"><tr><td class="lbl">' + t.bobCalc + "</td><td>" + bytesHex(gcmTag(app.key, app.nonce, g.c, a)) + '</td></tr></table><p class="verdict okline">' + t.bobOk + "</p>";
+  }
+  h += '<div class="why">' + t.gcmNonce + "</div></div>";
+  return h;
+}
+function modeXTS() {
+  const t = L(), p = msgBytes(), sec = new Uint8Array(64);
+  sec.set(p);
+  const tw = sectorBytes(app.sector), x = xtsEncrypt(app.key, app.k2, tw, sec);
+  let h = '<div class="card"><h3>' + t.xtsTop + '</h3><div class="hflow">' +
+    vb("nonce", t.secAs + ": " + app.sector, hxd(tw)) + '<span class="arrow">&#8594;</span>' + aesBox(1) + '<span class="arrow">&#8594;</span>' + vb("nonce", t.tweakT, hxd(x.T0)) + "</div></div>";
+  let cols = "", pair = null;
+  for (let j = 0; j < 4; j++) {
+    const pj = sec.slice(16 * j, 16 * j + 16);
+    for (let k = 0; k < j; k++) if (!pair && sameBytes(pj, sec.slice(16 * k, 16 * k + 16))) pair = [k + 1, j + 1];
+    const lim = Math.max(0, Math.min(16, p.length - 16 * j));
+    cols += '<div class="mcol">' + vb("nonce", "T<sub>" + (j + 1) + "</sub> = " + t.tjLbl(j), hxd(x.tweaks[j])) + va +
+      vb("pt", t.pLbl(j + 1), hxd(pj, { cls: i => i >= lim ? "pad" : "" }) + txd(chars(pj.slice(0, lim)))) +
+      xorC + '<div class="va" style="font-size:12px">T<sub>' + (j + 1) + "</sub></div>" + aesBox(2) + xorC + '<div class="va" style="font-size:12px">T<sub>' + (j + 1) + "</sub> &#8595;</div>" +
+      vb("ct", t.cLbl(j + 1), hxd(x.c.slice(16 * j, 16 * j + 16))) + "</div>";
+  }
+  h += '<div class="card"><h3>' + t.xtsTitle + '</h3><div class="mcols">' + cols + "</div>" +
+    '<p class="note" style="margin:8px 0 0">' + t.alphaNote + "</p>" + '<p class="note" style="margin:4px 0 0">' + t.sectorNote + "</p></div>";
+  // same data, other sectors
+  const b1 = sec.slice(0, 16);
+  let lines = "";
+  for (let d = 0; d < 3; d++) {
+    const s = app.sector + d;
+    lines += '<tr><td class="lbl">' + t.secN(s) + '</td><td style="color:var(--c)">' + bytesHex(xtsEncrypt(app.key, app.k2, sectorBytes(s), b1).c) + "</td></tr>";
+  }
+  h += '<div class="card"><h3>' + t.sameTitle + "</h3>" + (pair ? '<p class="verdict" style="margin:0 0 6px">' + t.sameEq(pair[0], pair[1]) + "</p>" : "") +
+    '<p style="margin:0 0 4px">' + t.sameTxt + '</p><table class="btable">' + lines + "</table></div>";
+  // Mallory, no tag
+  const c2 = x.c.slice();
+  if (app.xtsTamper >= 0) c2[16 * app.xtsTamper] ^= 1;
+  const back = xtsDecrypt(app.key, app.k2, tw, c2);
+  let rows = "";
+  for (let j = 0; j < 4; j++) {
+    const bj = back.slice(16 * j, 16 * j + 16), bad = j === app.xtsTamper;
+    rows += '<tr' + (bad ? ' class="on"' : "") + '><td class="lbl">' + t.pLbl(j + 1) + "</td><td>" + bytesHex(bj) + '</td><td style="white-space:pre">"' + esc(chars(bj)) + '"</td></tr>';
+  }
+  h += '<div class="card"><h3>' + t.noTagTitle + '</h3><p style="margin:0 0 6px">' + t.noTagTxt + '</p><div class="btns" style="margin:0 0 8px">' +
+    [0, 1, 2, 3].map(j => '<button data-action="xts-tamper" data-j="' + j + '"' + (j === app.xtsTamper ? ' class="dark"' : "") + ">" + t.malBlock(j + 1) + "</button>").join("") +
+    (app.xtsTamper >= 0 ? '<button data-action="xts-tamper" data-j="-1">' + t.undo + "</button>" : "") + "</div>" +
+    '<p style="margin:0 0 4px">' + t.bobReads + '</p><table class="btable">' + rows + "</table>" +
+    (app.xtsTamper >= 0 ? '<p class="verdict badline">' + t.garbled(app.xtsTamper + 1) + "</p>" : "") +
+    '<div class="why">' + t.determ + "</div></div>";
+  return h;
+}
+
+/* ---------- step 5: comparison ---------- */
+function render4() {
+  const t = L();
+  let h = '<div class="card"><div class="tablewrap"><table class="cmp"><thead><tr><th></th>' +
+    MODES.map(m => '<th><button data-action="open-mode" data-m="' + m + '">' + m.toUpperCase() + "</button></th>").join("") + '<th class="ref">' + t.refHead + "</th></tr></thead><tbody>";
+  t.cmpRows.forEach((rn, i) => {
+    h += '<tr><th class="rh">' + rn + "</th>" + t.cmp[i].map((v, k) => '<td class="' + CMP_GRADE[i][k] + (k === 4 ? " ref" : "") + '">' + v + "</td>").join("") + "</tr>";
+  });
+  return h + '</tbody></table></div><p class="note" style="margin:8px 0 0">' + t.cmpNote + "</p></div>";
+}
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
+    [render0, render1, render2, render3, render4][app.level]() + "</div>";
+  if (app.level === 0) updateL0();
+  if (app.level === 3) updateL3();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", "#" + (app.level + 1) + (app.level === 3 ? "-" + app.mode : "")); } catch (e) {}
+}
+function rerender() { const y = view.scrollTop; render(); view.scrollTop = y; const f = view.querySelector(".fade"); if (f) f.classList.remove("fade"); }
+function goTo(level) {
+  if (level === 2 && app.round < 1) app.round = 1;
+  app.level = level;
+  render();
+  view.scrollTop = 0;
+}
+function zoomIn() { if (app.level < NSTEPS - 1) goTo(app.level + 1); }
+function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+function inputsChanged() { if (app.level === 0) updateL0(); else if (app.level === 3) updateL3(); }
+function setRound(r) { app.round = Math.max(app.level === 2 ? 1 : 0, Math.min(10, r)); rerender(); }
+function setOp(k) { app.op = Math.max(0, Math.min(3, k)); rerender(); }
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "op-go") { e.stopPropagation(); if (app.round < 1) app.round = 1; app.op = +el.dataset.op; goTo(2); }
+  else if (a === "zoom") { if (app.level === 1 && app.round < 1) app.round = 1; zoomIn(); }
+  else if (a === "goto") goTo(+el.dataset.s);
+  else if (a === "rand") randomize(el.dataset.f);
+  else if (a === "flip-dec" || a === "flip-inc") {
+    app.flip = (app.flip + (a === "flip-inc" ? 1 : 127)) % 128;
+    const inp = view.querySelector('input[data-field="flip"]'); if (inp) inp.value = app.flip;
+    updateL0();
+  }
+  else if (a === "round-dec" || a === "round-inc") setRound(app.round + (a === "round-inc" ? 1 : -1));
+  else if (a === "round-set") setRound(+el.dataset.r);
+  else if (a === "op-set") setOp(+el.dataset.op);
+  else if (a === "op-prev") { if (app.op > 0) setOp(app.op - 1); else if (app.round > 1) { app.op = 3; setRound(app.round - 1); } }
+  else if (a === "op-next") { if (app.op < 3) setOp(app.op + 1); else if (app.round < 10) { app.op = 0; setRound(app.round + 1); } }
+  else if (a === "byte" && app.level === 2) {
+    const i = +el.dataset.i;
+    // in the "after" table of ShiftRows, follow the byte back to where it came from
+    if (app.op === 1 && el.closest("figure") && el.closest("figure").previousElementSibling) { const r = i % 4, c = i >> 2; app.sel = r + 4 * ((c + r) % 4); }
+    else app.sel = i;
+    app.mcCol = i >> 2;
+    rerender();
+  }
+  else if (a === "mode") { app.mode = el.dataset.m; rerender(); }
+  else if (a === "cbc-soon") { const n = document.getElementById("cbcnote"); if (n) n.hidden = !n.hidden; }
+  else if (a === "open-mode") { app.mode = el.dataset.m; goTo(3); }
+  else if (a === "sec-dec" || a === "sec-inc") {
+    app.sector = Math.max(0, app.sector + (a === "sec-inc" ? 1 : -1));
+    const inp = view.querySelector('input[data-field="sector"]'); if (inp) inp.value = app.sector;
+    app.xtsTamper = -1; updateL3();
+  }
+  else if (a === "tamper") { app.tamper = +el.dataset.i; updateL3(); }
+  else if (a === "xts-tamper") { app.xtsTamper = +el.dataset.j; updateL3(); }
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  const v = e.target.value;
+  if (f === "key") { const b = parseHex(v, 16); app.keyText = v; app.keyErr = !b; if (b) { app.key = b; app.tamper = -1; app.xtsTamper = -1; } inputsChanged(); }
+  else if (f === "k2") { const b = parseHex(v, 16); app.k2Text = v; app.k2Err = !b; if (b) { app.k2 = b; app.xtsTamper = -1; } inputsChanged(); }
+  else if (f === "nonce") { const b = parseHex(v, 12); app.nonceText = v; app.nonceErr = !b; if (b) { app.nonce = b; app.tamper = -1; } inputsChanged(); }
+  else if (f === "pt") {
+    const b = parseHex(v, 16); app.ptText = v; app.ptErr = !b;
+    if (b) { app.pt = b; const tx = view.querySelector('input[data-field="pttxt"]'); if (tx) tx.value = ptAsText(); }
+    updateL0();
+  }
+  else if (f === "pttxt") {
+    const raw = enc(v), b = new Uint8Array(16);
+    b.set(raw.slice(0, 16));
+    app.pt = b; app.ptText = bytesHex(b); app.ptErr = false;
+    const hx = view.querySelector('input[data-field="pt"]'); if (hx) hx.value = app.ptText;
+    updateL0();
+  }
+  else if (f === "flip") { const n = parseInt(v, 10); if (n >= 0 && n <= 127) { app.flip = n; updateL0(); } }
+  else if (f === "msg") { app.msg = v; app.tamper = -1; app.xtsTamper = -1; updateL3(); }
+  else if (f === "aad") { app.aad = v; updateL3(); }
+  else if (f === "sector") { const n = parseInt(v, 10); if (n >= 0 && n <= 0xffffffff) { app.sector = n; app.xtsTamper = -1; updateL3(); } }
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  rerender();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Enter" && tag === "BUTTON") return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
+  else if ((app.level === 1 || app.level === 2) && (e.key === "+" || e.key === "=")) setRound(app.round + 1);
+  else if ((app.level === 1 || app.level === 2) && e.key === "-") setRound(app.round - 1);
+});
+
+/* ---------- start ---------- */
+const SELF_FAILS = selfTest();
+(function () {
+  const m = /^#(\d)(?:-(ecb|ctr|gcm|xts))?$/.exec(location.hash);
+  if (m && +m[1] >= 1 && +m[1] <= NSTEPS) { app.level = +m[1] - 1; if (m[2]) app.mode = m[2]; }
+})();
+render();
+</script>
+</body>
+</html>
