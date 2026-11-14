@@ -15,6 +15,7 @@
   --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
   --p:#2F6FDB; --z:#9A6B00; --c:#7446C4;
   --g0:#2F6FDB; --g1:#2FA84F; --g2:#E5484D; --g3:#E2A60E;
+  --mv1:#E9F0FC; --mv2:#CCDCF7; --mv3:#A9C4F0;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
 }
@@ -27,6 +28,7 @@
     --ct-b:#B596F5; --ct-bg:#2A2142;
     --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
     --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+    --mv1:#1B2638; --mv2:#203856; --mv3:#2A4D80;
   }
 }
 :root[data-theme="dark"]{
@@ -37,6 +39,7 @@
   --ct-b:#B596F5; --ct-bg:#2A2142;
   --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
   --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
+  --mv1:#1B2638; --mv2:#203856; --mv3:#2A4D80;
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%}
@@ -71,6 +74,10 @@ select{font-family:var(--sans)}
 .step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
 .step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
 .step.past .gnum{background:var(--ink);color:var(--surface)}
+.step.open{background:var(--sunken)}
+.step.sub{padding:6px 10px 6px 26px;gap:9px}
+.step.sub b{font-size:13.5px;font-weight:600}
+.step.sub .gnum{width:34px;height:24px;font-size:12px;border-radius:6px}
 .sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 #selftest.okt{color:var(--ok);font-weight:600}
 #selftest.badt{color:var(--bad);font-weight:600}
@@ -183,6 +190,11 @@ textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--ru
 .sc b{font-size:12.5px;font-weight:600}
 .sc i{font-style:normal;font-size:9.5px;color:var(--z);font-weight:600}
 .sc.idle b{color:var(--muted);font-weight:400}
+.sc.mv1{background:var(--mv1)}.sc.mv2{background:var(--mv2)}.sc.mv3{background:var(--mv3)}
+.lg-mv0{border-color:var(--rule)!important;color:var(--muted)}
+.lg-mv1{border-color:var(--rule)!important;background:var(--mv1)}.lg-mv2{border-color:var(--rule)!important;background:var(--mv2)}.lg-mv3{border-color:var(--rule)!important;background:var(--mv3)}
+.gridwrap{position:relative;width:max-content}
+.gridwrap svg.ov{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:4}
 .sc.sw{background:var(--chg-bg);border-color:var(--chg)}
 .sc.pi{outline:3px solid var(--g1);outline-offset:0;z-index:2}
 .sc.pj{box-shadow:inset 0 0 0 3px var(--g2);z-index:2}
@@ -210,8 +222,38 @@ textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--ru
 .htable td.out{background:var(--key-bg);font-weight:600}
 
 /* step 4: the weaknesses */
-.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
-.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chart{display:block;width:100%;max-width:860px;height:auto;font-family:var(--sans)}
+.chart text{fill:var(--muted);font-size:11px}
+.chart .ax{stroke:var(--rule);stroke-width:1}
+.chart .ux{stroke:var(--non-b);stroke-width:1.5;stroke-dasharray:5 4}
+.chart text.ul{fill:var(--non-b);font-weight:600}
+.chart .bar{fill:var(--muted)}
+.chart .bar.hl{fill:var(--chg)}
+.chart .bar.real{fill:var(--ok)}
+.chart text.hlt{fill:var(--chg);font-weight:700;font-size:12px}
+.chart text.okt{fill:var(--ok);font-weight:700;font-size:12px}
+.chart .curve{fill:none;stroke:var(--chg);stroke-width:2.5}
+.chart .ptr{stroke:var(--ink);stroke-width:1.2;stroke-dasharray:3 3}
+.chart circle.ptr{fill:var(--chg);stroke:var(--surface);stroke-width:2;stroke-dasharray:none}
+.chart .mark{fill:var(--ink);stroke:var(--surface);stroke-width:2}
+.chart text.mk{fill:var(--ink);font-weight:600;font-size:12px}
+.chart .run{fill:var(--non-b)}
+.posbtns{display:inline-flex;gap:4px}
+.posbtns button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.pkts{font-family:var(--mono);font-size:12.5px;display:flex;flex-direction:column;gap:2px;min-height:150px;margin-top:4px}
+.pkts div{display:flex;gap:8px;padding:2px 8px;border-radius:5px;white-space:nowrap;overflow:hidden}
+.pkts div.weak{background:var(--chg-bg)}
+.pkts div.skip{color:var(--muted)}
+.pkts .ivb{border:1.5px solid var(--key-b);border-radius:4px;padding:0 4px}
+.kchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.kchip{font-family:var(--mono);font-size:14px;padding:3px 9px;border-radius:6px;border:1.5px solid var(--key-b);background:var(--key-bg);min-width:4.6em;text-align:center}
+.kchip small{display:block;font-family:var(--sans);font-size:10.5px;color:var(--muted)}
+.kchip.unk{background:var(--surface);color:var(--muted);border-style:dashed}
+.kchip.now{outline:2.5px solid var(--chg);outline-offset:1px}
+.kchip.found{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.kchip.found small{color:var(--surface);opacity:.85}
+.chachaline{margin:0 0 14px;font-size:14px}
+.chachaline a,.note a{color:var(--focus)}
 .mtag{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--chg);border-radius:5px;padding:1px 7px;margin-right:6px;vertical-align:1px}
 .bars{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;max-width:760px;margin-top:8px}
 .bars .bl{font-weight:600;font-size:13.5px;text-align:right;white-space:nowrap}
@@ -384,7 +426,7 @@ function countS0(keys16, rnd32, n, res) {
     res.n++;
   }
 }
-// mistake 2: how often keystream bytes 1, 2, 3 are 0, and the full count of byte 2 (for "recover a byte")
+// 4.2: the full count of keystream bytes 1, 2 and 3 over many keys: res.hist[b][z], b = 0, 1, 2
 function countZeros(keys16, n, res) {
   const S = new Uint8Array(256);
   for (let k = 0; k < n; k++) {
@@ -400,9 +442,7 @@ function countZeros(keys16, n, res) {
       i = (i + 1) % 256;
       j = (j + S[i]) % 256;
       const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
-      const z = S[(S[i] + S[j]) % 256];
-      if (z === 0) res.zero[b]++;
-      if (b === 1) res.hist2[z]++;
+      res.hist[b][S[(S[i] + S[j]) % 256]]++;
     }
     res.n++;
   }
@@ -418,6 +458,103 @@ function xorBytes(a, b) {
   for (let k = 0; k < n; k++) out[k] = a[k] ^ b[k];
   return out;
 }
+
+/* 4.3: the FMS attack exactly as in Lecture 1, example2 (wep.py, fms.py, attack.py).
+   The packets come from Python's random.Random(2): a port of Python's Mersenne Twister
+   (seeding with init_by_array, getrandbits, randrange = _randbelow, shuffle), so the packets are byte for byte
+   the ones wep.capture() makes. */
+function PyRandom(seed) {
+  const N = 624, mt = new Uint32Array(N);
+  let mti = N;
+  const initGenrand = s => {
+    mt[0] = s >>> 0;
+    for (let i = 1; i < N; i++) mt[i] = (Math.imul(1812433253, mt[i - 1] ^ (mt[i - 1] >>> 30)) + i) >>> 0;
+  };
+  // Python: an int seed becomes its 32-bit words, lowest first (seed < 2^32 here: one word)
+  const key = [seed >>> 0];
+  initGenrand(19650218);
+  let i = 1, j = 0;
+  for (let k = Math.max(N, key.length); k > 0; k--) {
+    mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1664525)) + key[j] + j) >>> 0;
+    i++; j++;
+    if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+    if (j >= key.length) j = 0;
+  }
+  for (let k = N - 1; k > 0; k--) {
+    mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1566083941)) - i) >>> 0;
+    i++;
+    if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+  }
+  mt[0] = 0x80000000;
+  const u32 = () => {
+    if (mti >= N) {
+      for (let k = 0; k < N; k++) {
+        const y = (mt[k] & 0x80000000) | (mt[(k + 1) % N] & 0x7fffffff);
+        mt[k] = mt[(k + 397) % N] ^ (y >>> 1) ^ (y & 1 ? 0x9908b0df : 0);
+      }
+      mti = 0;
+    }
+    let y = mt[mti++];
+    y ^= y >>> 11; y ^= (y << 7) & 0x9d2c5680; y ^= (y << 15) & 0xefc60000; y ^= y >>> 18;
+    return y >>> 0;
+  };
+  const getrandbits = k => u32() >>> (32 - k);   // k = 1 .. 32
+  const randbelow = n => {                      // Python's _randbelow_with_getrandbits
+    const k = 32 - Math.clz32(n);
+    let r = getrandbits(k);
+    while (r >= n) r = getrandbits(k);
+    return r;
+  };
+  return {
+    getrandbits: getrandbits, randrange: randbelow,
+    shuffle: x => { for (let a = x.length - 1; a > 0; a--) { const b = randbelow(a + 1); const t = x[a]; x[a] = x[b]; x[b] = t; } },
+  };
+}
+// wep.capture(seed=2, per_byte=3000): packets = IV (A+3, 255, x) followed by the RC4 ciphertext of AA + 8 random bytes.
+// Made in pieces: next(count) adds up to `count` packets and returns true when all are there (then shuffled).
+function wepCapture(secret, seed, perByte) {
+  const rng = PyRandom(seed), total = secret.length * perByte, packets = [];
+  let A = 0, k = 0;
+  return {
+    packets: packets, total: total,
+    next(count) {
+      while (count-- > 0 && A < secret.length) {
+        const iv = Uint8Array.from([A + 3, 255, rng.randrange(256)]);
+        const plain = new Uint8Array(9); plain[0] = 0xAA;
+        for (let b = 1; b < 9; b++) plain[b] = rng.randrange(256);
+        const c = xorBytes(plain, keystream(wepKey(iv, secret), 9));
+        const pk = new Uint8Array(12); pk.set(iv, 0); pk.set(c, 3);
+        packets.push(pk);
+        if (++k === perByte) { k = 0; A++; }
+      }
+      if (A < secret.length) return false;
+      if (!this.shuffled) { rng.shuffle(packets); this.shuffled = true; }
+      return true;
+    },
+  };
+}
+// fms.fms_guess: one guess for the next secret key byte, from a weak IV, the first keystream byte and the bytes found so far
+function fmsGuess(iv, z1, known) {
+  const key = Array.from(iv).concat(Array.from(known));
+  const A = key.length;
+  const S = new Uint8Array(256);
+  for (let x = 0; x < 256; x++) S[x] = x;
+  let j = 0;
+  for (let i = 0; i < A; i++) {
+    j = (j + S[i] + key[i]) % 256;
+    const tmp = S[i]; S[i] = S[j]; S[j] = tmp;
+  }
+  const inverse = new Uint8Array(256);
+  for (let x = 0; x < 256; x++) inverse[S[x]] = x;
+  return ((inverse[z1] - j - S[A]) % 256 + 256) % 256;
+}
+// attack.py, for one packet and the key byte A: null if the IV is not weak for A, else the vote
+function fmsVote(pk, A, recovered) {
+  if (pk[0] !== A + 3 || pk[1] !== 255) return null;
+  return fmsGuess(pk.subarray(0, 3), pk[3] ^ 0xAA, recovered);
+}
+// attack.py's ranking: sorted(range(256), key=votes, reverse=True) is stable, so ties keep the smaller value first
+function rankVotes(votes) { return Array.from({ length: 256 }, (_, v) => v).sort((a, b) => votes[b] - votes[a] || a - b); }
 
 function parseKeyHex(text) {
   const s = text.replace(/[\s:,]/g, "").replace(/^0x/i, "");
@@ -481,12 +618,54 @@ function selfTest() {
   const zw = keystream(wepKey(parseKeyHex("4F12A0"), WEP_SECRET), 4);
   if (bytesHex(zw) !== "ec56b2ac" || bytesHex(xorBytes(zw, SNAP)) !== "46fcb1ac") fails.push("WEP packet");
   // the statistics code is the same RC4
-  const r = { zero: [0, 0, 0], hist2: new Uint32Array(256), n: 0 };
+  const r = { hist: [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)], n: 0 };
   const k16 = parseKeyHex("0102030405060708090a0b0c0d0e0f10");
   countZeros(k16, 1, r);
   const z3 = keystream(k16, 3);
-  if (z3[1] !== 0xc7 || r.hist2[z3[1]] !== 1) fails.push("statistics code");
+  if (z3[1] !== 0xc7 || r.hist[0][z3[0]] !== 1 || r.hist[1][z3[1]] !== 1 || r.hist[2][z3[2]] !== 1) fails.push("statistics code");
+  // Python's random.Random(2), recomputed in Python 3.12: getrandbits(32) x 3 and randrange(256) x 5
+  const r1 = PyRandom(2), r2 = PyRandom(2);
+  if ([0, 1, 2].map(() => r1.getrandbits(32)).join(" ") !== "4106135923 3707026329 4070888059" ||
+      [0, 1, 2, 3, 4].map(() => r2.randrange(256)).join(" ") !== "28 46 43 184 86") fails.push("Python random");
   return fails;
+}
+/* example2: python3 attack.py prints (Python 3.12, seed 2, 15 000 packets):
+   first packet 06ffc3086258ce1bb152ee63, last packet 05ff2c5366f638c5b227ceb7,
+   K[0] 1F (147) 85 (76) 95 (59); K[1] 8A (96) 5C (66) 92 (59); K[2] 3C (124) 94 (82) BD (48);
+   K[3] 77 (210) 12 (58) 05 (51); K[4] D2 (245) 45 (70) 36 (46); recovered 1f 8a 3c 77 d2, match True. */
+const FMS_SEED = 2, FMS_PER_BYTE = 3000;
+const FMS_TOP3 = ["1F 147 85 76 95 59", "8A 96 5C 66 92 59", "3C 124 94 82 BD 48", "77 210 12 58 05 51", "D2 245 45 70 36 46"];
+// the same check in pieces (about 10 million small steps: the page must not freeze); done(fails) at the end
+function fmsSelfTest(done) {
+  const hex = v => v.toString(16).padStart(2, "0").toUpperCase();
+  const cap = wepCapture(WEP_SECRET, FMS_SEED, FMS_PER_BYTE);
+  const recovered = [], fails = [];
+  let A = 0, p = 0, votes = new Uint32Array(256), top = [];
+  const step = () => {
+    const t0 = performance.now();
+    while (performance.now() - t0 < 25) {
+      if (!cap.next(500)) continue;
+      if (p === 0 && A === 0 && recovered.length === 0 && !cap.checked) {
+        cap.checked = true;
+        if (bytesHex(cap.packets[0]) !== "06ffc3086258ce1bb152ee63" || bytesHex(cap.packets[cap.total - 1]) !== "05ff2c5366f638c5b227ceb7") fails.push("example2 packets");
+      }
+      const end = Math.min(cap.total, p + 1500);
+      for (; p < end; p++) { const v = fmsVote(cap.packets[p], A, recovered); if (v !== null) votes[v]++; }
+      if (p < cap.total) continue;
+      const rk = rankVotes(votes);
+      recovered.push(rk[0]);
+      top.push(rk.slice(0, 3).map(v => hex(v) + " " + votes[v]).join(" "));
+      A++; p = 0; votes = new Uint32Array(256);
+      if (A === WEP_SECRET.length) {
+        if (top.join("|") !== FMS_TOP3.join("|")) fails.push("example2 votes");
+        if (bytesHex(recovered) !== bytesHex(WEP_SECRET)) fails.push("example2 key");
+        done(fails);
+        return;
+      }
+    }
+    setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
 }
 // CORE-END
 
@@ -511,12 +690,16 @@ const T = {
       ["One input, one keystream", "RC4 takes only a key, 1 to 256 bytes, and turns it into a keystream as long as we need. Encrypting is XOR of the plaintext with the keystream, byte by byte. There is no nonce input: the same key always gives the same keystream. Click the RC4 box to look inside."],
       ["Step 1: prepare", "The table S starts in order: 0, 1, 2, …, 255. The helper table T holds the key, repeated. For i = 0 to 255 the key decides j, and S[i] and S[j] change places. This runs once, before the first byte. Then click PRGA."],
       ["Step 2: produce", "PRGA starts with the S from the KSA and i = j = 0. Every loop moves i by one, lets j jump by S[i], swaps S[i] and S[j], and outputs S[(S[i] + S[j]) mod 256]. One loop gives one keystream byte, and S changes every time."],
-      ["Three design mistakes", "RC4 is simple, and it has three design mistakes that every modern cipher avoids. Measure each one yourself, with real RC4 and random keys."]],
-    selfOk: "✓ checked against RFC 6229 and the slides", selfBad: f => "✗ self-test failed: " + f,
-    moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back", fixFirst: "Fix the key in step 1.",
+      ["Count it yourself", "After the KSA, S[0] still equals key[0] far more often than chance allows. Run many random keys and count."],
+      ["Fill the histogram", "Fill the histogram with many random keys. A uniform keystream gives flat bars. The second byte of RC4 does not."],
+      ["Three costs of IV + key", "WEP puts a public 3-byte IV in front of the shared key. See what a repeated IV gives away, how soon it repeats, and how weak IVs leak the key itself."]],
+    subs: [["S remembers the key", "the KSA mixes too little"], ["The second byte", "the value 0 comes twice as often"], ["No nonce (WEP)", "IV + key, and what it costs"]],
+    stepOfSub: k => "Step 4 of 4 · weakness " + k + " of 3 · RC4",
+    selfOk: "✓ checked against RFC 6229, the slides and example2", selfWait: "checking against RFC 6229, the slides and example2 …", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "→ / Enter: next · ← / Esc: back", fixFirst: "Fix the key in step 1.",
     keyShort: "secret key, hex (1 to 256 bytes)", keyAsText: "as text", keyNotText: "(not plain text)", keyLen: n => n + " byte" + (n === 1 ? "" : "s"),
     preset5: "01 02 03 04 05", preset5_s: "the key on the slides (RFC 6229)", presetK: "Kangaroo", presetK_s: "the key of Task 2", randKey: "random 16-byte key",
-    nonceT: "nonce: no such input", nonceP: "RC4 takes only the key. Same key, same keystream, every time. A protocol has to glue a nonce into the key itself (step 4, mistake 3).",
+    nonceT: "nonce: no such input", nonceP: "RC4 takes only the key. Same key, same keystream, every time. A protocol has to glue a nonce into the key itself (<a href='#4.3'>step 4.3</a>).",
     boxRC4_s: "click to look inside", nodeKs: "keystream Z", nodePt: "plaintext P", nodeCt: "ciphertext C",
     ksCap: n => "as many bytes as the message (" + n + ")", ctCap: n => n + " byte" + (n === 1 ? "" : "s"),
     cardMsg: "Encrypting with RC4", cardDetails: "Details: the XOR byte by byte",
@@ -534,11 +717,14 @@ const T = {
     ksaSwap: (i, j, a, b) => i === j ? "j = i: S[" + i + "] swaps with itself, nothing changes." : "Swap S[" + i + "] and S[" + j + "]: " + a + " and " + b + " change places.",
     ksaAfter: (i, j) => "After the swap of i = " + i + ". The new j = " + j + " is where the next step starts.",
     ksaDone: j => "Done: i = 255, j = " + j + ". T is thrown away. PRGA starts with this S and i = j = 0.",
-    idleN: n => n + " cell" + (n === 1 ? "" : "s") + " still hold their own index (grey: S[x] = x).",
     perm: "S is still a permutation: every number from 0 to 255 is there exactly once.",
     gridCap: "the table S, 256 cells. Index = row + column. Small yellow number: T[x], the key byte for that cell.",
     gridCapP: "the table S, 256 cells. Index = row + column.",
     lgI: "i", lgJ: "j", lgSw: "swap", lgIdle: "never moved", lgT: "T[x] (key)", lgTp: "t: the output cell",
+    lgMv: "how far the value in a cell is from its start:", lgMv0: "at its start", lgMv1: "1 to 15 places", lgMv2: "16 to 63", lgMv3: "64 or more",
+    mvN: (a, b, c, d) => "at its start " + a + " · 1 to 15: " + b + " · 16 to 63: " + c + " · 64+: " + d,
+    s0key: (s0, k0) => "S[0] = " + s0 + ", key[0] = " + k0 + (s0 === k0 ? ": still the same (weakness 4.1)." : "."),
+    arrI: "S[i]", arrJ: "S[j]",
     noteKey: k => "The key here: " + k + ". Change it in step 1.",
     prgaPos: (n, s) => "byte " + n + " · step " + s + " of 5",
     prgaStart: "S comes from the KSA. i and j start at 0.",
@@ -554,38 +740,59 @@ const T = {
     histHead: ["i", "j = (j + S[i]) mod 256", "swap", "t = (S[i] + S[j]) mod 256", "output"],
     histCard: "Byte by byte", histNote: n => n > 8 ? "The last 8 bytes. The keystream is the same as in step 1." : "The keystream is the same as in step 1.",
     rfcNote: "Key 01 02 03 04 05 is in the official RC4 test vectors (RFC 6229). They start with b2 39 63 05: the same bytes.",
-    tabM: ["1: S remembers the key", "2: the second byte", "3: no nonce (WEP)"],
-    m1h: "RC4 mistake 1: the KSA mixes the key badly",
     m1you: (s0, k0, eq) => "Your key from step 1: after the KSA, S[0] = " + s0 + " and key[0] = " + k0 + ". " + (eq ? "The same number." : "Different this time."),
-    m1why: p => "<b>Why?</b> At i = 0: j = 0 + S[0] + T[0] = key[0], so S[0] gets the value key[0]. Later S[0] changes only if some j hits 0: about 1 chance in 256 at each step. Chance that this never happens in 255 steps: (255/256)<sup>255</sup> = about " + p + ".",
+    m1why: p => "<b>Why?</b> At i = 0, j = key[0], so S[0] gets the value key[0]. Later it moves only if some j hits 0. Chance that this never happens: (255/256)<sup>255</sup> = about " + p + ".",
     m1run: n => "Run " + fmtInt(n) + " random 16-byte keys", m1q: "How often is S[0] == key[0]?",
     m1ksa: "KSA", m1shuf: "fair shuffle",
     m1res: (a, n) => fmtInt(a) + " of " + fmtInt(n),
     m1note: "A fair shuffle is the baseline: about 1 chance in 256. Your numbers change a little with every run (Task 7).",
-    m1wep: "WEP lost its key this way (WEP problem 2): a public IV goes into this weak mixer, and the first keystream bytes still remember the secret key bytes.",
-    m2h: "RC4 mistake 2: the second byte is biased",
-    m2intro: "If keystream bytes are uniform, every value appears with chance 1/256 = 0.39%. Count how often bytes 1, 2 and 3 of the keystream are 0, over many random 16-byte keys (Task 9).",
+    m1wep: "This is how WEP lost its key: a public IV goes into this weak mixer (<a href='#4.3'>4.3</a>).",
+    uniform: "uniform: 1/256",
+    m2h: "The second keystream byte over many keys",
     m2keys: "keys:", m2run: "Run", m2running: (k, n) => fmtInt(k) + " of " + fmtInt(n) + " keys …",
-    m2byte: b => "byte " + b, uniform: "uniform: 1/256",
-    m2theory: p => "Mantin and Shamir (2001): the second byte is 0 with chance about 2/256 = " + p + ", twice as often as it should be.",
-    m2small: "With few keys the numbers are noisy. Try 1 000 000.",
-    m2rec: "The same message under many keys", m2recP: "The secret second byte of the message is 61 (the letter a). Each copy uses a different key, so C2 = 61 XOR Z2. When Z2 = 0, C2 = P2. The attacker counts C2 over all copies:",
+    m2pos: "keystream byte:", m2byte: b => "byte " + b,
+    m2zero: (b, p, k) => "Byte " + b + " was 0 in " + p + " of the keys (" + fmtInt(k) + " times).",
+    m2theory: p => "Expected for byte 2: about 2/256 = " + p + " (Mantin and Shamir, 2001). Bytes 1 and 3 stay near 1/256.",
+    m2small: "With few keys the bars are noisy. Try 1 000 000.",
+    m2axX: "value of the byte (0 to 255)", m2axY: "share of keys",
+    m2rec: "The same message under many keys", m2recP: "Alice sends one message many times, each time with a new key. Its second byte is 61 (the letter a), so C2 = 61 XOR Z2, and C2 = 61 whenever Z2 = 0. Eve only counts C2:",
     m2top: "most common values of C2",
-    m2exp: e => "Without the bias every value would appear about " + e + " times. The secret byte stands out, and the keys were never touched.",
+    m2exp: e => "Without the bias every value would appear about " + e + " times. The secret byte stands out, and no key was touched.",
     m2wait: "Press Run.",
-    m3h: "RC4 mistake 3: no nonce, so WEP glued one into the key",
+    m3c1: "Two packets, one IV",
     m3iv: "IV", m3iv_s: "3 bytes, public, new for each packet", m3sec: "shared Wi-Fi key", m3sec_s: "secret, the same for everybody", m3rc4: "RC4 key", m3rc4_s: "IV + key, 8 bytes",
     m3pk: k => "packet " + k, m3ivLbl: "IV (hex)",
     m3same: "packet 2: the same IV as packet 1", m3new: "packet 2: a random IV",
     m3rowP: "P", m3rowZ: "Z", m3rowC: "C",
     m3ivErr: "An IV is exactly 3 bytes (6 hex digits).",
     m3x12: "C1 XOR C2", m3p12: "P1 XOR P2",
-    m3hit: "Same IV, same RC4 key, same keystream: C1 XOR C2 = P1 XOR P2. The keystream cancels out.",
-    m3known: "The attacker knows P1 (a status packet of the printer). Then C1 XOR C2 XOR P1 gives P2:",
-    m3miss: "Different IVs give different RC4 keys and completely different keystreams. C1 XOR C2 is not P1 XOR P2 here. Now give packet 2 the same IV.",
-    m3bday: "How soon does an IV repeat?", m3bdayP: (N, n) => "The IV has 3 bytes: " + N + " possible values. With random IVs, a repeat comes after about √(2 ln 2 · 2²⁴) = " + n + " packets (50% chance), not after millions.",
+    m3hit: "Same IV, same keystream: C1 XOR C2 = P1 XOR P2.",
+    m3known: "Eve knows P1 (a status packet of the printer). C1 XOR C2 XOR P1 gives P2:",
+    m3miss: "Different IVs, different keystreams: here C1 XOR C2 is not P1 XOR P2. Now give packet 2 the same IV.",
+    m3bday: "How soon does an IV repeat?",
+    m3bdayP: "Chance that some IV repeats after n packets, with random IVs: about 1 - e<sup>-n²/(2N)</sup>, N = 2<sup>24</sup>. Move the slider.",
+    m3axX: "packets sent", m3axY: "chance of a repeat",
+    m3ptr: (n, p) => "After " + fmtInt(n) + " packets: chance of a repeat " + p + ".",
+    m3half: n => "50% at " + n + " packets",
     m3send: "Send packets with random IVs until one repeats", m3after: n => "IV repeated after " + fmtInt(n) + " packets.",
-    m3runs: "your runs:",
+    m3runs: "your runs (dots on the axis):",
+    fmsH: "The key leaks: the FMS attack",
+    fmsSame: "The same attack as <a href=\"https://github.com/KsaweryM/Cryptography-Course/tree/main/Lecture1/example2\" target=\"_blank\" rel=\"noopener\">example2</a> (attack.py): the same 15 000 packets from seed 2, the same weak IVs (A+3, 255, x), the same votes.",
+    fmsStart: "▶ start", fmsPause: "⏸ pause", fmsReset: "⏮ reset", fmsSpeed: "speed:",
+    fmsSpeeds: ["20 packets/s", "200 packets/s", "2 000 packets/s", "20 000 packets/s"],
+    fmsPrep: "Preparing the packets …",
+    fmsStatus: (A, p, n) => "key byte K[" + A + "] · packet " + fmtInt(p) + " of " + fmtInt(n),
+    fmsDoneSt: "all 5 key bytes found",
+    fmsPkHead: "packets as they arrive, newest at the top",
+    fmsWeak: (A, z, g) => "weak for K[" + A + "]: Z1 = C1 XOR AA = " + z + ", vote " + g,
+    fmsSkip: (a, A) => "IV starts with " + a + ": weak for K[" + (a - 3) + "], not for K[" + A + "]",
+    fmsVotes: (A, n) => "votes for K[" + A + "], from " + fmtInt(n) + " weak packets so far",
+    fmsReal: "the real byte (Eve does not know it)", fmsLead: "leader", fmsAxX: "candidate value of the key byte (0 to 255)", fmsAxY: "votes",
+    fmsLook: "Most votes are noise. Watch the green bar pull ahead.",
+    fmsKey: "the key so far",
+    fmsOut: "what attack.py prints",
+    fmsHold: (A, v, c) => "K[" + A + "] = " + v + " with " + c + " votes. Next byte.",
+    chacha: "ChaCha20 takes the nonce as its own input: see <a href=\"../chacha20/index.html#1\">its black box</a>.",
     pPrinter: "status: the printer is online and ready", pDoor: "the door code is 2580",
   },
   pl: {
@@ -598,12 +805,16 @@ const T = {
       ["Jedno wejście, jeden keystream", "RC4 przyjmuje tylko klucz, od 1 do 256 bajtów, i robi z niego keystream tak długi, jak trzeba. Szyfrowanie to XOR tekstu jawnego z keystreamem, bajt po bajcie. Nie ma wejścia na nonce: ten sam klucz zawsze daje ten sam keystream. Kliknij pole RC4, żeby zajrzeć do środka."],
       ["Krok 1: przygotowanie", "Tablica S zaczyna po kolei: 0, 1, 2, …, 255. Tablica pomocnicza T to klucz powtarzany w kółko. Dla i = 0 do 255 klucz wyznacza j, a S[i] i S[j] zamieniają się miejscami. To dzieje się raz, przed pierwszym bajtem. Potem kliknij PRGA."],
       ["Krok 2: wytwarzanie", "PRGA zaczyna od S z KSA oraz i = j = 0. W każdym obiegu i idzie o jeden, j skacze o S[i], S[i] i S[j] zamieniają się, a na wyjście idzie S[(S[i] + S[j]) mod 256]. Jeden obieg daje jeden bajt keystreamu, a S zmienia się za każdym razem."],
-      ["Trzy błędy projektowe", "RC4 jest prosty i ma trzy błędy projektowe, których unika każdy nowoczesny szyfr. Zmierz każdy z nich sam, na prawdziwym RC4 i losowych kluczach."]],
-    selfOk: "✓ sprawdzone z RFC 6229 i slajdami", selfBad: f => "✗ samotest nie przeszedł: " + f,
-    moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej", fixFirst: "Popraw klucz w kroku 1.",
+      ["Policz sam", "Po KSA S[0] nadal równa się key[0] dużo częściej, niż pozwala przypadek. Uruchom wiele losowych kluczy i policz."],
+      ["Wypełnij histogram", "Wypełnij histogram wieloma losowymi kluczami. Jednostajny keystream daje równe słupki. Drugi bajt RC4 nie."],
+      ["Trzy koszty IV + klucz", "WEP dokleja jawny 3-bajtowy IV przed wspólny klucz. Zobacz, co zdradza powtórzony IV, jak szybko się powtarza i jak słabe IV ujawniają sam klucz."]],
+    subs: [["S pamięta klucz", "KSA miesza za mało"], ["Drugi bajt", "wartość 0 wypada dwa razy za często"], ["Brak nonce (WEP)", "IV + klucz i jego koszt"]],
+    stepOfSub: k => "Krok 4 z 4 · słabość " + k + " z 3 · RC4",
+    selfOk: "✓ sprawdzone z RFC 6229, slajdami i example2", selfWait: "sprawdzam z RFC 6229, slajdami i example2 …", selfBad: f => "✗ samotest nie przeszedł: " + f,
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: dalej · ← / Esc: wstecz", fixFirst: "Popraw klucz w kroku 1.",
     keyShort: "tajny klucz, hex (od 1 do 256 bajtów)", keyAsText: "jako tekst", keyNotText: "(to nie jest zwykły tekst)", keyLen: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
     preset5: "01 02 03 04 05", preset5_s: "klucz ze slajdów (RFC 6229)", presetK: "Kangaroo", presetK_s: "klucz z Task 2", randKey: "losowy klucz, 16 bajtów",
-    nonceT: "nonce: nie ma takiego wejścia", nonceP: "RC4 bierze tylko klucz. Ten sam klucz to zawsze ten sam keystream. Protokół musi sam wkleić nonce do klucza (krok 4, błąd 3).",
+    nonceT: "nonce: nie ma takiego wejścia", nonceP: "RC4 bierze tylko klucz. Ten sam klucz to zawsze ten sam keystream. Protokół musi sam wkleić nonce do klucza (<a href='#4.3'>krok 4.3</a>).",
     boxRC4_s: "kliknij, by zajrzeć", nodeKs: "keystream Z", nodePt: "tekst jawny P", nodeCt: "szyfrogram C",
     ksCap: n => "tyle bajtów, ile ma wiadomość (" + n + ")", ctCap: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
     cardMsg: "Szyfrowanie RC4", cardDetails: "Szczegóły: XOR bajt po bajcie",
@@ -621,11 +832,14 @@ const T = {
     ksaSwap: (i, j, a, b) => i === j ? "j = i: S[" + i + "] zamienia się sama ze sobą, nic się nie zmienia." : "Zamiana S[" + i + "] i S[" + j + "]: " + a + " i " + b + " zamieniają się miejscami.",
     ksaAfter: (i, j) => "Po zamianie dla i = " + i + ". Nowe j = " + j + " to punkt startu następnego kroku.",
     ksaDone: j => "Koniec: i = 255, j = " + j + ". T idzie do kosza. PRGA zaczyna od tego S oraz i = j = 0.",
-    idleN: n => n + " " + plN(n, "komórka nadal ma", "komórki nadal mają", "komórek nadal ma") + " swój własny indeks (szare: S[x] = x).",
     perm: "S jest nadal permutacją: każda liczba od 0 do 255 występuje dokładnie raz.",
     gridCap: "tablica S, 256 komórek. Indeks = wiersz + kolumna. Mała żółta liczba: T[x], bajt klucza dla tej komórki.",
     gridCapP: "tablica S, 256 komórek. Indeks = wiersz + kolumna.",
     lgI: "i", lgJ: "j", lgSw: "zamiana", lgIdle: "nieruszone", lgT: "T[x] (klucz)", lgTp: "t: komórka wyjścia",
+    lgMv: "jak daleko wartość w komórce jest od swojego startu:", lgMv0: "na starcie", lgMv1: "1 do 15 miejsc", lgMv2: "16 do 63", lgMv3: "64 i więcej",
+    mvN: (a, b, c, d) => "na starcie " + a + " · 1 do 15: " + b + " · 16 do 63: " + c + " · 64+: " + d,
+    s0key: (s0, k0) => "S[0] = " + s0 + ", key[0] = " + k0 + (s0 === k0 ? ": nadal to samo (słabość 4.1)." : "."),
+    arrI: "S[i]", arrJ: "S[j]",
     noteKey: k => "Klucz: " + k + ". Zmień go w kroku 1.",
     prgaPos: (n, s) => "bajt " + n + " · krok " + s + " z 5",
     prgaStart: "S pochodzi z KSA. i oraz j zaczynają od 0.",
@@ -641,38 +855,59 @@ const T = {
     histHead: ["i", "j = (j + S[i]) mod 256", "zamiana", "t = (S[i] + S[j]) mod 256", "wyjście"],
     histCard: "Bajt po bajcie", histNote: n => n > 8 ? "Ostatnie 8 bajtów. Keystream jest taki sam jak w kroku 1." : "Keystream jest taki sam jak w kroku 1.",
     rfcNote: "Klucz 01 02 03 04 05 jest w oficjalnych wektorach testowych RC4 (RFC 6229). Zaczynają się od b2 39 63 05: te same bajty.",
-    tabM: ["1: S pamięta klucz", "2: drugi bajt", "3: brak nonce (WEP)"],
-    m1h: "Błąd RC4 nr 1: KSA słabo miesza klucz",
     m1you: (s0, k0, eq) => "Twój klucz z kroku 1: po KSA S[0] = " + s0 + ", a key[0] = " + k0 + ". " + (eq ? "Ta sama liczba." : "Tym razem inna."),
-    m1why: p => "<b>Dlaczego?</b> Dla i = 0: j = 0 + S[0] + T[0] = key[0], więc S[0] dostaje wartość key[0]. Potem S[0] zmienia się tylko wtedy, gdy jakieś j trafi w 0: mniej więcej 1 szansa na 256 w każdym kroku. Szansa, że nie zdarzy się to w 255 krokach: (255/256)<sup>255</sup>, czyli około " + p + ".",
+    m1why: p => "<b>Dlaczego?</b> Dla i = 0 jest j = key[0], więc S[0] dostaje wartość key[0]. Potem zmienia się tylko wtedy, gdy jakieś j trafi w 0. Szansa, że to się nigdy nie zdarzy: (255/256)<sup>255</sup>, czyli około " + p + ".",
     m1run: n => "Uruchom " + fmtInt(n) + " losowych kluczy 16-bajtowych", m1q: "Jak często S[0] == key[0]?",
     m1ksa: "KSA", m1shuf: "uczciwe tasowanie",
     m1res: (a, n) => fmtInt(a) + " z " + fmtInt(n),
     m1note: "Uczciwe tasowanie to punkt odniesienia: około 1 szansa na 256. Liczby zmieniają się trochę przy każdym uruchomieniu (Task 7).",
-    m1wep: "Tak WEP stracił klucz (problem 2 WEP): jawny IV wchodzi do tego słabego miksera, a pierwsze bajty keystreamu nadal pamiętają tajne bajty klucza.",
-    m2h: "Błąd RC4 nr 2: drugi bajt jest skrzywiony",
-    m2intro: "Gdyby bajty keystreamu były jednostajne, każda wartość wypadałaby z szansą 1/256 = 0,39%. Policz, jak często bajty 1, 2 i 3 keystreamu są równe 0, dla wielu losowych kluczy 16-bajtowych (Task 9).",
+    m1wep: "Tak WEP stracił klucz: jawny IV wchodzi do tego słabego miksera (<a href='#4.3'>4.3</a>).",
+    uniform: "jednostajnie: 1/256",
+    m2h: "Drugi bajt keystreamu dla wielu kluczy",
     m2keys: "klucze:", m2run: "Uruchom", m2running: (k, n) => fmtInt(k) + " z " + fmtInt(n) + " kluczy …",
-    m2byte: b => "bajt " + b, uniform: "jednostajnie: 1/256",
-    m2theory: p => "Mantin i Shamir (2001): drugi bajt jest równy 0 z szansą około 2/256 = " + p + ", dwa razy częściej, niż powinien.",
-    m2small: "Przy małej liczbie kluczy wyniki mocno skaczą. Spróbuj 1 000 000.",
-    m2rec: "Ta sama wiadomość pod wieloma kluczami", m2recP: "Tajny drugi bajt wiadomości to 61 (litera a). Każda kopia ma inny klucz, więc C2 = 61 XOR Z2. Gdy Z2 = 0, to C2 = P2. Napastnik liczy wartości C2 we wszystkich kopiach:",
+    m2pos: "bajt keystreamu:", m2byte: b => "bajt " + b,
+    m2zero: (b, p, k) => "Bajt " + b + " był równy 0 dla " + p + " kluczy (" + fmtInt(k) + " razy).",
+    m2theory: p => "Oczekiwane dla bajtu 2: około 2/256 = " + p + " (Mantin i Shamir, 2001). Bajty 1 i 3 zostają blisko 1/256.",
+    m2small: "Przy małej liczbie kluczy słupki mocno skaczą. Spróbuj 1 000 000.",
+    m2axX: "wartość bajtu (od 0 do 255)", m2axY: "część kluczy",
+    m2rec: "Ta sama wiadomość pod wieloma kluczami", m2recP: "Alice wysyła jedną wiadomość wiele razy, za każdym razem z nowym kluczem. Jej drugi bajt to 61 (litera a), więc C2 = 61 XOR Z2, a gdy Z2 = 0, to C2 = 61. Eve tylko liczy wartości C2:",
     m2top: "najczęstsze wartości C2",
-    m2exp: e => "Bez skrzywienia każda wartość pojawiłaby się około " + e + " razy. Tajny bajt się wyróżnia, a kluczy nikt nie dotknął.",
+    m2exp: e => "Bez skrzywienia każda wartość pojawiłaby się około " + e + " razy. Tajny bajt się wyróżnia, a żadnego klucza nikt nie dotknął.",
     m2wait: "Naciśnij Uruchom.",
-    m3h: "Błąd RC4 nr 3: brak nonce, więc WEP wkleił go do klucza",
+    m3c1: "Dwa pakiety, jeden IV",
     m3iv: "IV", m3iv_s: "3 bajty, jawny, nowy dla każdego pakietu", m3sec: "wspólny klucz Wi-Fi", m3sec_s: "tajny, ten sam dla wszystkich", m3rc4: "klucz RC4", m3rc4_s: "IV + klucz, 8 bajtów",
     m3pk: k => "pakiet " + k, m3ivLbl: "IV (hex)",
     m3same: "pakiet 2: ten sam IV co pakiet 1", m3new: "pakiet 2: losowy IV",
     m3rowP: "P", m3rowZ: "Z", m3rowC: "C",
     m3ivErr: "IV ma dokładnie 3 bajty (6 cyfr hex).",
     m3x12: "C1 XOR C2", m3p12: "P1 XOR P2",
-    m3hit: "Ten sam IV, ten sam klucz RC4, ten sam keystream: C1 XOR C2 = P1 XOR P2. Keystream się znosi.",
-    m3known: "Napastnik zna P1 (pakiet ze statusem drukarki). Wtedy C1 XOR C2 XOR P1 daje P2:",
-    m3miss: "Różne IV dają różne klucze RC4 i zupełnie różne keystreamy. Tutaj C1 XOR C2 to nie jest P1 XOR P2. Daj teraz pakietowi 2 ten sam IV.",
-    m3bday: "Jak szybko IV się powtórzy?", m3bdayP: (N, n) => "IV ma 3 bajty: " + N + " możliwych wartości. Przy losowych IV powtórka przychodzi po około √(2 ln 2 · 2²⁴) = " + n + " pakietach (szansa 50%), a nie po milionach.",
+    m3hit: "Ten sam IV, ten sam keystream: C1 XOR C2 = P1 XOR P2.",
+    m3known: "Eve zna P1 (pakiet ze statusem drukarki). C1 XOR C2 XOR P1 daje P2:",
+    m3miss: "Różne IV, różne keystreamy: tutaj C1 XOR C2 to nie P1 XOR P2. Daj teraz pakietowi 2 ten sam IV.",
+    m3bday: "Jak szybko IV się powtórzy?",
+    m3bdayP: "Szansa, że po n pakietach jakiś IV się powtórzy, przy losowych IV: około 1 - e<sup>-n²/(2N)</sup>, N = 2<sup>24</sup>. Przesuń suwak.",
+    m3axX: "wysłane pakiety", m3axY: "szansa powtórki",
+    m3ptr: (n, p) => "Po " + fmtInt(n) + " " + plN(n, "pakiecie", "pakietach", "pakietach") + ": szansa powtórki " + p + ".",
+    m3half: n => "50% przy " + n + " pakietach",
     m3send: "Wysyłaj pakiety z losowym IV aż do powtórki", m3after: n => "IV powtórzył się po " + fmtInt(n) + " " + plN(n, "pakiecie", "pakietach", "pakietach") + ".",
-    m3runs: "twoje próby:",
+    m3runs: "twoje próby (kropki na osi):",
+    fmsH: "Klucz wycieka: atak FMS",
+    fmsSame: "Ten sam atak co w <a href=\"https://github.com/KsaweryM/Cryptography-Course/tree/main/Lecture1/example2\" target=\"_blank\" rel=\"noopener\">example2</a> (attack.py): te same 15 000 pakietów z ziarna 2, te same słabe IV (A+3, 255, x), te same głosy.",
+    fmsStart: "▶ start", fmsPause: "⏸ pauza", fmsReset: "⏮ od nowa", fmsSpeed: "tempo:",
+    fmsSpeeds: ["20 pakietów/s", "200 pakietów/s", "2 000 pakietów/s", "20 000 pakietów/s"],
+    fmsPrep: "Przygotowuję pakiety …",
+    fmsStatus: (A, p, n) => "bajt klucza K[" + A + "] · pakiet " + fmtInt(p) + " z " + fmtInt(n),
+    fmsDoneSt: "znalezione wszystkie 5 bajtów klucza",
+    fmsPkHead: "pakiety w kolejności przychodzenia, najnowszy na górze",
+    fmsWeak: (A, z, g) => "słaby dla K[" + A + "]: Z1 = C1 XOR AA = " + z + ", głos " + g,
+    fmsSkip: (a, A) => "IV zaczyna się od " + a + ": słaby dla K[" + (a - 3) + "], nie dla K[" + A + "]",
+    fmsVotes: (A, n) => "głosy na K[" + A + "] z " + fmtInt(n) + " " + plN(n, "słabego pakietu", "słabych pakietów", "słabych pakietów") + " do tej pory",
+    fmsReal: "prawdziwy bajt (Eve go nie zna)", fmsLead: "prowadzi", fmsAxX: "kandydat na bajt klucza (od 0 do 255)", fmsAxY: "głosy",
+    fmsLook: "Większość głosów to szum. Patrz, jak zielony słupek wychodzi na prowadzenie.",
+    fmsKey: "klucz do tej pory",
+    fmsOut: "co wypisuje attack.py",
+    fmsHold: (A, v, c) => "K[" + A + "] = " + v + ", " + c + " " + plN(c, "głos", "głosy", "głosów") + ". Następny bajt.",
+    chacha: "ChaCha20 przyjmuje nonce jako osobne wejście: zobacz <a href=\"../chacha20/index.html#1\">jego czarną skrzynkę</a>.",
     pPrinter: "status: the printer is online and ready", pDoor: "the door code is 2580",
   },
 };
@@ -688,10 +923,12 @@ const app = {
   msg: "Meet me at the library at 5.",
   ksaPos: 0,     // 0 = start; 2i+1 = loop i, j computed; 2i+2 = loop i, after the swap
   prgaPos: 0,    // 0 = start; 5b + s = byte b+1, sub-step s (1..5)
-  mis: 0,
   iv1: "4F 12 A0", iv2: "21 E8 55",
-  s1: null, s2: null, s2n: 100000, ivRuns: [],
+  s1: null, s2: null, s2n: 100000, s2pos: 1, ivRuns: [], ivN: 2000,
 };
+// the pages: steps 1, 2, 3, then the weaknesses 4.1, 4.2, 4.3 (app.level = index here)
+const PAGES = ["1", "2", "3", "4.1", "4.2", "4.3"];
+const LAST = PAGES.length - 1;
 const KSA_MAX = 512, PRGA_MAXB = 256, PRGA_MAX = 5 * PRGA_MAXB;
 const hx2 = x => x.toString(16).padStart(2, "0");
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -812,6 +1049,7 @@ function sgridHTML(S, T, marks) {
       const x = 16 * r + c;
       let cls = "sc", tag = "";
       if (marks.idle && S[x] === x) cls += " idle";
+      if (marks.mv) { const d = Math.abs(S[x] - x); if (d > 0) cls += d < 16 ? " mv1" : d < 64 ? " mv2" : " mv3"; }
       if (marks.sw && marks.sw.indexOf(x) >= 0) cls += " sw";
       if (marks.t === x) cls += marks.tout ? " pt ptout" : " pt";
       if (marks.i === x) cls += " pi";
@@ -842,7 +1080,8 @@ function render1() {
       '<input type="range" min="0" max="' + KSA_MAX + '" data-field="ksapos" value="' + app.ksaPos + '" aria-label="i" style="width:100%"></div><span class="pos" id="ksapos"></span>' +
       '<div id="ksacode"></div><div class="calc" id="ksacalc"></div><div class="note" id="ksanote"></div></div></div>' +
       '<div class="legend"><span class="lg-i">' + t.lgI + '</span><span class="lg-j">' + t.lgJ + '</span><span class="lg-sw">' + t.lgSw + "</span>" +
-      '<span class="lg-idle">' + t.lgIdle + '</span><span class="lg-T">' + t.lgT + "</span></div></div>";
+      '<span class="lg-T">' + t.lgT + "</span></div>" +
+      '<div class="legend" style="margin-top:6px">' + t.lgMv + ' <span class="lg-mv0">' + t.lgMv0 + '</span><span class="lg-mv1">' + t.lgMv1 + '</span><span class="lg-mv2">' + t.lgMv2 + '</span><span class="lg-mv3">' + t.lgMv3 + "</span></div></div>";
 }
 function renderL1Body() {
   const g = document.getElementById("ksagrid");
@@ -852,7 +1091,7 @@ function renderL1Body() {
   let st, marks, cur, calc, note;
   if (p === 0) {
     st = ksaAt(app.key, 0);
-    marks = { idle: true };
+    marks = { idle: true, mv: true };
     cur = [0, 1, 2]; calc = t.ksaStart; note = "";
     document.getElementById("ksapos").textContent = "j = 0";
   } else {
@@ -861,25 +1100,27 @@ function renderL1Body() {
     const r = pre.row;
     if (!after) {
       st = pre;
-      marks = { idle: true, i: i, j: r.j, sw: [i, r.j] };
+      marks = { idle: true, mv: true, i: i, j: r.j, sw: [i, r.j] };
       cur = [4];
       calc = t.ksaCalc(r.jOld, r.si, r.ti, r.j);
       note = t.ksaSwap(i, r.j, pre.S[i], pre.S[r.j]);
     } else {
       st = ksaAt(app.key, i + 1);
-      marks = { idle: true, i: i, j: r.j, sw: [i, r.j] };
+      marks = { idle: true, mv: true, i: i, j: r.j, sw: [i, r.j] };
       cur = [5];
       calc = t.ksaCalc(r.jOld, r.si, r.ti, r.j);
       note = i === 255 ? t.ksaDone(r.j) : t.ksaAfter(i, r.j);
     }
     document.getElementById("ksapos").textContent = t.ksaPos(i, r.j);
   }
-  let idle = 0; for (let x = 0; x < 256; x++) if (st.S[x] === x) idle++;
+  const mv = [0, 0, 0, 0];
+  for (let x = 0; x < 256; x++) { const d = Math.abs(st.S[x] - x); mv[d === 0 ? 0 : d < 16 ? 1 : d < 64 ? 2 : 3]++; }
   g.innerHTML = sgridHTML(st.S, Ttab, marks);
   document.getElementById("ksacode").innerHTML = codeHTML(KSA_CODE, cur, [3, 4, 5]);
   document.getElementById("ksacalc").textContent = calc;
   document.getElementById("ksacalc").style.whiteSpace = "pre-wrap";
-  document.getElementById("ksanote").innerHTML = (note ? "<b>" + esc(note) + "</b><br>" : "") + esc(t.idleN(idle)) +
+  document.getElementById("ksanote").innerHTML = (note ? "<b>" + esc(note) + "</b><br>" : "") + esc(t.mvN(mv[0], mv[1], mv[2], mv[3])) +
+    (p > 0 ? "<br>" + esc(t.s0key(st.S[0], app.key[0])) : "") +
     (isPermutation(st.S) ? '<br><span class="okline">✓ ' + esc(t.perm) + "</span>" : "");
   const sl = view.querySelector('input[data-field="ksapos"]'); if (sl) sl.value = p;
   document.getElementById("flowZ").textContent = bytesHex(keystream(app.key, 4), " ") + " …";
@@ -892,7 +1133,7 @@ function render2() {
   const t = L();
   if (app.keyErr) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
   return flowHTML(2) +
-    '<div class="card"><div class="split"><figure style="margin:0"><div id="prgagrid"></div><figcaption class="note" style="max-width:556px;margin-top:6px">' + t.gridCapP + "</figcaption></figure>" +
+    '<div class="card"><div class="split"><figure style="margin:0"><div id="prgagrid" class="gridwrap"></div><figcaption class="note" style="max-width:556px;margin-top:6px">' + t.gridCapP + "</figcaption></figure>" +
       '<div class="sidepanel"><div class="controls">' +
       '<button data-action="prga-reset">' + t.bReset + '</button><button data-action="prga-prev">' + t.bPrev + "</button>" +
       '<button class="dark" data-action="prga-next">' + t.bNext + '</button><button data-action="prga-byte">' + t.bByte + "</button>" +
@@ -930,6 +1171,7 @@ function renderL2Body() {
     document.getElementById("prgapos").textContent = t.prgaPos(done + 1, sub) + ": " + t.subName[sub - 1];
   }
   g.innerHTML = sgridHTML(S, null, marks);
+  if (sub >= 4) drawArrows(g, r.i, r.j, r.t);
   document.getElementById("prgacode").innerHTML = codeHTML(PRGA_CODE, cur, [2, 3, 4, 5, 6, 7]);
   document.getElementById("prgavars").innerHTML = vars;
   document.getElementById("prgacalc").textContent = calc;
@@ -956,19 +1198,36 @@ function renderL2Body() {
   document.getElementById("histnote").textContent = rows.length ? t.histNote(rows.length) : "";
   document.getElementById("flowZ").textContent = outs.length ? bytesHex(outs.slice(-4), " ") : "…";
 }
+// arrows on the table: from S[i] and S[j] to S[t], t = (S[i] + S[j]) mod 256. A small SVG (the size of the table) on top.
+function drawArrows(g, i, j, tt) {
+  const cells = g.querySelectorAll(".sc");
+  const W = g.offsetWidth, H = g.offsetHeight;
+  const ctr = x => { const c = cells[x]; return [c.offsetLeft + c.offsetWidth / 2, c.offsetTop + c.offsetHeight / 2]; };
+  const [tx, ty] = ctr(tt);
+  const t = L();
+  let h = '<svg class="ov" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" aria-hidden="true"><defs>' +
+    '<marker id="arI" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--g1)"/></marker>' +
+    '<marker id="arJ" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--g2)"/></marker></defs>';
+  const one = (x, col, mk, bend, lbl) => {
+    if (x === tt) return;   // the cell points at itself: no arrow
+    const [cx0, cy0] = ctr(x);
+    const dx = tx - cx0, dy = ty - cy0, len = Math.hypot(dx, dy);
+    const sx = cx0 + dx / len * 12, sy = cy0 + dy / len * 12;   // start at the edge of the source cell, its value stays readable
+    // stop at the edge of the target cell, bend sideways so the two arrows do not overlap
+    const ex = tx - dx / len * 18, ey = ty - dy / len * 18;
+    const cx = (sx + ex) / 2 - dy / len * bend * Math.min(80, len * 0.3), cy = (sy + ey) / 2 + dx / len * bend * Math.min(80, len * 0.3);
+    const d = "M" + sx.toFixed(1) + " " + sy.toFixed(1) + " Q" + cx.toFixed(1) + " " + cy.toFixed(1) + " " + ex.toFixed(1) + " " + ey.toFixed(1);
+    h += '<path d="' + d + '" fill="none" stroke="var(--surface)" stroke-width="5" stroke-linecap="round" opacity=".75"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2.6" stroke-linecap="round" marker-end="url(#' + mk + ')"/>' +
+      '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="3.5" fill="' + col + '"/>';
+  };
+  one(i, "var(--g1)", "arI", 1, t.arrI);
+  one(j, "var(--g2)", "arJ", i === j ? -1 : -1, t.arrJ);
+  g.insertAdjacentHTML("beforeend", h + "</svg>");
+}
 function prgaGo(q) { app.prgaPos = Math.max(0, Math.min(PRGA_MAX, q)); renderL2Body(); }
 
-/* ---------- step 4: the weaknesses ---------- */
-function render3() {
-  const t = L();
-  const pressed = c => ' aria-pressed="' + (c ? "true" : "false") + '"';
-  let h = '<div class="card" style="padding:10px 14px"><span class="tabs">' +
-    t.tabM.map((s, k) => '<button data-action="mis" data-m="' + k + '"' + pressed(app.mis === k) + ">" + s + "</button>").join("") + "</span></div>";
-  if (app.mis === 0) h += renderM1();
-  else if (app.mis === 1) h += renderM2();
-  else h += renderM3();
-  return h;
-}
+/* ---------- step 4: the weaknesses (4.1, 4.2, 4.3) ---------- */
 function barsHTML(items, maxV, ux, uxLbl) {
   // items: [{ l, v, txt, hl }]; ux: position (value) of the dashed "uniform" line
   let h = '<div class="bars">';
@@ -982,8 +1241,31 @@ function barsHTML(items, maxV, ux, uxLbl) {
   if (uxLbl) h += '<div class="ulbl" style="margin-top:4px">┆ ' + uxLbl + "</div>";
   return h;
 }
+// 256 bars in one SVG: counts[v] for v = 0..255; opt: { yMax, ux (dashed level), uxLbl, cls(v), xLbl, yLbl, yFmt, labels: [{ v, txt, cls }] }
+function hist256(counts, opt) {
+  const W = 860, H = 250, L0 = 54, R = 12, T0 = 22, B = 40, pw = W - L0 - R, ph = H - T0 - B, bw = pw / 256;
+  const y = v => T0 + ph - ph * Math.min(1, v / opt.yMax);
+  let h = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+  for (const tv of opt.yTicks) h += '<line class="ax" x1="' + L0 + '" x2="' + (W - R) + '" y1="' + y(tv).toFixed(1) + '" y2="' + y(tv).toFixed(1) + '" opacity=".6"/>' +
+    '<text x="' + (L0 - 6) + '" y="' + (y(tv) + 4).toFixed(1) + '" text-anchor="end">' + opt.yFmt(tv) + "</text>";
+  for (let v = 0; v < 256; v++) {
+    const top = y(counts[v]);
+    h += '<rect class="bar' + (opt.cls ? opt.cls(v) : "") + '" x="' + (L0 + v * bw + 0.3).toFixed(2) + '" y="' + top.toFixed(1) + '" width="' + Math.max(1, bw - 0.6).toFixed(2) + '" height="' + (T0 + ph - top).toFixed(1) + '"/>';
+  }
+  for (let v = 0; v <= 256; v += 32) h += '<text x="' + (L0 + Math.min(v, 255) * bw + bw / 2).toFixed(1) + '" y="' + (T0 + ph + 15) + '" text-anchor="middle">' + Math.min(v, 255) + "</text>";
+  h += '<line class="ax" x1="' + L0 + '" x2="' + (W - R) + '" y1="' + (T0 + ph) + '" y2="' + (T0 + ph) + '"/>';
+  if (opt.ux !== undefined) h += '<line class="ux" x1="' + L0 + '" x2="' + (W - R) + '" y1="' + y(opt.ux).toFixed(1) + '" y2="' + y(opt.ux).toFixed(1) + '"/>' +
+    '<text class="ul" x="' + (W - R) + '" y="' + (y(opt.ux) - 5).toFixed(1) + '" text-anchor="end">' + opt.uxLbl + "</text>";
+  for (const lb of opt.labels || []) {
+    const lx = Math.max(L0 + 4, Math.min(W - R - 4, L0 + lb.v * bw + bw / 2));
+    h += '<text class="' + lb.cls + '" x="' + lx.toFixed(1) + '" y="' + Math.max(12, y(counts[lb.v]) - 6).toFixed(1) + '" text-anchor="' + (lb.v < 20 ? "start" : lb.v > 235 ? "end" : "middle") + '">' + lb.txt + "</text>";
+  }
+  h += '<text x="' + (L0 + pw / 2) + '" y="' + (H - 4) + '" text-anchor="middle">' + opt.xLbl + "</text>" +
+    '<text x="12" y="' + (T0 + ph / 2) + '" text-anchor="middle" transform="rotate(-90 12 ' + (T0 + ph / 2) + ')">' + opt.yLbl + "</text></svg>";
+  return h;
+}
 
-// mistake 1
+// 4.1
 function renderM1() {
   const t = L();
   let mine = "";
@@ -992,7 +1274,7 @@ function renderM1() {
     mine = '<p style="margin:0 0 8px">' + esc(t.m1you(S[0], app.key[0], S[0] === app.key[0])) + "</p>";
   }
   const p = Math.pow(255 / 256, 255);
-  return '<div class="card"><h3><span class="mtag">1/3</span>' + t.m1h + "</h3>" + mine +
+  return '<div class="card">' + mine +
     '<div class="why" style="margin:0 0 12px">' + t.m1why(fmtPct(p, 1)) + "</div>" +
     "<b>" + t.m1q + '</b><div class="btns" style="margin-top:6px"><button class="dark" data-action="run1">' + t.m1run(10000) + '</button></div><div class="prog"><span id="prog1"></span></div>' +
     '<div id="m1out"></div><p class="note">' + t.m1note + "</p>" +
@@ -1012,7 +1294,7 @@ function updateM1() {
 }
 let RUN1 = 0;
 function run1() {
-  const total = 10000, CH = 2000, id = ++RUN1;
+  const total = 10000, CH = 1000, id = ++RUN1;
   app.s1 = { ksa: 0, shuffle: 0, n: 0, total: total };
   const step = () => {
     if (id !== RUN1) return;
@@ -1026,14 +1308,16 @@ function run1() {
   step();
 }
 
-// mistake 2
+// 4.2: the histogram of keystream byte 1, 2 or 3 over many random keys
 function renderM2() {
   const t = L();
   const opts = [10000, 100000, 1000000].map(n => '<option value="' + n + '"' + (n === app.s2n ? " selected" : "") + ">" + fmtInt(n) + "</option>").join("");
-  return '<div class="card"><h3><span class="mtag">2/3</span>' + t.m2h + "</h3><p style=\"margin:0 0 8px\">" + t.m2intro + "</p>" +
-    '<div class="btns"><label>' + t.m2keys + ' <select data-field="s2n">' + opts + '</select></label><button class="dark" data-action="run2">' + t.m2run + '</button><span class="note" id="m2status"></span></div>' +
-    '<div class="prog"><span id="prog2"></span></div><div id="m2out"></div>' +
-    '<p class="note" style="margin:8px 0 0">' + t.m2theory(fmtPct(2 / 256)) + "</p></div>" +
+  const pos = [0, 1, 2].map(b => '<button data-action="s2pos" data-b="' + b + '" aria-pressed="' + (b === app.s2pos) + '">' + t.m2byte(b + 1) + "</button>").join("");
+  return '<div class="card"><h3>' + t.m2h + "</h3>" +
+    '<div class="btns"><label>' + t.m2keys + ' <select data-field="s2n">' + opts + '</select></label><button class="dark" data-action="run2">' + t.m2run + '</button>' +
+    '<span style="margin-left:14px">' + t.m2pos + '</span><span class="posbtns">' + pos + '</span><span class="note" id="m2status"></span></div>' +
+    '<div class="prog"><span id="prog2"></span></div><div id="m2out" style="margin-top:8px"></div>' +
+    '<p class="note" style="margin:6px 0 0">' + t.m2theory(fmtPct(2 / 256)) + "</p></div>" +
     '<div class="card"><h3>' + t.m2rec + "</h3><p style=\"margin:0 0 6px\">" + t.m2recP + '</p><div id="m2rec"></div></div>';
 }
 function updateM2() {
@@ -1043,52 +1327,72 @@ function updateM2() {
   const pg = document.getElementById("prog2"), stt = document.getElementById("m2status");
   if (!s) { o.innerHTML = '<p class="note">' + t.m2wait + "</p>"; rc.innerHTML = '<p class="note">' + t.m2wait + "</p>"; if (pg) pg.style.width = "0"; if (stt) stt.textContent = ""; return; }
   if (pg) pg.style.width = (100 * s.n / s.total) + "%";
-  if (stt) stt.textContent = s.n < s.total ? t.m2running(s.n, s.total) : "";
-  const pr = b => s.zero[b] / Math.max(1, s.n);
-  o.innerHTML = barsHTML([0, 1, 2].map(b => ({ l: t.m2byte(b + 1), v: pr(b), txt: fmtPct(pr(b), 3) + " (" + fmtInt(s.zero[b]) + ")", hl: b === 1 })), 0.01, 1 / 256, t.uniform + " = " + fmtPct(1 / 256, 3)) +
-    (s.n < 1000000 && s.n === s.total ? '<p class="note" style="margin:6px 0 0">' + t.m2small + "</p>" : "");
+  if (stt) stt.textContent = s.n < s.total ? " " + t.m2running(s.n, s.total) : "";
+  const b = app.s2pos, hist = s.hist[b], n = Math.max(1, s.n);
+  const share = new Float64Array(256);
+  for (let v = 0; v < 256; v++) share[v] = hist[v] / n;
+  let mx = 0; for (let v = 0; v < 256; v++) mx = Math.max(mx, share[v]);
+  const yMax = Math.max(2.6 / 256, mx * 1.12);
+  o.innerHTML = hist256(share, {
+    yMax: yMax, yTicks: [0, 1 / 256, 2 / 256].concat(yMax > 3.2 / 256 ? [3 / 256] : []), yFmt: v => fmtPct(v, 2),
+    ux: 1 / 256, uxLbl: t.uniform, cls: v => v === 0 ? " hl" : "", xLbl: t.m2axX, yLbl: t.m2axY,
+    labels: [{ v: 0, txt: "0: " + fmtPct(share[0], 2), cls: "hlt" }],
+  }) + '<p style="margin:4px 0 0;font-weight:600">' + t.m2zero(b + 1, fmtPct(share[0], 3), hist[0]) + "</p>" +
+    (s.n < 1000000 && s.n === s.total ? '<p class="note" style="margin:2px 0 0">' + t.m2small + "</p>" : "");
   // the same message under many keys: C2 = 0x61 XOR Z2
   const c2 = new Uint32Array(256);
-  for (let z = 0; z < 256; z++) c2[0x61 ^ z] = s.hist2[z];
-  const order = Array.from({ length: 256 }, (_, k) => k).sort((a, b) => c2[b] - c2[a] || a - b).slice(0, 4);
-  const mx = Math.max(1, c2[order[0]]) * 1.25;
-  rc.innerHTML = "<b>" + t.m2top + "</b>" + barsHTML(order.map(v => ({ l: '<span class="mono">' + hx2(v).toUpperCase() + "</span>", v: c2[v], txt: fmtInt(c2[v]), hl: v === 0x61 })), mx, s.n / 256) +
+  for (let z = 0; z < 256; z++) c2[0x61 ^ z] = s.hist[1][z];
+  const order = Array.from({ length: 256 }, (_, k) => k).sort((a, b2) => c2[b2] - c2[a] || a - b2).slice(0, 4);
+  const mxc = Math.max(1, c2[order[0]]) * 1.25;
+  rc.innerHTML = "<b>" + t.m2top + "</b>" + barsHTML(order.map(v => ({ l: '<span class="mono">' + hx2(v).toUpperCase() + "</span>", v: c2[v], txt: fmtInt(c2[v]), hl: v === 0x61 })), mxc, s.n / 256) +
     '<p class="note" style="margin:6px 0 0">┆ ' + t.m2exp(fmtInt(Math.round(s.n / 256))) + "</p>";
 }
 let RUN2 = 0;
 function run2() {
-  const total = app.s2n, CH = 4000, id = ++RUN2;
-  app.s2 = { zero: [0, 0, 0], hist2: new Uint32Array(256), n: 0, total: total };
+  const total = app.s2n, CH = 1000, id = ++RUN2;
+  app.s2 = { hist: [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)], n: 0, total: total };
   let lastDraw = 0;
   const step = () => {
     if (id !== RUN2) return;
     const t0 = performance.now();
-    while (app.s2.n < total && performance.now() - t0 < 40) {
+    while (app.s2.n < total && performance.now() - t0 < 25) {
       const n = Math.min(CH, total - app.s2.n);
       const keys = new Uint8Array(16 * n); crypto.getRandomValues(keys);
       countZeros(keys, n, app.s2);
     }
-    if (app.s2.n >= total || performance.now() - lastDraw > 120) { updateM2(); lastDraw = performance.now(); }
+    if (app.s2.n >= total || performance.now() - lastDraw > 150) { updateM2(); lastDraw = performance.now(); }
     if (app.s2.n < total) setTimeout(step, 0);
   };
   step();
 }
 
-// mistake 3
+// 4.3: two packets with one IV
 function parseIV(s) { const b = parseKeyHex(s); return b && b.length === 3 ? b : null; }
 function renderM3() {
   const t = L();
-  const N = Math.pow(2, 24), n50 = Math.round(Math.sqrt(2 * Math.log(2) * N));
   const pkRow = k => '<span class="ph">' + t.m3pk(k) + '</span><label class="note">' + t.m3ivLbl + ' <input class="ivin mono" data-field="iv' + k + '" spellcheck="false" value="' + esc(k === 1 ? app.iv1 : app.iv2) + '"></label><span id="pk' + k + 'key" class="note mono"></span>';
-  return '<div class="card"><h3><span class="mtag">3/3</span>' + t.m3h + "</h3>" +
+  return '<div class="card"><h3>' + t.m3c1 + "</h3>" +
     '<div class="wep"><span class="part iv">' + t.m3iv + "<small>" + t.m3iv_s + '</small></span><span class="op">+</span>' +
       '<span class="part role-key">' + KEY_SVG.replace('width="34"', 'width="26"') + " " + t.m3sec + ' <span class="mono" style="font-weight:400">' + bytesHex(WEP_SECRET, " ").toUpperCase() + "</span><small>" + t.m3sec_s + '</small></span><span class="op">=</span>' +
       '<span class="part role-key">' + t.m3rc4 + "<small>" + t.m3rc4_s + "</small></span></div>" +
     '<div class="pk">' + pkRow(1) + pkRow(2) + "</div>" +
     '<div class="btns"><button data-action="iv-same">' + t.m3same + '</button><button data-action="iv-rand">' + t.m3new + "</button></div>" +
     '<div id="m3out"></div></div>' +
-    '<div class="card"><h3>' + t.m3bday + "</h3><p style=\"margin:0 0 8px\">" + t.m3bdayP(fmtInt(N), fmtInt(n50)) + "</p>" +
-    '<div class="btns"><button class="dark" data-action="ivrun">' + t.m3send + '</button></div><div id="m3bd" style="margin-top:8px"></div></div>';
+    '<div class="card"><h3>' + t.m3bday + '</h3><p style="margin:0 0 8px">' + t.m3bdayP + "</p>" +
+    '<div class="controls"><input type="range" min="0" max="20000" step="1" data-field="ivn" value="' + app.ivN + '" aria-label="n" style="width:420px;max-width:100%"><span class="pos" id="ivptr"></span></div>' +
+    '<div id="ivchart"></div>' +
+    '<div class="btns" style="margin-top:6px"><button class="dark" data-action="ivrun">' + t.m3send + '</button></div><div id="m3bd" style="margin-top:6px"></div></div>' +
+    '<div class="card"><h3>' + t.fmsH + '</h3><p class="note" style="margin:0 0 8px;font-size:13.5px">' + t.fmsSame + "</p>" +
+    '<div class="controls"><button class="dark" data-action="fms-go" id="fmsgo"></button><button data-action="fms-reset">' + t.fmsReset + "</button>" +
+    "<label>" + t.fmsSpeed + ' <select data-field="fmsspeed">' + t.fmsSpeeds.map((x, k) => '<option value="' + k + '"' + (k === FMS.speed ? " selected" : "") + ">" + x + "</option>").join("") + "</select></label>" +
+    '<span class="pos" id="fmsstat"></span></div>' +
+    '<div class="kchips" id="fmskey"></div>' +
+    '<b id="fmsvh"></b><div id="fmschart"></div>' +
+    '<div class="legend" style="margin-top:2px"><span style="border-color:var(--ok);background:var(--ok);color:var(--surface)">' + t.fmsReal + '</span><span style="border-color:var(--chg);background:var(--chg);color:#fff">' + t.fmsLead + "</span>" +
+    '<span style="border:0;padding:0" class="note">' + t.fmsLook + "</span></div>" +
+    '<div style="margin-top:10px"><b style="font-size:13px">' + t.fmsPkHead + '</b><div class="pkts" id="fmspk"></div></div>' +
+    '<div style="margin-top:10px"><b style="font-size:13px">' + t.fmsOut + '</b><div class="code" id="fmsout" style="font-size:12.5px"></div></div></div>' +
+    '<p class="chachaline">' + t.chacha + "</p>";
 }
 function updateM3() {
   const o = document.getElementById("m3out");
@@ -1121,6 +1425,40 @@ function updateM3() {
   } else h += '<div class="result">' + t.m3miss + "</div>";
   o.innerHTML = h;
 }
+
+// 4.3: the birthday curve, the formula of the slide "How soon do repeats come?"
+const IV_N = Math.pow(2, 24), IV_N50 = Math.round(Math.sqrt(2 * Math.log(2) * IV_N));   // 4 823
+const pRepeat = n => 1 - Math.exp(-n * n / (2 * IV_N));
+function updateIvChart() {
+  const o = document.getElementById("ivchart");
+  if (!o) return;
+  const t = L(), n = app.ivN, XM = 20000;
+  const W = 860, H = 250, L0 = 54, R = 16, T0 = 16, B = 40, pw = W - L0 - R, ph = H - T0 - B;
+  const x = v => L0 + pw * v / XM, y = p => T0 + ph - ph * p;
+  let h = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+  for (const p of [0, 0.25, 0.5, 0.75, 1]) h += '<line class="ax" x1="' + L0 + '" x2="' + (W - R) + '" y1="' + y(p) + '" y2="' + y(p) + '" opacity=".6"/><text x="' + (L0 - 6) + '" y="' + (y(p) + 4) + '" text-anchor="end">' + fmtPct(p, 0) + "</text>";
+  for (let v = 0; v <= XM; v += 4000) h += '<text x="' + x(v) + '" y="' + (T0 + ph + 15) + '" text-anchor="middle">' + fmtInt(v) + "</text>";
+  let d = "";
+  for (let k = 0; k <= 200; k++) { const v = XM * k / 200; d += (k ? " L" : "M") + x(v).toFixed(1) + " " + y(pRepeat(v)).toFixed(1); }
+  h += '<path class="curve" d="' + d + '"/>';
+  // the slide's point: 50% at about 4 823 packets
+  h += '<line class="ptr" x1="' + x(IV_N50) + '" x2="' + x(IV_N50) + '" y1="' + y(0) + '" y2="' + y(0.5) + '" style="stroke:var(--muted)"/>' +
+    '<line class="ptr" x1="' + L0 + '" x2="' + x(IV_N50) + '" y1="' + y(0.5) + '" y2="' + y(0.5) + '" style="stroke:var(--muted)"/>' +
+    '<circle class="mark" cx="' + x(IV_N50) + '" cy="' + y(0.5) + '" r="5"/>' +
+    '<text class="mk" x="' + (x(IV_N50) + 9) + '" y="' + (y(0.5) + 16) + '">' + t.m3half(fmtInt(IV_N50)) + "</text>";
+  // your runs: dots on the axis
+  for (const r of app.ivRuns) if (r <= XM) h += '<circle class="run" cx="' + x(r).toFixed(1) + '" cy="' + (y(0) - 4) + '" r="3.5"/>';
+  // the pointer
+  const pn = pRepeat(n);
+  h += '<line class="ptr" x1="' + x(n) + '" x2="' + x(n) + '" y1="' + y(0) + '" y2="' + T0 + '"/><circle class="ptr" cx="' + x(n) + '" cy="' + y(pn) + '" r="6"/>';
+  const right = x(n) > W - 200;
+  h += '<text class="hlt" x="' + (x(n) + (right ? -10 : 10)) + '" y="' + Math.max(T0 + 12, y(pn) - 10) + '" text-anchor="' + (right ? "end" : "start") + '">' + fmtPct(pn, 1) + "</text>";
+  h += '<line class="ax" x1="' + L0 + '" x2="' + (W - R) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>' +
+    '<text x="' + (L0 + pw / 2) + '" y="' + (H - 4) + '" text-anchor="middle">' + t.m3axX + "</text>" +
+    '<text x="12" y="' + (T0 + ph / 2) + '" text-anchor="middle" transform="rotate(-90 12 ' + (T0 + ph / 2) + ')">' + t.m3axY + "</text></svg>";
+  o.innerHTML = h;
+  document.getElementById("ivptr").textContent = t.m3ptr(n, fmtPct(pn, 1));
+}
 function ivRun() {
   const seen = new Set();
   const buf = new Uint8Array(3 * 8192);
@@ -1130,7 +1468,7 @@ function ivRun() {
     for (let k = 0; k < 8192; k++) {
       const v = (buf[3 * k] << 16) | (buf[3 * k + 1] << 8) | buf[3 * k + 2];
       n++;
-      if (seen.has(v)) { app.ivRuns.push(n); if (app.ivRuns.length > 12) app.ivRuns.shift(); updateBd(); return; }
+      if (seen.has(v)) { app.ivRuns.push(n); if (app.ivRuns.length > 12) app.ivRuns.shift(); updateBd(); updateIvChart(); return; }
       seen.add(v);
     }
   }
@@ -1144,12 +1482,122 @@ function updateBd() {
     (r.length > 1 ? '<div class="ivruns">' + t.m3runs + " " + r.map(fmtInt).join(", ") + "</div>" : "");
 }
 
+// 4.3: the FMS attack of example2, packet by packet. The same packets, the same rule, the same votes as attack.py.
+const FMS_SPEEDS = [20, 200, 2000, 20000];   // packets per second
+const FMS = { cap: null, ready: false, A: 0, p: 0, votes: new Uint32Array(256), weak: 0, recovered: [], lines: [], log: [],
+              running: false, speed: 2, hold: 0, timer: 0, acc: 0, last: 0 };
+function fmsPrepare() {
+  if (FMS.cap) return;
+  FMS.cap = wepCapture(WEP_SECRET, FMS_SEED, FMS_PER_BYTE);
+  const step = () => {
+    const t0 = performance.now();
+    while (performance.now() - t0 < 25) if (FMS.cap.next(300)) { FMS.ready = true; updateFms(); return; }
+    setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
+}
+function fmsReset() {
+  FMS.running = false; clearTimeout(FMS.timer);
+  Object.assign(FMS, { A: 0, p: 0, votes: new Uint32Array(256), weak: 0, recovered: [], lines: [], log: [], hold: 0, acc: 0 });
+  updateFms();
+}
+function fmsDone() { return FMS.recovered.length === WEP_SECRET.length; }
+// one packet of attack.py's loop for the key byte FMS.A
+function fmsOne() {
+  const pk = FMS.cap.packets[FMS.p++];
+  const v = fmsVote(pk, FMS.A, FMS.recovered);
+  if (v !== null) { FMS.votes[v]++; FMS.weak++; }
+  FMS.log.push({ k: FMS.p, pk: pk, v: v, A: FMS.A });
+  if (FMS.log.length > 6) FMS.log.shift();
+  if (FMS.p === FMS.cap.total) {   // the end of the packets: the winner is this key byte
+    const rk = rankVotes(FMS.votes);
+    FMS.recovered.push(rk[0]);
+    const hx = x => hx2(x).toUpperCase();
+    FMS.lines.push("K[" + FMS.A + "]: top guesses  " + hx(rk[0]) + " (" + FMS.votes[rk[0]] + " votes), " + hx(rk[1]) + " (" + FMS.votes[rk[1]] + "), " + hx(rk[2]) + " (" + FMS.votes[rk[2]] + ")");
+    return true;
+  }
+  return false;
+}
+function fmsTick() {
+  if (!FMS.running) return;
+  const now = performance.now(), dt = Math.min(0.2, (now - FMS.last) / 1000);
+  FMS.last = now;
+  if (FMS.hold) {   // a short pause on the finished byte, then the next one
+    if (now < FMS.hold) { FMS.timer = setTimeout(fmsTick, 40); return; }
+    FMS.hold = 0; FMS.A++; FMS.p = 0; FMS.votes = new Uint32Array(256); FMS.weak = 0; FMS.log = [];
+  }
+  FMS.acc += FMS_SPEEDS[FMS.speed] * dt;
+  const t0 = performance.now();
+  while (FMS.acc >= 1 && performance.now() - t0 < 20) {
+    FMS.acc--;
+    if (fmsOne()) { FMS.acc = 0; FMS.hold = now + 1500; break; }
+  }
+  if (FMS.acc > 2000) FMS.acc = 0;
+  if (FMS.hold && fmsDone()) { FMS.running = false; FMS.hold = 0; }
+  updateFms();
+  if (FMS.running) FMS.timer = setTimeout(fmsTick, 40);
+}
+function fmsGo() {
+  if (!FMS.ready) return;
+  if (FMS.running) { FMS.running = false; clearTimeout(FMS.timer); updateFms(); return; }
+  if (fmsDone()) fmsReset();
+  FMS.running = true; FMS.last = performance.now();
+  fmsTick();
+}
+function updateFms() {
+  const ch = document.getElementById("fmschart");
+  if (!ch) return;
+  const t = L(), hx = x => hx2(x).toUpperCase();
+  const go = document.getElementById("fmsgo");
+  go.textContent = FMS.running ? t.fmsPause : t.fmsStart;
+  go.disabled = !FMS.ready;
+  const st = document.getElementById("fmsstat");
+  if (!FMS.ready) { st.textContent = t.fmsPrep; ch.innerHTML = ""; return; }
+  const done = fmsDone(), A = FMS.A;
+  st.textContent = done ? t.fmsDoneSt : FMS.hold ? t.fmsHold(A, hx(FMS.recovered[A]), FMS.votes[FMS.recovered[A]]) : t.fmsStatus(A, FMS.p, FMS.cap.total);
+  // the key so far
+  document.getElementById("fmskey").innerHTML = '<b style="font-size:13px;margin-right:4px">' + t.fmsKey + ":</b>" +
+    Array.from(WEP_SECRET, (_, k) => k < FMS.recovered.length ? '<span class="kchip found"><small>K[' + k + "]</small>" + hx(FMS.recovered[k]) + "</span>" :
+      '<span class="kchip unk' + (k === A && !done ? " now" : "") + '"><small>K[' + k + "]</small>??</span>").join("");
+  // the votes for the current key byte
+  const real = WEP_SECRET[Math.min(A, WEP_SECRET.length - 1)];
+  const rk = rankVotes(FMS.votes), lead = rk[0], mx = FMS.votes[lead];
+  document.getElementById("fmsvh").textContent = t.fmsVotes(Math.min(A, WEP_SECRET.length - 1), FMS.weak);
+  const labels = [{ v: real, txt: hx(real) + " (" + FMS.votes[real] + ")", cls: "okt" }];
+  if (mx > 0 && lead !== real) labels.push({ v: lead, txt: t.fmsLead + " " + hx(lead) + " (" + mx + ")", cls: "hlt" });
+  const yMax = Math.max(10, Math.ceil(mx * 1.15 / 10) * 10);
+  const ticks = []; const stp = yMax <= 20 ? 5 : yMax <= 60 ? 10 : yMax <= 150 ? 25 : 50;
+  for (let v = 0; v <= yMax; v += stp) ticks.push(v);
+  ch.innerHTML = hist256(FMS.votes, { yMax: yMax, yTicks: ticks, yFmt: v => String(v), cls: v => v === real ? " real" : v === lead && mx > 0 ? " hl" : "",
+    xLbl: t.fmsAxX, yLbl: t.fmsAxY, labels: labels });
+  // the packets
+  document.getElementById("fmspk").innerHTML = FMS.log.slice().reverse().map(e => {
+    const iv = '<span class="ivb">' + bytesHex(e.pk.subarray(0, 3), " ").toUpperCase() + "</span>";
+    const c = '<span>' + bytesHex(e.pk.subarray(3, 6), " ").toUpperCase() + " …</span>";
+    return e.v !== null ? '<div class="weak"><span>#' + fmtInt(e.k) + "</span>" + iv + c + "<span>" + t.fmsWeak(e.A, hx(e.pk[3] ^ 0xAA), hx(e.v)) + "</span></div>" :
+      '<div class="skip"><span>#' + fmtInt(e.k) + "</span>" + iv + c + "<span>" + t.fmsSkip(e.pk[0], e.A) + "</span></div>";
+  }).join("");
+  // what attack.py prints
+  const out = ["captured " + FMS.cap.total + " packets with weak IVs", ""].concat(FMS.lines);
+  if (done) out.push("", "recovered key: " + bytesHex(FMS.recovered, " "), "real key:      " + bytesHex(WEP_SECRET, " "), "match: " + (bytesHex(FMS.recovered) === bytesHex(WEP_SECRET) ? "True" : "False"));
+  document.getElementById("fmsout").textContent = out.join("\n");
+}
+
 /* ---------- frame, navigation ---------- */
 function buildSide() {
-  const t = L();
-  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
-    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
-    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+  const t = L(), lv = app.level;
+  const btn = (i, num, s, extra, pressed) => '<button class="step' + extra + '" data-step="' + i + '" aria-pressed="' + pressed + '">' +
+    '<span class="gnum">' + num + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>";
+  let h = "";
+  for (let i = 0; i < 4; i++) h += btn(i, i + 1, t.steps[i], (i < lv && i < 3 ? " past" : "") + (i === 3 && lv >= 3 ? " open" : ""), i < 3 && i === lv);
+  t.subs.forEach((s, k) => { h += btn(3 + k, "4." + (k + 1), s, " sub" + (3 + k < lv ? " past" : ""), 3 + k === lv); });
+  document.getElementById("steps").innerHTML = h;
+}
+function selfLine() {
+  const t = L(), st = document.getElementById("selftest");
+  const fails = SELF_FAILS.concat(FMS_FAILS || []);
+  st.textContent = fails.length ? t.selfBad(fails.join(", ")) : FMS_FAILS === null ? t.selfWait : t.selfOk;
+  st.className = fails.length ? "badt" : FMS_FAILS === null ? "" : "okt";
 }
 function render() {
   const t = L();
@@ -1160,31 +1608,42 @@ function render() {
   document.getElementById("home").textContent = "← " + t.home;
   document.getElementById("keys").textContent = t.keys;
   document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
-  const st = document.getElementById("selftest");
-  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
-  st.className = SELF_FAILS.length ? "badt" : "okt";
+  selfLine();
   buildSide();
-  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
-  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
-  document.getElementById("mhSub").textContent = t.steps[app.level][1];
-  const ex = t.explain[app.level];
+  const lv = app.level, sub = lv >= 3 ? t.subs[lv - 3] : t.steps[lv];
+  document.getElementById("mhGrp").textContent = lv >= 3 ? t.stepOfSub(lv - 2) : t.stepOf(lv + 1);
+  document.getElementById("mhTitle").textContent = (lv >= 3 ? PAGES[lv] + " " : "") + sub[0];
+  document.getElementById("mhSub").textContent = sub[1];
+  if (lv !== 5 && FMS.running) { FMS.running = false; clearTimeout(FMS.timer); }
+  const ex = t.explain[lv];
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
-    [render0, render1, render2, render3][app.level]() + "</div>";
-  if (app.level === 0) updateL0();
-  if (app.level === 1) renderL1Body();
-  if (app.level === 2) renderL2Body();
-  if (app.level === 3) { updateM1(); updateM2(); updateM3(); updateBd(); }
+    [render0, render1, render2, renderM1, renderM2, renderM3][lv]() + "</div>";
+  if (lv === 0) updateL0();
+  if (lv === 1) renderL1Body();
+  if (lv === 2) renderL2Body();
+  if (lv === 3) updateM1();
+  if (lv === 4) updateM2();
+  if (lv === 5) { updateM3(); updateIvChart(); updateBd(); fmsPrepare(); updateFms(); }
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
-  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+  try { history.replaceState(null, "", "#" + PAGES[lv]); } catch (e) {}
 }
 function goTo(level) {
   app.level = level;
   render();
   view.scrollTop = 0;
 }
-function zoomIn() { if (app.level < 3) goTo(app.level + 1); }
+function zoomIn() { if (app.level < LAST) goTo(app.level + 1); }
 function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+// "#2", "#4" (= 4.1), "#4.2", "#4.3"; anything else: null
+function levelOfHash(h) {
+  const m = /^#?(\d)(?:\.(\d))?$/.exec(h);
+  if (!m) return null;
+  const n = +m[1], k = m[2] === undefined ? 1 : +m[2];
+  if (n >= 1 && n <= 3 && m[2] === undefined) return n - 1;
+  if (n === 4 && k >= 1 && k <= 3) return 2 + k;
+  return null;
+}
 
 /* ---------- events ---------- */
 const view = document.getElementById("view");
@@ -1223,7 +1682,9 @@ view.addEventListener("click", e => {
   else if (a === "prga-next") prgaGo(app.prgaPos + 1);
   else if (a === "prga-byte") prgaGo(app.prgaPos === 0 ? 5 : 5 * Math.ceil(app.prgaPos / 5) + (app.prgaPos % 5 === 0 ? 5 : 0));
   else if (a === "prga-16") prgaGo(5 * (Math.floor(app.prgaPos / 5) + 16));
-  else if (a === "mis") { app.mis = +el.dataset.m; render(); }
+  else if (a === "s2pos") { app.s2pos = +el.dataset.b; view.querySelectorAll('[data-action="s2pos"]').forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.b === app.s2pos))); updateM2(); }
+  else if (a === "fms-go") fmsGo();
+  else if (a === "fms-reset") fmsReset();
   else if (a === "run1") run1();
   else if (a === "run2") run2();
   else if (a === "iv-same") { app.iv2 = app.iv1; const i2 = view.querySelector('input[data-field="iv2"]'); if (i2) i2.value = app.iv2; updateM3(); }
@@ -1247,6 +1708,8 @@ view.addEventListener("input", e => {
   else if (f === "ksapos") ksaGo(+v);
   else if (f === "iv1" || f === "iv2") { app[f] = v; updateM3(); }
   else if (f === "s2n") app.s2n = +v;
+  else if (f === "ivn") { app.ivN = +v; updateIvChart(); }
+  else if (f === "fmsspeed") FMS.speed = +v;
 });
 view.addEventListener("mouseover", e => {
   const td = e.target.closest("td[data-i]");
@@ -1279,11 +1742,18 @@ document.addEventListener("keydown", e => {
   else if (app.level === 2 && e.key === "p") prgaGo(app.prgaPos - 1);
 });
 
+window.addEventListener("hashchange", () => {
+  const lv = levelOfHash(location.hash);
+  if (lv !== null && lv !== app.level) goTo(lv);
+});
+
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-const startStep = parseInt(location.hash.slice(1), 10);
-if (startStep >= 1 && startStep <= 4) app.level = startStep - 1;
+let FMS_FAILS = null;   // the FMS check of example2 runs in pieces after the first paint
+const startLv = levelOfHash(location.hash);
+if (startLv !== null) app.level = startLv;
 render();
+fmsSelfTest(f => { FMS_FAILS = f; selfLine(); });
 </script>
 </body>
 </html>
