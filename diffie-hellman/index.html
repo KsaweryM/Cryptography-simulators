@@ -237,6 +237,13 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
   .main{display:block}
   .two{grid-template-columns:1fr}
 }
+/* every box filled with a role colour has a border in that role colour (doubled class: wins over .chip, .half, .mark, .legend span) */
+.role-pub.role-pub{border-color:var(--pub-b)}
+.role-sec.role-sec{border-color:var(--sec-b)}
+.role-sh.role-sh{border-color:var(--sh-b)}
+.role-msg.role-msg{border-color:var(--msg-b)}
+.role-mal.role-mal{border-color:var(--mal-b)}
+.ptable td.on{border:1.5px solid var(--pub-b)}
 </style>
 </head>
 <body>

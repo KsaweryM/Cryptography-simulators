@@ -280,6 +280,15 @@ h4.sub:first-of-type{margin-top:0}
   .side{border-right:0;border-bottom:1px solid var(--rule)}
   .main{display:block}
 }
+/* every box filled with a role colour has a border in that role colour (doubled class: wins over .node, .kbox, .chip, .pill, .hn, .legend span) */
+.role-pub.role-pub{border-color:var(--ctr-b)}
+.role-sec.role-sec{border-color:var(--key-b)}
+.role-msg.role-msg{border-color:var(--non-b)}
+.role-ct.role-ct{border-color:var(--ct-b)}
+.role-eve.role-eve{border-color:var(--g2)}
+.gc{border-width:1.5px}
+.ltab tr.rm td:not(.lbl){border:1.5px solid var(--non-b)}
+.ltab tr.rc td:not(.lbl){border:1.5px solid var(--ct-b)}
 </style>
 </head>
 <body>

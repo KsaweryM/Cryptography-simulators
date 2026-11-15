@@ -125,16 +125,12 @@ textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--ru
 .schwrap{overflow-x:auto}
 .sch{position:relative;width:900px;height:432px;color:var(--muted)}
 .sch .arrows{position:absolute;left:0;top:0;color:var(--ink)}
-.sg-key{position:absolute;left:8px;top:0;width:560px;height:118px;border:1.5px solid;border-radius:8px;padding:6px 10px;color:var(--ink)}
+.sg-key{position:absolute;left:8px;top:0;width:886px;height:118px;border:1.5px solid;border-radius:8px;padding:6px 10px;color:var(--ink)}
 .sg-key .lblrow{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:600}
 .sg-key input.khex{width:100%;margin-top:3px;font-size:13px}
 .sg-key .krow{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12.5px;font-weight:600}
 .sg-key .krow input{flex:1 1 auto;min-width:0;font-size:13px}
 .sg-key .krow button{padding:3px 8px;font-size:12.5px;font-weight:500;white-space:nowrap}
-.sg-non{position:absolute;left:592px;top:0;width:300px;height:118px;border:2px dashed var(--muted);border-radius:8px;padding:6px 10px;font-size:12.5px;color:var(--ink)}
-.sg-non b{display:flex;align-items:center;gap:6px;font-size:13.5px}
-.sg-non .x{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--chg);color:#fff;align-items:center;justify-content:center;font-size:13px;font-weight:700}
-.sg-non p{margin:3px 0 0;color:var(--muted);line-height:1.4}
 .sg-box{position:absolute;left:30px;top:166px;width:180px;height:76px;justify-content:center}
 .node{position:absolute;border-radius:10px;padding:8px 12px;border:1.5px solid;color:var(--ink)}
 .node .nh{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
@@ -285,6 +281,11 @@ textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--ru
   .side{border-right:0;border-bottom:1px solid var(--rule)}
   .main{display:block}
 }
+/* every box filled with a role colour has a border in that role colour (doubled class: wins over .node, .fchip, .wep .part, .sg-key) */
+.role-key.role-key{border-color:var(--key-b)}
+.role-pt.role-pt{border-color:var(--non-b)}
+.role-ct.role-ct{border-color:var(--ct-b)}
+.role-const.role-const{border-color:var(--const-b)}
 </style>
 </head>
 <body>
@@ -699,7 +700,6 @@ const T = {
     moreBelow: "More below", keys: "→ / Enter: next · ← / Esc: back", fixFirst: "Fix the key in step 1.",
     keyShort: "secret key, hex (1 to 256 bytes)", keyAsText: "as text", keyNotText: "(not plain text)", keyLen: n => n + " byte" + (n === 1 ? "" : "s"),
     preset5: "01 02 03 04 05", preset5_s: "the key on the slides (RFC 6229)", presetK: "Kangaroo", presetK_s: "the key of Task 2", randKey: "random 16-byte key",
-    nonceT: "nonce: no such input", nonceP: "RC4 takes only the key. Same key, same keystream, every time. A protocol has to glue a nonce into the key itself (<a href='#4.3'>step 4.3</a>).",
     boxRC4_s: "click to look inside", nodeKs: "keystream Z", nodePt: "plaintext P", nodeCt: "ciphertext C",
     ksCap: n => "as many bytes as the message (" + n + ")", ctCap: n => n + " byte" + (n === 1 ? "" : "s"),
     cardMsg: "Encrypting with RC4", cardDetails: "Details: the XOR byte by byte",
@@ -814,7 +814,6 @@ const T = {
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: dalej · ← / Esc: wstecz", fixFirst: "Popraw klucz w kroku 1.",
     keyShort: "tajny klucz, hex (od 1 do 256 bajtów)", keyAsText: "jako tekst", keyNotText: "(to nie jest zwykły tekst)", keyLen: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
     preset5: "01 02 03 04 05", preset5_s: "klucz ze slajdów (RFC 6229)", presetK: "Kangaroo", presetK_s: "klucz z Task 2", randKey: "losowy klucz, 16 bajtów",
-    nonceT: "nonce: nie ma takiego wejścia", nonceP: "RC4 bierze tylko klucz. Ten sam klucz to zawsze ten sam keystream. Protokół musi sam wkleić nonce do klucza (<a href='#4.3'>krok 4.3</a>).",
     boxRC4_s: "kliknij, by zajrzeć", nodeKs: "keystream Z", nodePt: "tekst jawny P", nodeCt: "szyfrogram C",
     ksCap: n => "tyle bajtów, ile ma wiadomość (" + n + ")", ctCap: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
     cardMsg: "Szyfrowanie RC4", cardDetails: "Szczegóły: XOR bajt po bajcie",
@@ -973,7 +972,6 @@ function render0() {
         '<input class="khex" data-field="khex" spellcheck="false" value="' + esc(app.keyText) + '">' +
         '<div class="krow"><span>' + t.keyAsText + '</span><input data-field="ktext" spellcheck="false" value="' + esc(txt === null ? "" : txt) + '" placeholder="' + esc(txt === null ? t.keyNotText : "") + '">' +
         '<button data-action="preset-5" title="' + esc(t.preset5_s) + '">' + t.preset5 + '</button><button data-action="preset-k" title="' + esc(t.presetK_s) + '">' + t.presetK + "</button></div></div>" +
-      '<div class="sg-non"><b><span class="x">✕</span>' + t.nonceT + "</b><p>" + t.nonceP + "</p></div>" +
       '<button class="box sg-box" data-action="zoom">RC4<small>' + t.boxRC4_s + "</small></button>" +
       '<div class="node sg-ks"><div class="nh">' + KEY_SVG + " " + t.nodeKs + '</div><div class="nb mono" id="ksbytes"></div><small id="kscap"></small></div>' +
       '<div class="sg-xor" aria-label="XOR">&#8853;</div>' +
