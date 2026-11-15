@@ -19,7 +19,8 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
   d and the power are in the mathematics section.
 - **Diffie-Hellman and ElGamal** (`diffie-hellman/`): black box, the powers of g, Mallory in the middle, ElGamal, one power.
 - **Elliptic curves** (`elliptic-curves/`): black box, adding points, the curve modulo 17, one addition.
-- **Certificates and PKI** (`pki/`): contents only for now, 10 chapters and 46 sections.
+- **Certificates and PKI** (`pki/`): black box (Mallory swaps a key, a CA signature stops her), inside a certificate (X.509 fields, DER
+  bytes, fingerprint), chain of trust, validation checks, revocation (CRL, OCSP, stapling), certificates in TLS 1.3 and mTLS, pinning.
 
 ## Coming soon
 
