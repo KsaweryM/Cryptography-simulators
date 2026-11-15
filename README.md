@@ -6,7 +6,8 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 
 ## Ready
 
-- **ChaCha20** (`chacha20/`): black box, inside, one round, one operation.
+- **ChaCha20** (`chacha20/`): black box, inside, one round, one operation, and the comparison with RC4 (the two key
+  tests of Lecture 2 over 10 000 or 100 000 keys; the fixed seed 2026 gives the numbers on the slides).
 
 ## In progress
 

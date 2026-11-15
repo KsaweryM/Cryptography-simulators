@@ -311,6 +311,32 @@ figcaption{font-size:12.5px;color:var(--muted);margin-top:4px}
 .oprow .lbl{width:4.4em;text-align:right;font-weight:600}
 .ruler{border-top:2px solid var(--ink);margin:3px 0 3px 4.9em}
 
+/* step 5: compared with RC4 */
+.cmpwhat{margin:0 0 6px}
+.cmpctl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0 8px}
+.cmpctl label{display:flex;gap:6px;align-items:center;font-size:13.5px}
+.prog{height:8px;background:var(--sunken);border-radius:4px;overflow:hidden;width:800px;max-width:100%}
+.prog span{display:block;height:100%;background:var(--ink);width:0}
+.progtxt{font-size:12.5px;color:var(--muted);margin:3px 0 0;min-height:1.4em}
+.cbars{position:relative;width:960px;padding:2px 0 24px;margin-top:6px}
+.cbar{display:grid;grid-template-columns:250px 560px auto;gap:12px;align-items:center;margin:10px 0}
+.cbar .nm{text-align:right;font-weight:600;font-size:14px;line-height:1.3}
+.cbar .nm small{display:block;font-weight:400;color:var(--muted);font-size:12px;font-family:var(--mono)}
+.cbar .tr{height:30px;background:var(--sunken);border-radius:5px;overflow:hidden}
+.cbar .tr span{display:block;height:100%;width:0}
+.cbar.rc4 .tr span{background:var(--chg)}
+.cbar.cc .tr span{background:var(--muted)}
+.cbar .val{font-family:var(--mono);font-size:13.5px;white-space:nowrap}
+.cbar .val b{font-size:15px}
+.chance{position:absolute;top:0;bottom:4px;border-left:2px dashed var(--ink)}
+.chance span{position:absolute;bottom:-4px;left:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.exline{font-size:13.5px;margin:2px 0 0;min-height:1.6em}
+.exline .kb{font-family:var(--mono);padding:0 5px;border-radius:4px;border:1.5px solid}
+.exline .ob{font-family:var(--mono);font-weight:700}
+.exline .hit{color:var(--chg);font-weight:700}
+.why a{color:inherit;font-weight:600}
+.why.calm{border-left-color:var(--muted);background:var(--sunken)}
+
 @media (max-width:900px){
   .app{height:auto;display:block}
   .top{flex-wrap:wrap}
@@ -468,6 +494,145 @@ function selfTest() {
   if (bytesHex(ct.slice(0, 8)) !== RFC_CT_START) fails.push("encryption (2.4.2)");
   return fails;
 }
+
+/* ===================== step 5: the same key tests on RC4 and ChaCha20 =====================
+   A port of the Lecture 2 demos remember.py and second_byte.py. With the fixed seed the keys come from
+   Python's random.Random(2026): a port of Python's Mersenne Twister (seeding with init_by_array, getrandbits).
+   Python's randbytes(n) is getrandbits(8n).to_bytes(n, "little"), so a 16-byte key is 4 words of getrandbits(32),
+   each written lowest byte first. Each key: first randbytes(16) for RC4, then randbytes(32) for ChaCha20. */
+function PyRandom(seed) {
+  const N = 624, mt = new Uint32Array(N);
+  let mti = N;
+  const initGenrand = s => {
+    mt[0] = s >>> 0;
+    for (let i = 1; i < N; i++) mt[i] = (Math.imul(1812433253, mt[i - 1] ^ (mt[i - 1] >>> 30)) + i) >>> 0;
+  };
+  // Python: an int seed becomes its 32-bit words, lowest first (seed < 2^32 here: one word)
+  const key = [seed >>> 0];
+  initGenrand(19650218);
+  let i = 1, j = 0;
+  for (let k = Math.max(N, key.length); k > 0; k--) {
+    mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1664525)) + key[j] + j) >>> 0;
+    i++; j++;
+    if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+    if (j >= key.length) j = 0;
+  }
+  for (let k = N - 1; k > 0; k--) {
+    mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1566083941)) - i) >>> 0;
+    i++;
+    if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+  }
+  mt[0] = 0x80000000;
+  const u32 = () => {
+    if (mti >= N) {
+      for (let k = 0; k < N; k++) {
+        const y = (mt[k] & 0x80000000) | (mt[(k + 1) % N] & 0x7fffffff);
+        mt[k] = mt[(k + 397) % N] ^ (y >>> 1) ^ (y & 1 ? 0x9908b0df : 0);
+      }
+      mti = 0;
+    }
+    let y = mt[mti++];
+    y ^= y >>> 11; y ^= (y << 7) & 0x9d2c5680; y ^= (y << 15) & 0xefc60000; y ^= y >>> 18;
+    return y >>> 0;
+  };
+  return { getrandbits32: u32 };
+}
+
+// RC4 on a 16-byte key given as 4 little-endian words: S[0] after the key schedule and the second keystream byte
+const RC4_S = new Uint8Array(256), RC4_OUT = [0, 0];
+function rc4Probe(kw, off) {
+  const S = RC4_S;
+  for (let i = 0; i < 256; i++) S[i] = i;
+  let j = 0;
+  for (let i = 0; i < 256; i++) {
+    j = (j + S[i] + ((kw[off + ((i >> 2) & 3)] >>> (8 * (i & 3))) & 255)) & 255;
+    const t = S[i]; S[i] = S[j]; S[j] = t;
+  }
+  RC4_OUT[0] = S[0];
+  let i = 0, z = 0; j = 0;
+  for (let k = 0; k < 2; k++) {
+    i = (i + 1) & 255; j = (j + S[i]) & 255;
+    const t = S[i]; S[i] = S[j]; S[j] = t;
+    z = S[(S[i] + S[j]) & 255];
+  }
+  RC4_OUT[1] = z;
+  return RC4_OUT;
+}
+// ChaCha20 on a 32-byte key given as 8 little-endian words, nonce 0, counter 0: the first keystream word
+// (its lowest byte is keystream byte 0, the next one byte 1)
+const CC_S = new Uint32Array(16), CC_X = new Uint32Array(16);
+function chachaWord0(kw, off) {
+  for (let i = 0; i < 4; i++) CC_S[i] = SIGMA[i];
+  for (let i = 0; i < 8; i++) CC_S[4 + i] = kw[off + i];
+  for (let i = 12; i < 16; i++) CC_S[i] = 0;
+  CC_X.set(CC_S);
+  for (let r = 1; r <= 20; r++) for (const g of groupsOfRound(r)) quarterRound(CC_X, g[0], g[1], g[2], g[3]);
+  return (CC_X[0] + CC_S[0]) >>> 0;
+}
+
+// one run over n keys, done in pieces: step(count) tests up to count more keys
+function cmpRun(n, seeded) {
+  const rng = seeded ? PyRandom(2026) : null;
+  const BATCH = 1024, buf = new Uint32Array(12 * BATCH);
+  let bpos = BATCH;
+  const r = { n: n, seeded: seeded, done: 0, rc4S0: 0, ccZ0: 0, rc4Z1: 0, ccZ1: 0, ex: null };
+  r.step = count => {
+    const end = Math.min(n, r.done + count);
+    let ex = null;
+    for (; r.done < end; r.done++) {
+      let w, o;
+      if (rng) { w = buf; o = 0; for (let k = 0; k < 12; k++) buf[k] = rng.getrandbits32(); }
+      else {
+        if (bpos >= BATCH) { crypto.getRandomValues(buf); bpos = 0; }
+        w = buf; o = 12 * bpos++;
+      }
+      const k0 = w[o] & 255, rc = rc4Probe(w, o);
+      if (rc[0] === k0) r.rc4S0++;
+      if (rc[1] === 0) r.rc4Z1++;
+      const c0 = w[o + 4] & 255, z = chachaWord0(w, o + 4), z0 = z & 255, z1 = (z >>> 8) & 255;
+      if (z0 === c0) r.ccZ0++;
+      if (z1 === 0) r.ccZ1++;
+      ex = { k0: k0, s0: rc[0], rz1: rc[1], c0: c0, z0: z0, z1: z1 };
+    }
+    if (ex) r.ex = ex;
+    return r.done >= n;
+  };
+  return r;
+}
+/* the Python reference run (Python 3.12, random.seed(2026)):
+   python3 remember.py     100 000 keys: RC4 S[0] == key[0] 36 751 (36.75%), ChaCha20 first byte == key[0] 398 (0.40%)
+   python3 second_byte.py  100 000 keys: second byte 0: RC4 779 (0.78%), ChaCha20 362 (0.36%)
+   the first 10 000 keys: 3 679, 34, 80, 42 */
+const CMP_REF = { n: 100000, rc4S0: 36751, ccZ0: 398, rc4Z1: 779, ccZ1: 362 };
+function cmpQuickTest() {
+  const fails = [];
+  // Python 3.12: r = random.Random(2026); [r.getrandbits(32) for _ in range(12)]; the first key is
+  // randbytes(16) = 19a47e1e70bcc9515adfa480fc2f8bf3, then randbytes(32) = 3bd00683...821412e5
+  const r = PyRandom(2026), w = Uint32Array.from({ length: 12 }, () => r.getrandbits32());
+  if (Array.from(w, hex8).join(" ") !== "1e7ea419 51c9bc70 80a4df5a f38b2ffc 8306d03b a5aec797 dc28ff90 f3f49249 1a466884 e255accb 39292d22 e5121482")
+    fails.push("Python random");
+  // the fast RC4: RFC 6229, key 0102...10, keystream 9a c7 ...; the fast ChaCha20 against the block function above
+  const k16 = Uint32Array.from([0x04030201, 0x08070605, 0x0c0b0a09, 0x100f0e0d]);
+  if (rc4Probe(k16, 0)[1] !== 0xc7) fails.push("RC4 second byte");
+  const kb = wordsToBytes(w.subarray(4, 12)), z = keystream(kb, new Uint8Array(12), 0, 4);
+  if (chachaWord0(w, 4) !== u32le(z, 0)) fails.push("ChaCha20 first word");
+  return fails;
+}
+// the demo numbers again, in pieces after the first paint; done(fails) at the end
+function cmpSelfTest(done) {
+  const run = cmpRun(CMP_REF.n, true);
+  const step = () => {
+    const t0 = performance.now();
+    while (performance.now() - t0 < 25) {
+      if (run.step(500)) {
+        done(["rc4S0", "ccZ0", "rc4Z1", "ccZ1"].some(k => run[k] !== CMP_REF[k]) ? ["seed 2026 demo numbers"] : []);
+        return;
+      }
+    }
+    setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
+}
 // CORE-END
 
 /* ===================== texts (EN and PL) ===================== */
@@ -481,14 +646,16 @@ const T = {
   en: {
     title: "ChaCha20 explorer", home: "All simulators",
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
-    stepOf: n => "Step " + n + " of 4 · ChaCha20",
+    stepOf: n => "Step " + n + " of 5 · ChaCha20",
     steps: [["Black box", "key, nonce, counter in; keystream out"], ["Inside", "the inputs fill a 4×4 table"],
-            ["One round", "4 quarter rounds, 12 small steps each"], ["One operation", "add, xor, rotate, bit by bit"]],
+            ["One round", "4 quarter rounds, 12 small steps each"], ["One operation", "add, xor, rotate, bit by bit"],
+            ["Compared with RC4", "the same two key tests on both ciphers"]],
     explain: [
       ["Three inputs, one keystream", "Three inputs go in, a keystream comes out, 64 bytes per block. Encrypting is XOR of the message with the keystream. Change the counter and watch your message move along the keystream. Click the ChaCha20 box to look inside."],
       ["A table, mixed and added back", "The key, the nonce and the counter fill a 4×4 table S together with 4 fixed constants. 20 rounds mix S into X. At the end S is added back to X, word by word, and the result is one block of keystream. Click “20 rounds” to zoom in."],
       ["Inside one round", "One round splits the table into 4 groups of 4 words and runs a quarter round on each: odd rounds take the columns, even rounds the diagonals. ChaCha20 does this 20 times. Pick a group, then step through its 12 small operations. Click an operation to see it bit by bit."],
-      ["Three simple operations", "Everything in ChaCha20 is built from add, xor and rotate on 32-bit words. No tables, the same work for every key."]],
+      ["Three simple operations", "Everything in ChaCha20 is built from add, xor and rotate on 32-bit words. No tables, the same work for every key."],
+      ["Two tests that RC4 fails", "In Lecture 1, RC4 leaked in two ways. Here we run the same two tests on RC4 and on ChaCha20, with many random keys. If an output byte looks random, each test hits by chance in 1 key of 256, that is 0.39%. If a cipher hits more often, Eve learns something about the key or the message."]],
     selfOk: "✓ checked against RFC 8439", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back", fixFirst: "Fix the key or the nonce in step 1.",
     cardInputs: "Inputs", key: "key", key_s: "the shared secret: 32 bytes = 256 bits (64 hex digits)", nonce: "nonce", nonce_s: "public, new for every message, so no two messages share a keystream (12 bytes = 24 hex digits)",
@@ -542,18 +709,41 @@ const T = {
     exAddDrop: "Here a carry fell off the top.",
     exXor: "XOR gives 1 where the two bits differ, 0 where they are the same. Do it twice with the same b and you get a back.",
     exRot: n => "Rotate left by " + n + ": every bit moves " + n + " places to the left. The " + n + " bits that fall off the left (framed) come back on the right. Nothing is lost.",
+    selfWait: "… checking the seed-2026 numbers",
+    cmpTitle: ["Test 1: does the output remember the key?", "Test 2: the second byte"],
+    cmpWhat: ["For every random key we check one thing: is the first output byte equal to the first key byte, key[0]?",
+              "For every random key we check one thing: is the second keystream byte 0?"],
+    cmpKeys: "RC4 keys have 16 bytes. ChaCha20 keys have 32 bytes, with nonce 0 and counter 0.",
+    cmpRows: [[["RC4", "S[0] == key[0]"], ["ChaCha20", "first byte == key[0]"]], [["RC4", "second byte == 0"], ["ChaCha20", "second byte == 0"]]],
+    cmpRun: "▶ Run", cmpRunning: "Running…", cmpKeysN: n => fmtN(n) + " keys",
+    cmpSeed: "fixed seed 2026 (the numbers on the slides)",
+    cmpSeedTip: "Python's random.seed(2026), ported to this page: the same keys in every run. Without it: new random keys every time.",
+    cmpPress: "Press Run.",
+    cmpProg: (d, n, sd) => fmtN(d) + " of " + fmtN(n) + " keys" + (sd ? " · seed 2026" : " · new random keys"),
+    cmpVal: (h, n) => "<b>" + pctS(h, n) + "</b>  (" + fmtN(h) + " key" + (h === 1 ? "" : "s") + ")",
+    cmpChance: "chance: 1/256 = 0.39%",
+    cmpExpect: (n, e, sd) => "Chance alone gives about " + fmtN(e) + " keys of " + fmtN(n) + ", give or take " + sd + ". Differences that small are noise.",
+    cmpEx: [ex => "Last key: key[0] = <span class=\"kb role-key\">" + hx2(ex.k0) + "</span>, RC4 S[0] = <span class=\"ob" + (ex.s0 === ex.k0 ? " hit" : "") + "\">" + hx2(ex.s0) + "</span>" + (ex.s0 === ex.k0 ? " <span class=\"hit\">(the same)</span>" : "") +
+               " · ChaCha20 key[0] = <span class=\"kb role-key\">" + hx2(ex.c0) + "</span>, first byte = <span class=\"ob" + (ex.z0 === ex.c0 ? " hit" : "") + "\">" + hx2(ex.z0) + "</span>",
+             ex => "Last key: RC4 second byte = <span class=\"ob" + (ex.rz1 === 0 ? " hit" : "") + "\">" + hx2(ex.rz1) + "</span> · ChaCha20 second byte = <span class=\"ob" + (ex.z1 === 0 ? " hit" : "") + "\">" + hx2(ex.z1) + "</span>"],
+    cmpWhyRc4: ["<b>Why RC4 remembers.</b> The first step of the key schedule is j = 0 + S[0] + key[0] = key[0], and it swaps S[0] with S[key[0]]. So after step 1, S[0] = key[0]. The other 255 steps move S[0] only when j happens to be 0. In about 37% of keys that never happens: (255/256)<sup>255</sup> ≈ 0.37. Step through it in the RC4 explorer: <a href=\"../rc4/index.html#4.1\">4.1 S remembers the key</a>.",
+                "<b>Why RC4 likes 0.</b> If S[2] = 0 after the key schedule (1 key in 256), the second byte comes out 0 almost always. Add the 1 in 256 by chance and you get about 2 in 256. So Eve, who sees one message under many keys, finds its second byte: it is the most common second byte of the ciphertext (Mantin and Shamir, 2001). See it in the RC4 explorer: <a href=\"../rc4/index.html#4.2\">4.2 The second byte</a>."],
+    cmpWhyCc: ["<b>Why ChaCha20 looks like chance.</b> 20 rounds of add, xor and rotate mix every key bit into every output word (steps 2 to 4). Nothing of key[0] stays in place: the first byte matches key[0] only by luck, in 1 key of 256.",
+               "<b>Why ChaCha20 looks like chance.</b> 20 rounds of add, xor and rotate mix every key bit into every output word (steps 2 to 4). No output byte prefers any value: 0 comes in 1 key of 256, like every other byte."],
   },
   pl: {
     title: "Eksplorator ChaCha20", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
-    stepOf: n => "Krok " + n + " z 4 · ChaCha20",
+    stepOf: n => "Krok " + n + " z 5 · ChaCha20",
     steps: [["Czarna skrzynka", "klucz, nonce i licznik na wejściu, keystream na wyjściu"], ["W środku", "wejścia wypełniają tabelę 4×4"],
-            ["Jedna runda", "4 ćwiartki rundy, po 12 małych kroków"], ["Jedna operacja", "dodawanie, XOR, rotacja bit po bicie"]],
+            ["Jedna runda", "4 ćwiartki rundy, po 12 małych kroków"], ["Jedna operacja", "dodawanie, XOR, rotacja bit po bicie"],
+            ["Porównanie z RC4", "te same dwa testy klucza na obu szyfrach"]],
     explain: [
       ["Trzy wejścia, jeden keystream", "Na wejściu trzy wartości, na wyjściu keystream, po 64 bajty na blok. Szyfrowanie to XOR wiadomości z keystreamem. Zmień licznik i patrz, jak wiadomość przesuwa się wzdłuż keystreamu. Kliknij pole ChaCha20, żeby zajrzeć do środka."],
       ["Tabela, wymieszana i dodana z powrotem", "Klucz, nonce i licznik wypełniają tabelę 4×4 S razem z 4 stałymi. 20 rund miesza S w X. Na końcu S jest dodawana z powrotem do X, słowo po słowie, i wynik to jeden blok keystreamu. Kliknij „20 rund”, żeby wejść głębiej."],
       ["Wnętrze jednej rundy", "Runda dzieli tabelę na 4 grupy po 4 słowa i na każdej wykonuje ćwiartkę rundy: rundy nieparzyste biorą kolumny, parzyste przekątne. ChaCha20 robi to 20 razy. Wybierz grupę i przejdź krok po kroku przez jej 12 małych operacji. Kliknij operację, żeby zobaczyć ją bit po bicie."],
-      ["Trzy proste operacje", "Cały ChaCha20 jest zbudowany z dodawania, XOR i rotacji na słowach 32-bitowych. Bez tablic, ta sama praca dla każdego klucza."]],
+      ["Trzy proste operacje", "Cały ChaCha20 jest zbudowany z dodawania, XOR i rotacji na słowach 32-bitowych. Bez tablic, ta sama praca dla każdego klucza."],
+      ["Dwa testy, których RC4 nie przechodzi", "Na wykładzie 1 RC4 przeciekał na dwa sposoby. Tutaj robimy te same dwa testy na RC4 i na ChaCha20, dla wielu losowych kluczy. Jeśli bajt wyjścia wygląda na losowy, każdy test trafia przypadkiem w 1 kluczu na 256, czyli w 0,39%. Jeśli szyfr trafia częściej, Eve dowiaduje się czegoś o kluczu albo o wiadomości."]],
     selfOk: "✓ sprawdzone z RFC 8439", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej", fixFirst: "Popraw klucz albo nonce w kroku 1.",
     cardInputs: "Wejścia", key: "klucz", key_s: "wspólny sekret: 32 bajty = 256 bitów (64 cyfry hex)", nonce: "nonce", nonce_s: "jawny, nowy dla każdej wiadomości, żeby dwie wiadomości nie dostały tego samego keystreamu (12 bajtów = 24 cyfry hex)",
@@ -607,6 +797,27 @@ const T = {
     exAddDrop: "Tutaj przeniesienie wypadło poza najstarszy bit.",
     exXor: "XOR daje 1 tam, gdzie bity się różnią, i 0 tam, gdzie są takie same. Zrób go dwa razy z tym samym b, a wrócisz do a.",
     exRot: n => "Rotacja w lewo o " + n + ": każdy bit przesuwa się o " + n + " " + plN(n, "miejsce", "miejsca", "miejsc") + " w lewo. Bity, które wypadają z lewej (w ramkach), wracają z prawej. Nic nie ginie.",
+    selfWait: "… sprawdzam liczby z ziarnem 2026",
+    cmpTitle: ["Test 1: czy wyjście pamięta klucz?", "Test 2: drugi bajt"],
+    cmpWhat: ["Dla każdego losowego klucza sprawdzamy jedno: czy pierwszy bajt wyjścia jest równy pierwszemu bajtowi klucza, key[0]?",
+              "Dla każdego losowego klucza sprawdzamy jedno: czy drugi bajt keystreamu to 0?"],
+    cmpKeys: "Klucze RC4 mają 16 bajtów. Klucze ChaCha20 mają 32 bajty, nonce 0 i licznik 0.",
+    cmpRows: [[["RC4", "S[0] == key[0]"], ["ChaCha20", "pierwszy bajt == key[0]"]], [["RC4", "drugi bajt == 0"], ["ChaCha20", "drugi bajt == 0"]]],
+    cmpRun: "▶ Uruchom", cmpRunning: "Liczę…", cmpKeysN: n => fmtN(n) + " " + plN(n, "klucz", "klucze", "kluczy"),
+    cmpSeed: "stałe ziarno 2026 (liczby ze slajdów)",
+    cmpSeedTip: "random.seed(2026) z Pythona, przeniesione na tę stronę: te same klucze przy każdym uruchomieniu. Bez tego: za każdym razem nowe losowe klucze.",
+    cmpPress: "Naciśnij Uruchom.",
+    cmpProg: (d, n, sd) => fmtN(d) + " z " + fmtN(n) + " kluczy" + (sd ? " · ziarno 2026" : " · nowe losowe klucze"),
+    cmpVal: (h, n) => "<b>" + pctS(h, n) + "</b>  (" + fmtN(h) + " " + plN(h, "klucz", "klucze", "kluczy") + ")",
+    cmpChance: "przypadek: 1/256 = 0,39%",
+    cmpExpect: (n, e, sd) => "Sam przypadek daje około " + fmtN(e) + " kluczy z " + fmtN(n) + ", plus minus " + sd + ". Tak małe różnice to szum.",
+    cmpEx: [ex => "Ostatni klucz: key[0] = <span class=\"kb role-key\">" + hx2(ex.k0) + "</span>, RC4 S[0] = <span class=\"ob" + (ex.s0 === ex.k0 ? " hit" : "") + "\">" + hx2(ex.s0) + "</span>" + (ex.s0 === ex.k0 ? " <span class=\"hit\">(to samo)</span>" : "") +
+               " · ChaCha20 key[0] = <span class=\"kb role-key\">" + hx2(ex.c0) + "</span>, pierwszy bajt = <span class=\"ob" + (ex.z0 === ex.c0 ? " hit" : "") + "\">" + hx2(ex.z0) + "</span>",
+             ex => "Ostatni klucz: drugi bajt RC4 = <span class=\"ob" + (ex.rz1 === 0 ? " hit" : "") + "\">" + hx2(ex.rz1) + "</span> · drugi bajt ChaCha20 = <span class=\"ob" + (ex.z1 === 0 ? " hit" : "") + "\">" + hx2(ex.z1) + "</span>"],
+    cmpWhyRc4: ["<b>Dlaczego RC4 pamięta.</b> Pierwszy krok układania klucza to j = 0 + S[0] + key[0] = key[0] i zamiana S[0] z S[key[0]]. Więc po kroku 1 S[0] = key[0]. Pozostałe 255 kroków rusza S[0] tylko wtedy, gdy j przypadkiem wynosi 0. W około 37% kluczy to się nie zdarza ani razu: (255/256)<sup>255</sup> ≈ 0,37. Przejdź to krok po kroku w eksploratorze RC4: <a href=\"../rc4/index.html#4.1\">4.1 S pamięta klucz</a>.",
+                "<b>Dlaczego RC4 lubi 0.</b> Jeśli po układaniu klucza S[2] = 0 (1 klucz na 256), drugi bajt wychodzi 0 prawie zawsze. Dodaj 1 na 256 z przypadku i masz około 2 na 256. Więc Eve, która widzi jedną wiadomość pod wieloma kluczami, znajduje jej drugi bajt: to najczęstszy drugi bajt szyfrogramu (Mantin i Shamir, 2001). Zobacz w eksploratorze RC4: <a href=\"../rc4/index.html#4.2\">4.2 Drugi bajt</a>."],
+    cmpWhyCc: ["<b>Dlaczego ChaCha20 wygląda jak przypadek.</b> 20 rund dodawania, XOR i rotacji miesza każdy bit klucza z każdym słowem wyjścia (kroki 2 do 4). Z key[0] nic nie zostaje na miejscu: pierwszy bajt równa się key[0] tylko przez przypadek, w 1 kluczu na 256.",
+               "<b>Dlaczego ChaCha20 wygląda jak przypadek.</b> 20 rund dodawania, XOR i rotacji miesza każdy bit klucza z każdym słowem wyjścia (kroki 2 do 4). Żaden bajt wyjścia nie woli żadnej wartości: 0 wypada w 1 kluczu na 256, jak każdy inny bajt."],
   },
 };
 
@@ -1028,12 +1239,80 @@ function setOpFromQR(k) {
   app.opOrigin = { k: k + 1, txt: op.txt };
 }
 
+/* ---------- step 5: compared with RC4 ---------- */
+const fmtN = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+const pctS = (h, n) => { const s = (100 * h / n).toFixed(2) + "%"; return lang === "pl" ? s.replace(".", ",") : s; };
+const hx2 = x => x.toString(16).padStart(2, "0");
+// per card: which counters, and the scale of the bars (a full bar = this many percent)
+const CMP_CARDS = [{ rc4: "rc4S0", cc: "ccZ0", full: 40 }, { rc4: "rc4Z1", cc: "ccZ1", full: 1 }];
+const CMP_TRACK = 560, CMP_LEFT = 250 + 12;
+app.cmp = [{ n: 100000, seeded: true, run: null, timer: null }, { n: 100000, seeded: true, run: null, timer: null }];
+function render5() {
+  const t = L();
+  let h = "";
+  CMP_CARDS.forEach((c, ci) => {
+    const st = app.cmp[ci];
+    const pressed = v => ' aria-pressed="' + (st.n === v) + '"';
+    const x = Math.round(100 / 256 / c.full * CMP_TRACK);
+    h += '<div class="card"><h3>' + t.cmpTitle[ci] + '</h3><p class="cmpwhat">' + t.cmpWhat[ci] + '</p><p class="note" style="margin:0">' + t.cmpKeys + "</p>" +
+      '<div class="cmpctl"><span class="tabs">' +
+        '<button data-action="cmp-n" data-c="' + ci + '" data-n="10000"' + pressed(10000) + ">" + t.cmpKeysN(10000) + "</button>" +
+        '<button data-action="cmp-n" data-c="' + ci + '" data-n="100000"' + pressed(100000) + ">" + t.cmpKeysN(100000) + "</button></span>" +
+        '<label title="' + esc(t.cmpSeedTip) + '"><input type="checkbox" data-field="cmp-seed" data-c="' + ci + '"' + (st.seeded ? " checked" : "") + "> " + t.cmpSeed + "</label>" +
+        '<button class="dark" data-action="cmp-run" data-c="' + ci + '" id="cmpBtn' + ci + '">' + t.cmpRun + "</button></div>" +
+      '<div class="prog"><span id="cmpProg' + ci + '"></span></div><p class="progtxt" id="cmpProgT' + ci + '"></p>' +
+      '<div class="schwrap"><div class="cbars">' +
+        t.cmpRows[ci].map((rw, k) => '<div class="cbar ' + (k ? "cc" : "rc4") + '"><span class="nm">' + rw[0] + "<small>" + rw[1] + '</small></span>' +
+          '<span class="tr"><span id="cmpBar' + ci + k + '"></span></span><span class="val" id="cmpVal' + ci + k + '"></span></div>').join("") +
+        '<div class="chance" style="left:' + (CMP_LEFT + x) + 'px"><span>' + t.cmpChance + "</span></div></div></div>" +
+      '<p class="note" id="cmpExp' + ci + '"></p><p class="exline" id="cmpEx' + ci + '"></p>' +
+      '<div class="why">' + t.cmpWhyRc4[ci] + '</div><div class="why calm">' + t.cmpWhyCc[ci] + "</div></div>";
+  });
+  return h;
+}
+function updateCmp(ci) {
+  const bar = document.getElementById("cmpBar" + ci + "0");
+  if (!bar) return;
+  const t = L(), c = CMP_CARDS[ci], st = app.cmp[ci], r = st.run;
+  document.getElementById("cmpBtn" + ci).textContent = st.timer ? t.cmpRunning : t.cmpRun;
+  document.getElementById("cmpProg" + ci).style.width = r ? (100 * r.done / r.n) + "%" : "0";
+  document.getElementById("cmpProgT" + ci).textContent = r ? t.cmpProg(r.done, r.n, r.seeded) : t.cmpPress;
+  [c.rc4, c.cc].forEach((f, k) => {
+    const h = r ? r[f] : 0, d = r ? r.done : 0;
+    document.getElementById("cmpBar" + ci + k).style.width = d ? Math.min(100, (100 * h / d) / c.full * 100) + "%" : "0";
+    document.getElementById("cmpVal" + ci + k).innerHTML = d ? t.cmpVal(h, d) : "–";
+  });
+  const done = r && r.done >= r.n;
+  document.getElementById("cmpExp" + ci).textContent = done ? t.cmpExpect(r.n, Math.round(r.n / 256), Math.round(Math.sqrt(r.n * (1 / 256) * (255 / 256)))) : "";
+  document.getElementById("cmpEx" + ci).innerHTML = r && r.ex ? t.cmpEx[ci](r.ex) : "";
+}
+function cmpStart(ci) {
+  const st = app.cmp[ci];
+  if (st.timer) clearTimeout(st.timer);
+  st.run = cmpRun(st.n, st.seeded);
+  const step = () => {
+    const t0 = performance.now();
+    let fin = false;
+    while (!fin && performance.now() - t0 < 30) fin = st.run.step(400);
+    st.timer = fin ? null : setTimeout(step, 0);
+    updateCmp(ci);
+  };
+  st.timer = setTimeout(step, 0);
+  updateCmp(ci);
+}
+
 /* ---------- frame, navigation ---------- */
 function buildSide() {
   const t = L();
   document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
-    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<button class="step' + (i < app.level && app.level < 4 ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
     '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function selfLine() {
+  const t = L(), st = document.getElementById("selftest");
+  const fails = SELF_FAILS.concat(CMP_FAILS || []);
+  st.textContent = fails.length ? t.selfBad(fails.join(", ")) : CMP_FAILS === null ? t.selfWait : t.selfOk;
+  st.className = fails.length ? "badt" : CMP_FAILS === null ? "" : "okt";
 }
 function render() {
   const t = L();
@@ -1044,9 +1323,7 @@ function render() {
   document.getElementById("home").textContent = "← " + t.home;
   document.getElementById("keys").textContent = t.keys;
   document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
-  const st = document.getElementById("selftest");
-  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
-  st.className = SELF_FAILS.length ? "badt" : "okt";
+  selfLine();
   buildSide();
   document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
@@ -1054,11 +1331,12 @@ function render() {
   const ex = t.explain[app.level];
   const view = document.getElementById("view");
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
-    [render0, render1, render2, render4][app.level]() + "</div>";
+    [render0, render1, render2, render4, render5][app.level]() + "</div>";
   if (app.level === 0) updateL0();
   if (app.level === 1) renderL1Body();
   if (app.level === 2) renderL2Body();
   if (app.level === 3) renderL4Body();
+  if (app.level === 4) { updateCmp(0); updateCmp(1); }
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
   try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
@@ -1118,6 +1396,9 @@ view.addEventListener("click", e => {
   else if (a === "qr-prev") qrGo(app.qrStep - 1);
   else if (a === "qr-next") qrGo(app.qrStep + 1);
   else if (a === "op-line") { setOpFromQR(+el.dataset.k); goTo(3); }
+  else if (a === "cmp-n") { const st = app.cmp[+el.dataset.c]; st.n = +el.dataset.n;
+    el.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === el))); }
+  else if (a === "cmp-run") cmpStart(+el.dataset.c);
   else if (a === "tab") { app.opType = el.dataset.t; app.opOrigin = null; render(); }
 });
 view.addEventListener("input", e => {
@@ -1152,6 +1433,7 @@ view.addEventListener("mouseover", e => {
 });
 view.addEventListener("change", e => {
   const f = e.target.dataset.field;
+  if (f === "cmp-seed") { app.cmp[+e.target.dataset.c].seeded = e.target.checked; return; }
   if (f === "opA" || f === "opB") {
     const s = e.target.value.trim().replace(/^0x/i, "");
     if (/^[0-9a-fA-F]{1,8}$/.test(s)) { app[f] = parseInt(s, 16) >>> 0; app.opOrigin = null; render(); }
@@ -1179,14 +1461,21 @@ document.addEventListener("keydown", e => {
   else if (app.level === 2 && e.key === "p") qrGo(app.qrStep - 1);
 });
 
+window.addEventListener("hashchange", () => {
+  const n = parseInt(location.hash.slice(1), 10);
+  if (n >= 1 && n <= 5 && n - 1 !== app.level) { if (n === 4) setOpFromQR(0); goTo(n - 1); }
+});
+
 /* ---------- start ---------- */
-const SELF_FAILS = selfTest();
+const SELF_FAILS = selfTest().concat(cmpQuickTest());
+let CMP_FAILS = null;   // the seed-2026 numbers are checked in pieces after the first paint
 const startStep = parseInt(location.hash.slice(1), 10);
-if (startStep >= 1 && startStep <= 4) {
+if (startStep >= 1 && startStep <= 5) {
   app.level = startStep - 1;
   if (app.level === 3) setOpFromQR(0);
 }
 render();
+cmpSelfTest(f => { CMP_FAILS = f; selfLine(); });
 </script>
 </body>
 </html>
