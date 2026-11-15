@@ -13,7 +13,7 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 - **Mathematics for cryptography** (`math/`): 9 chapters and 60 sections; two sections are done: the extended Euclidean
   algorithm (`math/extended-euclid/`) and fast modular exponentiation (`math/fast-exponentiation/`).
 - **AES and its modes** (`aes/`): black box, inside, one round, the modes ECB, CTR, GCM and XTS, comparison.
-- **RC4** (`rc4/`): black box, key scheduling (KSA), producing bytes (PRGA), the weaknesses.
+- **RC4** (`rc4/`): black box, key scheduling (KSA), producing bytes (PRGA), the weaknesses (with WEP: the IV repeats, the FMS attack step by step).
 - **RSA** (`rsa/`): black box (a story in 9 steps), making the keys, why decryption works, Eve tries to break it, why textbook RSA is not enough. The algorithms behind
   d and the power are in the mathematics section.
 - **Diffie-Hellman and ElGamal** (`diffie-hellman/`): black box, the powers of g, Mallory in the middle, ElGamal, one power.

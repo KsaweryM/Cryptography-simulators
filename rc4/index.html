@@ -192,6 +192,7 @@ textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--ru
 .gridwrap{position:relative;width:max-content}
 .gridwrap svg.ov{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:4}
 .sc.sw{background:var(--chg-bg);border-color:var(--chg)}
+.sc.watch{outline:2.5px dashed var(--chg);outline-offset:1px;z-index:2}
 .sc.pi{outline:3px solid var(--g1);outline-offset:0;z-index:2}
 .sc.pj{box-shadow:inset 0 0 0 3px var(--g2);z-index:2}
 .sc.pt{background:var(--key-bg);border:2.5px dashed var(--z);z-index:1}
@@ -248,6 +249,11 @@ textarea{width:100%;font-size:14px;scrollbar-width:thin;scrollbar-color:var(--ru
 .kchip.now{outline:2.5px solid var(--chg);outline-offset:1px}
 .kchip.found{background:var(--ok);border-color:var(--ok);color:var(--surface)}
 .kchip.found small{color:var(--surface);opacity:.85}
+.kchip.pub{background:var(--surface)}
+.fms1 .calc{white-space:pre-wrap}
+.verdict{margin-top:8px;padding:8px 12px;border-radius:6px;font-weight:600;font-size:14px}
+.verdict.ok{border:1.5px solid var(--ok);color:var(--ok)}
+.verdict.no{border:1.5px solid var(--bad);color:var(--bad)}
 .chachaline{margin:0 0 14px;font-size:14px}
 .chachaline a,.note a{color:var(--focus)}
 .mtag{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--chg);border-radius:5px;padding:1px 7px;margin-right:6px;vertical-align:1px}
@@ -460,7 +466,7 @@ function xorBytes(a, b) {
   return out;
 }
 
-/* 4.3: the FMS attack exactly as in Lecture 1, example2 (wep.py, fms.py, attack.py).
+/* 4.4: the FMS attack exactly as in the Python reference run of Lecture 1 (wep.py, fms.py, attack.py).
    The packets come from Python's random.Random(2): a port of Python's Mersenne Twister
    (seeding with init_by_array, getrandbits, randrange = _randbelow, shuffle), so the packets are byte for byte
    the ones wep.capture() makes. */
@@ -589,7 +595,7 @@ const RFC6229 = [
 ];
 const SLIDE_KEY = "0102030405";
 const TASK2_CT = "24F8BF0ADE0C16426D343A28F5558755720EF505F96EB7C0972B61E7";
-const WEP_SECRET = Uint8Array.from([0x1F, 0x8A, 0x3C, 0x77, 0xD2]);   // slides "WEP, packet by packet" and example1
+const WEP_SECRET = Uint8Array.from([0x1F, 0x8A, 0x3C, 0x77, 0xD2]);   // the slides "WEP, packet by packet" and "WEP, problem 2"
 const SNAP = Uint8Array.from([0xAA, 0xAA, 0x03, 0x00]);               // every WEP data packet starts with this header
 
 function selfTest() {
@@ -630,7 +636,7 @@ function selfTest() {
       [0, 1, 2, 3, 4].map(() => r2.randrange(256)).join(" ") !== "28 46 43 184 86") fails.push("Python random");
   return fails;
 }
-/* example2: python3 attack.py prints (Python 3.12, seed 2, 15 000 packets):
+/* the Python reference run: python3 attack.py prints (Python 3.12, seed 2, 15 000 packets):
    first packet 06ffc3086258ce1bb152ee63, last packet 05ff2c5366f638c5b227ceb7,
    K[0] 1F (147) 85 (76) 95 (59); K[1] 8A (96) 5C (66) 92 (59); K[2] 3C (124) 94 (82) BD (48);
    K[3] 77 (210) 12 (58) 05 (51); K[4] D2 (245) 45 (70) 36 (46); recovered 1f 8a 3c 77 d2, match True. */
@@ -648,7 +654,7 @@ function fmsSelfTest(done) {
       if (!cap.next(500)) continue;
       if (p === 0 && A === 0 && recovered.length === 0 && !cap.checked) {
         cap.checked = true;
-        if (bytesHex(cap.packets[0]) !== "06ffc3086258ce1bb152ee63" || bytesHex(cap.packets[cap.total - 1]) !== "05ff2c5366f638c5b227ceb7") fails.push("example2 packets");
+        if (bytesHex(cap.packets[0]) !== "06ffc3086258ce1bb152ee63" || bytesHex(cap.packets[cap.total - 1]) !== "05ff2c5366f638c5b227ceb7") fails.push("FMS packets");
       }
       const end = Math.min(cap.total, p + 1500);
       for (; p < end; p++) { const v = fmsVote(cap.packets[p], A, recovered); if (v !== null) votes[v]++; }
@@ -658,8 +664,8 @@ function fmsSelfTest(done) {
       top.push(rk.slice(0, 3).map(v => hex(v) + " " + votes[v]).join(" "));
       A++; p = 0; votes = new Uint32Array(256);
       if (A === WEP_SECRET.length) {
-        if (top.join("|") !== FMS_TOP3.join("|")) fails.push("example2 votes");
-        if (bytesHex(recovered) !== bytesHex(WEP_SECRET)) fails.push("example2 key");
+        if (top.join("|") !== FMS_TOP3.join("|")) fails.push("FMS votes");
+        if (bytesHex(recovered) !== bytesHex(WEP_SECRET)) fails.push("FMS key");
         done(fails);
         return;
       }
@@ -686,17 +692,18 @@ const T = {
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
     stepOf: n => "Step " + n + " of 4 · RC4",
     steps: [["Black box", "one key in, keystream out"], ["Preparing the key (KSA)", "the key shuffles the table S"],
-            ["Producing the bytes (PRGA)", "one keystream byte per loop"], ["The weaknesses", "three design mistakes, measured"]],
+            ["Producing the bytes (PRGA)", "one keystream byte per loop"], ["The weaknesses", "design mistakes, measured, and WEP"]],
     explain: [
       ["One input, one keystream", "RC4 takes only a key, 1 to 256 bytes, and turns it into a keystream as long as we need. Encrypting is XOR of the plaintext with the keystream, byte by byte. There is no nonce input: the same key always gives the same keystream. Click the RC4 box to look inside."],
       ["Step 1: prepare", "The table S starts in order: 0, 1, 2, …, 255. The helper table T holds the key, repeated. For i = 0 to 255 the key decides j, and S[i] and S[j] change places. This runs once, before the first byte. Then click PRGA."],
       ["Step 2: produce", "PRGA starts with the S from the KSA and i = j = 0. Every loop moves i by one, lets j jump by S[i], swaps S[i] and S[j], and outputs S[(S[i] + S[j]) mod 256]. One loop gives one keystream byte, and S changes every time."],
       ["Count it yourself", "After the KSA, S[0] still equals key[0] far more often than chance allows. Run many random keys and count."],
       ["Fill the histogram", "Fill the histogram with many random keys. A uniform keystream gives flat bars. The second byte of RC4 does not."],
-      ["Three costs of IV + key", "WEP puts a public 3-byte IV in front of the shared key. See what a repeated IV gives away, how soon it repeats, and how weak IVs leak the key itself."]],
-    subs: [["S remembers the key", "the KSA mixes too little"], ["The second byte", "the value 0 comes twice as often"], ["No nonce (WEP)", "IV + key, and what it costs"]],
-    stepOfSub: k => "Step 4 of 4 · weakness " + k + " of 3 · RC4",
-    selfOk: "✓ checked against RFC 6229, the slides and example2", selfWait: "checking against RFC 6229, the slides and example2 …", selfBad: f => "✗ self-test failed: " + f,
+      ["One IV, one keystream", "WEP puts a public 3-byte IV in front of the shared key. When an IV comes back, its keystream comes back too. See what a repeated IV gives away and how soon an IV repeats."],
+      ["The key itself leaks", "Some IVs let the weak mixing of the KSA (4.1) show through: the first keystream byte then tells one secret key byte. First one packet, step by step. Then thousands of packets vote."]],
+    subs: [["S remembers the key", "the KSA mixes too little"], ["The second byte", "the value 0 comes twice as often"], ["The IV repeats (WEP)", "same IV, same keystream"], ["The key leaks (WEP)", "the FMS attack"]],
+    stepOfSub: k => "Step 4 of 4 · part " + k + " of 4 · RC4",
+    selfOk: "✓ checked against RFC 6229, the slides and a Python run", selfWait: "checking against RFC 6229, the slides and a Python run …", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: next · ← / Esc: back", fixFirst: "Fix the key in step 1.",
     keyShort: "secret key, hex (1 to 256 bytes)", keyAsText: "as text", keyNotText: "(not plain text)", keyLen: n => n + " byte" + (n === 1 ? "" : "s"),
     preset5: "01 02 03 04 05", preset5_s: "the key on the slides (RFC 6229)", presetK: "Kangaroo", presetK_s: "the key of Task 2", randKey: "random 16-byte key",
@@ -746,7 +753,7 @@ const T = {
     m1ksa: "KSA", m1shuf: "fair shuffle",
     m1res: (a, n) => fmtInt(a) + " of " + fmtInt(n),
     m1note: "A fair shuffle is the baseline: about 1 chance in 256. Your numbers change a little with every run (Task 7).",
-    m1wep: "This is how WEP lost its key: a public IV goes into this weak mixer (<a href='#4.3'>4.3</a>).",
+    m1wep: "This is how WEP lost its key: a public IV goes into this weak mixer (<a href='#4.4'>4.4</a>).",
     uniform: "uniform: 1/256",
     m2h: "The second keystream byte over many keys",
     m2keys: "keys:", m2run: "Run", m2running: (k, n) => fmtInt(k) + " of " + fmtInt(n) + " keys …",
@@ -776,8 +783,33 @@ const T = {
     m3half: n => "50% at " + n + " packets",
     m3send: "Send packets with random IVs until one repeats", m3after: n => "IV repeated after " + fmtInt(n) + " packets.",
     m3runs: "your runs (dots on the axis):",
-    fmsH: "The key leaks: the FMS attack",
-    fmsSame: "The same attack as <a href=\"https://github.com/KsaweryM/Cryptography-Course/tree/main/Lecture1/example2\" target=\"_blank\" rel=\"noopener\">example2</a> (attack.py): the same 15 000 packets from seed 2, the same weak IVs (A+3, 255, x), the same votes.",
+    fmsH: "Thousands of packets vote",
+    fmsSame: "Now many packets: 15 000 captured packets with weak IVs (A+3, 255, x), 3 000 for each key byte K[A]. Each weak packet votes exactly as above. Most votes are noise, but the right ones all land on the same value.",
+    f1H: "One weak packet, step by step",
+    f1Lead: x => "One packet with the IV 03 FF " + x + ". The RC4 key is this IV followed by the secret Wi-Fi key. Eve sees the IV in the air; the secret part she does not know.",
+    f1Key: "RC4 key of this packet:", f1Pub: "IV, public", f1Sec: "secret",
+    f1Pos: k => "step " + k + " of 6",
+    f1Another: "another weak IV", f1Stay: "an IV where the cells stay",
+    f1Cap: ["Eve's copy of S", "Eve's copy of S", "Eve's copy of S", "Eve's copy of S", "Eve's copy of S", "really, after the whole KSA (Eve cannot see this)", "Eve's copy of S, as after step 3"],
+    f1Text: [
+      () => "The KSA starts with S in order: 0, 1, 2, …, 255. The first 3 key bytes are the IV, so Eve can run the first 3 loops of the KSA herself. Press next.",
+      () => "Loop i = 0 uses key[0] = 03, a public byte. Eve computes it herself.",
+      () => "Loop i = 1 uses key[1] = FF, a public byte. Eve computes it herself.",
+      () => "Loop i = 2 uses key[2], the last IV byte. Eve now knows S and j exactly. Look at cells 0 and 1: S[0] = 3 and S[1] = 0. WEP picks IVs at random; Eve simply waits for packets whose IV starts with 03 FF, because they set up this trap.",
+      () => "Loop i = 3 uses key[3] = K[0], the first secret byte. Eve cannot compute j any more. But she knows one thing: the swap moves the value from cell j into cell 3. So if Eve ever learns which value landed in cell 3, she knows j, and from j she gets K[0].",
+      (stay, z) => stay ? "The other 252 loops did not touch cells 0, 1 and 3 (dashed). Then the first PRGA loop takes i = 1, j = S[1] = 0, swaps, and outputs cell S[1] + S[0] = 3. So the first keystream byte is the value that loop 3 put into cell 3: " + z + "."
+                      : "This time the other 252 loops moved cell 0, 1 or 3 (dashed). The first keystream byte (" + z + ") has nothing to do with loop 3 any more. This packet will vote, but its vote is noise.",
+      () => "Eve knows the first keystream byte: every packet starts with AA, so Z1 = C1 XOR AA. She finds this value in her copy of S. Its cell is the j of loop 3, and the line of loop 3 gives K[0]."],
+    f1Calc: {
+      start: "j = 0",
+      loop: (i, jo, si, ki, j) => "loop i = " + i + ":\nj = (j + S[" + i + "] + key[" + i + "]) mod 256\n  = (" + jo + " + " + si + " + " + ki + ") mod 256 = " + j + "\nswap S[" + i + "] and S[" + j + "]",
+      unk: (jo, si) => "loop i = 3:\nj = (j + S[3] + K[0]) mod 256\n  = (" + jo + " + " + si + " + ??) mod 256 = ??\nswap S[3] and S[??]",
+      real: (s0, s1, s3) => "after the KSA: S[0] = " + s0 + ", S[1] = " + s1 + ", S[3] = " + s3,
+      eve: (zh, z, p, jo, si, v) => "Z1 = C1 XOR AA = " + zh + " (" + z + ")\nthe value " + z + " is in cell " + p + ", so j = " + p + "\nK[0] = (j − " + jo + " − " + si + ") mod 256\n     = (" + p + " − " + jo + " − " + si + ") mod 256 = " + v,
+    },
+    f1Right: v => "✓ The real K[0] is 1F: this packet votes " + v + ", the right value.",
+    f1Wrong: v => "✗ The real K[0] is 1F: this packet votes " + v + ", a wrong value (noise).",
+    f1Tally: (n, ok, best) => "All 256 IVs from 03 FF 00 to 03 FF FF: the cells stay put in " + n + " of them (about 1 in 20), and each of those votes 1F. The other votes scatter: 1F gets " + ok + " votes, the best wrong value only " + best + ".",
     fmsStart: "▶ start", fmsPause: "⏸ pause", fmsReset: "⏮ reset", fmsSpeed: "speed:",
     fmsSpeeds: ["20 packets/s", "200 packets/s", "2 000 packets/s", "20 000 packets/s"],
     fmsPrep: "Preparing the packets …",
@@ -790,7 +822,7 @@ const T = {
     fmsReal: "the real byte (Eve does not know it)", fmsLead: "leader", fmsAxX: "candidate value of the key byte (0 to 255)", fmsAxY: "votes",
     fmsLook: "Most votes are noise. Watch the green bar pull ahead.",
     fmsKey: "the key so far",
-    fmsOut: "what attack.py prints",
+    fmsOut: "the summary",
     fmsHold: (A, v, c) => "K[" + A + "] = " + v + " with " + c + " votes. Next byte.",
     chacha: "ChaCha20 takes the nonce as its own input: see <a href=\"../chacha20/index.html#1\">its black box</a>.",
     pPrinter: "status: the printer is online and ready", pDoor: "the door code is 2580",
@@ -800,17 +832,18 @@ const T = {
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
     stepOf: n => "Krok " + n + " z 4 · RC4",
     steps: [["Czarna skrzynka", "jeden klucz na wejściu, keystream na wyjściu"], ["Przygotowanie klucza (KSA)", "klucz tasuje tablicę S"],
-            ["Wytwarzanie bajtów (PRGA)", "jeden bajt keystreamu na obieg pętli"], ["Słabości", "trzy błędy projektowe, zmierzone"]],
+            ["Wytwarzanie bajtów (PRGA)", "jeden bajt keystreamu na obieg pętli"], ["Słabości", "błędy projektowe, zmierzone, i WEP"]],
     explain: [
       ["Jedno wejście, jeden keystream", "RC4 przyjmuje tylko klucz, od 1 do 256 bajtów, i robi z niego keystream tak długi, jak trzeba. Szyfrowanie to XOR tekstu jawnego z keystreamem, bajt po bajcie. Nie ma wejścia na nonce: ten sam klucz zawsze daje ten sam keystream. Kliknij pole RC4, żeby zajrzeć do środka."],
       ["Krok 1: przygotowanie", "Tablica S zaczyna po kolei: 0, 1, 2, …, 255. Tablica pomocnicza T to klucz powtarzany w kółko. Dla i = 0 do 255 klucz wyznacza j, a S[i] i S[j] zamieniają się miejscami. To dzieje się raz, przed pierwszym bajtem. Potem kliknij PRGA."],
       ["Krok 2: wytwarzanie", "PRGA zaczyna od S z KSA oraz i = j = 0. W każdym obiegu i idzie o jeden, j skacze o S[i], S[i] i S[j] zamieniają się, a na wyjście idzie S[(S[i] + S[j]) mod 256]. Jeden obieg daje jeden bajt keystreamu, a S zmienia się za każdym razem."],
       ["Policz sam", "Po KSA S[0] nadal równa się key[0] dużo częściej, niż pozwala przypadek. Uruchom wiele losowych kluczy i policz."],
       ["Wypełnij histogram", "Wypełnij histogram wieloma losowymi kluczami. Jednostajny keystream daje równe słupki. Drugi bajt RC4 nie."],
-      ["Trzy koszty IV + klucz", "WEP dokleja jawny 3-bajtowy IV przed wspólny klucz. Zobacz, co zdradza powtórzony IV, jak szybko się powtarza i jak słabe IV ujawniają sam klucz."]],
-    subs: [["S pamięta klucz", "KSA miesza za mało"], ["Drugi bajt", "wartość 0 wypada dwa razy za często"], ["Brak nonce (WEP)", "IV + klucz i jego koszt"]],
-    stepOfSub: k => "Krok 4 z 4 · słabość " + k + " z 3 · RC4",
-    selfOk: "✓ sprawdzone z RFC 6229, slajdami i example2", selfWait: "sprawdzam z RFC 6229, slajdami i example2 …", selfBad: f => "✗ samotest nie przeszedł: " + f,
+      ["Jeden IV, jeden keystream", "WEP dokleja jawny 3-bajtowy IV przed wspólny klucz. Gdy IV wraca, wraca też jego keystream. Zobacz, co zdradza powtórzony IV i jak szybko IV się powtarza."],
+      ["Wycieka sam klucz", "Przy niektórych IV słabe mieszanie KSA (4.1) przebija na wyjście: pierwszy bajt keystreamu zdradza wtedy jeden bajt tajnego klucza. Najpierw jeden pakiet, krok po kroku. Potem głosują tysiące pakietów."]],
+    subs: [["S pamięta klucz", "KSA miesza za mało"], ["Drugi bajt", "wartość 0 wypada dwa razy za często"], ["IV się powtarza (WEP)", "ten sam IV, ten sam keystream"], ["Klucz wycieka (WEP)", "atak FMS"]],
+    stepOfSub: k => "Krok 4 z 4 · część " + k + " z 4 · RC4",
+    selfOk: "✓ sprawdzone z RFC 6229, slajdami i przebiegiem w Pythonie", selfWait: "sprawdzam z RFC 6229, slajdami i przebiegiem w Pythonie …", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: dalej · ← / Esc: wstecz", fixFirst: "Popraw klucz w kroku 1.",
     keyShort: "tajny klucz, hex (od 1 do 256 bajtów)", keyAsText: "jako tekst", keyNotText: "(to nie jest zwykły tekst)", keyLen: n => n + " " + plN(n, "bajt", "bajty", "bajtów"),
     preset5: "01 02 03 04 05", preset5_s: "klucz ze slajdów (RFC 6229)", presetK: "Kangaroo", presetK_s: "klucz z Task 2", randKey: "losowy klucz, 16 bajtów",
@@ -860,7 +893,7 @@ const T = {
     m1ksa: "KSA", m1shuf: "uczciwe tasowanie",
     m1res: (a, n) => fmtInt(a) + " z " + fmtInt(n),
     m1note: "Uczciwe tasowanie to punkt odniesienia: około 1 szansa na 256. Liczby zmieniają się trochę przy każdym uruchomieniu (Task 7).",
-    m1wep: "Tak WEP stracił klucz: jawny IV wchodzi do tego słabego miksera (<a href='#4.3'>4.3</a>).",
+    m1wep: "Tak WEP stracił klucz: jawny IV wchodzi do tego słabego miksera (<a href='#4.4'>4.4</a>).",
     uniform: "jednostajnie: 1/256",
     m2h: "Drugi bajt keystreamu dla wielu kluczy",
     m2keys: "klucze:", m2run: "Uruchom", m2running: (k, n) => fmtInt(k) + " z " + fmtInt(n) + " kluczy …",
@@ -891,7 +924,32 @@ const T = {
     m3send: "Wysyłaj pakiety z losowym IV aż do powtórki", m3after: n => "IV powtórzył się po " + fmtInt(n) + " " + plN(n, "pakiecie", "pakietach", "pakietach") + ".",
     m3runs: "twoje próby (kropki na osi):",
     fmsH: "Klucz wycieka: atak FMS",
-    fmsSame: "Ten sam atak co w <a href=\"https://github.com/KsaweryM/Cryptography-Course/tree/main/Lecture1/example2\" target=\"_blank\" rel=\"noopener\">example2</a> (attack.py): te same 15 000 pakietów z ziarna 2, te same słabe IV (A+3, 255, x), te same głosy.",
+    fmsSame: "Teraz wiele pakietów: 15 000 przechwyconych pakietów ze słabymi IV (A+3, 255, x), po 3 000 na każdy bajt klucza K[A]. Każdy słaby pakiet głosuje dokładnie tak jak wyżej. Większość głosów to szum, ale trafne padają zawsze na tę samą wartość.",
+    f1H: "Jeden słaby pakiet, krok po kroku",
+    f1Lead: x => "Jeden pakiet z IV 03 FF " + x + ". Klucz RC4 to ten IV, a za nim tajny klucz Wi-Fi. Ewa widzi IV w eterze; tajnej części nie zna.",
+    f1Key: "klucz RC4 tego pakietu:", f1Pub: "IV, jawny", f1Sec: "tajny",
+    f1Pos: k => "krok " + k + " z 6",
+    f1Another: "inny słaby IV", f1Stay: "IV, przy którym komórki zostają",
+    f1Cap: ["kopia S u Ewy", "kopia S u Ewy", "kopia S u Ewy", "kopia S u Ewy", "kopia S u Ewy", "naprawdę, po całym KSA (Ewa tego nie widzi)", "kopia S u Ewy, jak po kroku 3"],
+    f1Text: [
+      () => "KSA zaczyna od S po kolei: 0, 1, 2, …, 255. Pierwsze 3 bajty klucza to IV, więc Ewa sama wykona 3 pierwsze obiegi KSA. Naciśnij dalej.",
+      () => "Obieg i = 0 używa key[0] = 03, bajtu jawnego. Ewa liczy go sama.",
+      () => "Obieg i = 1 używa key[1] = FF, bajtu jawnego. Ewa liczy go sama.",
+      () => "Obieg i = 2 używa key[2], ostatniego bajtu IV. Ewa zna teraz dokładnie S i j. Spójrz na komórki 0 i 1: S[0] = 3 i S[1] = 0. WEP losuje IV; Ewa po prostu czeka na pakiety, których IV zaczyna się od 03 FF, bo to one zastawiają tę pułapkę.",
+      () => "Obieg i = 3 używa key[3] = K[0], pierwszego tajnego bajtu. Ewa nie policzy już j. Wie jednak jedno: zamiana przenosi wartość z komórki j do komórki 3. Jeśli Ewa kiedyś pozna wartość, która trafiła do komórki 3, to zna j, a z j wylicza K[0].",
+      (stay, z) => stay ? "Pozostałe 252 obiegi nie ruszyły komórek 0, 1 i 3 (przerywana ramka). Pierwszy obieg PRGA bierze wtedy i = 1, j = S[1] = 0, zamienia i wypisuje komórkę S[1] + S[0] = 3. Pierwszy bajt keystreamu to więc wartość, którą obieg 3 włożył do komórki 3: " + z + "."
+                      : "Tym razem pozostałe 252 obiegi ruszyły komórkę 0, 1 albo 3 (przerywana ramka). Pierwszy bajt keystreamu (" + z + ") nie ma już nic wspólnego z obiegiem 3. Ten pakiet też zagłosuje, ale jego głos to szum.",
+      () => "Ewa zna pierwszy bajt keystreamu: każdy pakiet zaczyna się od AA, więc Z1 = C1 XOR AA. Szuka tej wartości w swojej kopii S. Jej komórka to j z obiegu 3, a wzór obiegu 3 daje K[0]."],
+    f1Calc: {
+      start: "j = 0",
+      loop: (i, jo, si, ki, j) => "obieg i = " + i + ":\nj = (j + S[" + i + "] + key[" + i + "]) mod 256\n  = (" + jo + " + " + si + " + " + ki + ") mod 256 = " + j + "\nzamiana S[" + i + "] i S[" + j + "]",
+      unk: (jo, si) => "obieg i = 3:\nj = (j + S[3] + K[0]) mod 256\n  = (" + jo + " + " + si + " + ??) mod 256 = ??\nzamiana S[3] i S[??]",
+      real: (s0, s1, s3) => "po KSA: S[0] = " + s0 + ", S[1] = " + s1 + ", S[3] = " + s3,
+      eve: (zh, z, p, jo, si, v) => "Z1 = C1 XOR AA = " + zh + " (" + z + ")\nwartość " + z + " jest w komórce " + p + ", więc j = " + p + "\nK[0] = (j − " + jo + " − " + si + ") mod 256\n     = (" + p + " − " + jo + " − " + si + ") mod 256 = " + v,
+    },
+    f1Right: v => "✓ Prawdziwy K[0] to 1F: ten pakiet głosuje na " + v + ", trafnie.",
+    f1Wrong: v => "✗ Prawdziwy K[0] to 1F: ten pakiet głosuje na " + v + ", źle (szum).",
+    f1Tally: (n, ok, best) => "Wszystkie 256 IV od 03 FF 00 do 03 FF FF: komórki zostają w " + n + " z nich (mniej więcej 1 na 20) i każdy z nich głosuje na 1F. Reszta głosów się rozsypuje: 1F dostaje " + ok + " głosów, najlepsza zła wartość tylko " + best + ".",
     fmsStart: "▶ start", fmsPause: "⏸ pauza", fmsReset: "⏮ od nowa", fmsSpeed: "tempo:",
     fmsSpeeds: ["20 pakietów/s", "200 pakietów/s", "2 000 pakietów/s", "20 000 pakietów/s"],
     fmsPrep: "Przygotowuję pakiety …",
@@ -904,7 +962,7 @@ const T = {
     fmsReal: "prawdziwy bajt (Eve go nie zna)", fmsLead: "prowadzi", fmsAxX: "kandydat na bajt klucza (od 0 do 255)", fmsAxY: "głosy",
     fmsLook: "Większość głosów to szum. Patrz, jak zielony słupek wychodzi na prowadzenie.",
     fmsKey: "klucz do tej pory",
-    fmsOut: "co wypisuje attack.py",
+    fmsOut: "podsumowanie",
     fmsHold: (A, v, c) => "K[" + A + "] = " + v + ", " + c + " " + plN(c, "głos", "głosy", "głosów") + ". Następny bajt.",
     chacha: "ChaCha20 przyjmuje nonce jako osobne wejście: zobacz <a href=\"../chacha20/index.html#1\">jego czarną skrzynkę</a>.",
     pPrinter: "status: the printer is online and ready", pDoor: "the door code is 2580",
@@ -923,10 +981,11 @@ const app = {
   ksaPos: 0,     // 0 = start; 2i+1 = loop i, j computed; 2i+2 = loop i, after the swap
   prgaPos: 0,    // 0 = start; 5b + s = byte b+1, sub-step s (1..5)
   iv1: "4F 12 A0", iv2: "21 E8 55",
+  fp: 0, fx: 0,   // 4.4: the step (0 .. 6) and the last IV byte x of the weak IV 03 FF x
   s1: null, s2: null, s2n: 100000, s2pos: 1, ivRuns: [], ivN: 2000,
 };
-// the pages: steps 1, 2, 3, then the weaknesses 4.1, 4.2, 4.3 (app.level = index here)
-const PAGES = ["1", "2", "3", "4.1", "4.2", "4.3"];
+// the pages: steps 1, 2, 3, then the weaknesses 4.1 to 4.4 (app.level = index here)
+const PAGES = ["1", "2", "3", "4.1", "4.2", "4.3", "4.4"];
 const LAST = PAGES.length - 1;
 const KSA_MAX = 512, PRGA_MAXB = 256, PRGA_MAX = 5 * PRGA_MAXB;
 const hx2 = x => x.toString(16).padStart(2, "0");
@@ -1049,6 +1108,7 @@ function sgridHTML(S, T, marks) {
       if (marks.idle && S[x] === x) cls += " idle";
       if (marks.mv) { const d = Math.abs(S[x] - x); if (d > 0) cls += d < 16 ? " mv1" : d < 64 ? " mv2" : " mv3"; }
       if (marks.sw && marks.sw.indexOf(x) >= 0) cls += " sw";
+      if (marks.watch && marks.watch.indexOf(x) >= 0) cls += " watch";
       if (marks.t === x) cls += marks.tout ? " pt ptout" : " pt";
       if (marks.i === x) cls += " pi";
       if (marks.j === x) cls += " pj";
@@ -1380,16 +1440,6 @@ function renderM3() {
     '<div class="controls"><input type="range" min="0" max="20000" step="1" data-field="ivn" value="' + app.ivN + '" aria-label="n" style="width:420px;max-width:100%"><span class="pos" id="ivptr"></span></div>' +
     '<div id="ivchart"></div>' +
     '<div class="btns" style="margin-top:6px"><button class="dark" data-action="ivrun">' + t.m3send + '</button></div><div id="m3bd" style="margin-top:6px"></div></div>' +
-    '<div class="card"><h3>' + t.fmsH + '</h3><p class="note" style="margin:0 0 8px;font-size:13.5px">' + t.fmsSame + "</p>" +
-    '<div class="controls"><button class="dark" data-action="fms-go" id="fmsgo"></button><button data-action="fms-reset">' + t.fmsReset + "</button>" +
-    "<label>" + t.fmsSpeed + ' <select data-field="fmsspeed">' + t.fmsSpeeds.map((x, k) => '<option value="' + k + '"' + (k === FMS.speed ? " selected" : "") + ">" + x + "</option>").join("") + "</select></label>" +
-    '<span class="pos" id="fmsstat"></span></div>' +
-    '<div class="kchips" id="fmskey"></div>' +
-    '<b id="fmsvh"></b><div id="fmschart"></div>' +
-    '<div class="legend" style="margin-top:2px"><span style="border-color:var(--ok);background:var(--ok);color:var(--surface)">' + t.fmsReal + '</span><span style="border-color:var(--chg);background:var(--chg);color:#fff">' + t.fmsLead + "</span>" +
-    '<span style="border:0;padding:0" class="note">' + t.fmsLook + "</span></div>" +
-    '<div style="margin-top:10px"><b style="font-size:13px">' + t.fmsPkHead + '</b><div class="pkts" id="fmspk"></div></div>' +
-    '<div style="margin-top:10px"><b style="font-size:13px">' + t.fmsOut + '</b><div class="code" id="fmsout" style="font-size:12.5px"></div></div></div>' +
     '<p class="chachaline">' + t.chacha + "</p>";
 }
 function updateM3() {
@@ -1423,6 +1473,87 @@ function updateM3() {
   } else h += '<div class="result">' + t.m3miss + "</div>";
   o.innerHTML = h;
 }
+
+// 4.4: the FMS attack. First one weak packet, IV 03 FF x, step by step; then the votes of many packets.
+function f1Data(x) {
+  const iv = Uint8Array.from([3, 255, x]), key = wepKey(iv, WEP_SECRET);
+  const s3 = ksaAt(key, 3), s4 = ksaAt(key, 4), sf = ksaAt(key, 256);
+  const z = keystream(key, 1)[0];
+  // the cells stay: loop 3 left S[0], S[1] alone, and the 252 loops after it left S[0], S[1], S[3] alone
+  const stay = sf.S[0] === s3.S[0] && sf.S[1] === s3.S[1] && sf.S[3] === s4.S[3];
+  return { iv: iv, key: key, s3: s3, s4: s4, sf: sf, z: z, stay: stay, vote: fmsGuess(iv, z, []) };
+}
+let F1TALLY = null;   // over all 256 IVs 03 FF x: how many keep the cells, and the votes
+function f1Tally() {
+  if (F1TALLY) return F1TALLY;
+  const votes = new Uint32Array(256); let n = 0;
+  for (let x = 0; x < 256; x++) { const d = f1Data(x); votes[d.vote]++; if (d.stay) n++; }
+  const rk = rankVotes(votes), real = WEP_SECRET[0];
+  const best = rk[0] === real ? votes[rk[1]] : votes[rk[0]];
+  F1TALLY = { n: n, ok: votes[real], best: best };
+  return F1TALLY;
+}
+function renderM4() {
+  const t = L();
+  return '<div class="card fms1"><h3>' + t.f1H + '</h3><p style="margin:0 0 8px" id="f1lead"></p>' +
+    '<div class="kchips" id="f1key"></div>' +
+    '<div class="controls" style="margin-bottom:10px"><button data-action="f1-reset">' + t.bReset + '</button><button data-action="f1-prev">' + t.bPrev + '</button>' +
+      '<button class="dark" data-action="f1-next">' + t.bNext + '</button><span class="pos" id="f1pos"></span>' +
+      '<button data-action="f1-another">' + DICE_SVG + " " + t.f1Another + '</button><button data-action="f1-stay">' + t.f1Stay + "</button></div>" +
+    '<div class="split"><div><b style="font-size:13px" id="f1cap"></b><div class="gridwrap" id="f1grid" style="margin-top:12px"></div></div>' +
+      '<div class="sidepanel"><div class="calc" id="f1calc"></div><div id="f1note" style="font-size:14px"></div><div id="f1verdict"></div></div></div>' +
+    '<p class="note" id="f1tally" style="margin:12px 0 0;font-size:13.5px"></p></div>' +
+    '<div class="card"><h3>' + t.fmsH + '</h3><p class="note" style="margin:0 0 8px;font-size:13.5px">' + t.fmsSame + "</p>" +
+    '<div class="controls"><button class="dark" data-action="fms-go" id="fmsgo"></button><button data-action="fms-reset">' + t.fmsReset + "</button>" +
+    "<label>" + t.fmsSpeed + ' <select data-field="fmsspeed">' + t.fmsSpeeds.map((x, k) => '<option value="' + k + '"' + (k === FMS.speed ? " selected" : "") + ">" + x + "</option>").join("") + "</select></label>" +
+    '<span class="pos" id="fmsstat"></span></div>' +
+    '<div class="kchips" id="fmskey"></div>' +
+    '<b id="fmsvh"></b><div id="fmschart"></div>' +
+    '<div class="legend" style="margin-top:2px"><span style="border-color:var(--ok);background:var(--ok);color:var(--surface)">' + t.fmsReal + '</span><span style="border-color:var(--chg);background:var(--chg);color:#fff">' + t.fmsLead + "</span>" +
+    '<span style="border:0;padding:0" class="note">' + t.fmsLook + "</span></div>" +
+    '<div style="margin-top:10px"><b style="font-size:13px">' + t.fmsPkHead + '</b><div class="pkts" id="fmspk"></div></div>' +
+    '<div style="margin-top:10px"><b style="font-size:13px">' + t.fmsOut + '</b><div class="code" id="fmsout" style="font-size:12.5px"></div></div></div>' +
+    "";
+}
+function updateF1() {
+  const g = document.getElementById("f1grid");
+  if (!g) return;
+  const t = L(), p = app.fp, d = f1Data(app.fx), H = x => hx2(x).toUpperCase();
+  document.getElementById("f1lead").textContent = t.f1Lead(H(app.fx));
+  document.getElementById("f1key").innerHTML = '<b style="font-size:13px;margin-right:4px">' + t.f1Key + "</b>" +
+    Array.from(d.iv, (b, k) => '<span class="kchip pub"><small>key[' + k + "] · " + t.f1Pub + "</small>" + H(b) + "</span>").join("") +
+    Array.from(WEP_SECRET, (_, k) => '<span class="kchip unk' + (k === 0 && p >= 4 ? " now" : "") + '"><small>K[' + k + "] · " + t.f1Sec + "</small>??</span>").join("");
+  document.getElementById("f1pos").textContent = t.f1Pos(p);
+  document.getElementById("f1cap").textContent = t.f1Cap[p];
+  let S, marks, calc, note = t.f1Text[p](d.stay, H(d.z) + " (" + d.z + ")"), verdict = "";
+  if (p === 0) { S = ksaAt(d.key, 0).S; marks = { idle: true }; calc = t.f1Calc.start; }
+  else if (p <= 3) {
+    const r = ksaAt(d.key, p - 1).row;
+    S = ksaAt(d.key, p).S; marks = { idle: true, i: r.i, j: r.j, sw: [r.i, r.j] };
+    calc = t.f1Calc.loop(r.i, r.jOld, r.si, r.ti, r.j);
+    if (p === 3) marks.watch = [0, 1];
+  } else if (p === 4) {
+    S = d.s3.S; marks = { idle: true, i: 3, watch: [3] };
+    calc = t.f1Calc.unk(d.s3.j, d.s3.S[3]);
+  } else if (p === 5) {
+    S = d.sf.S; marks = { watch: [0, 1, 3], t: d.stay ? 3 : undefined };
+    calc = t.f1Calc.real(d.sf.S[0], d.sf.S[1], d.sf.S[3]);
+  } else {
+    const at = d.s3.S.indexOf(d.z);
+    S = d.s3.S; marks = { idle: true, t: at, tout: true };
+    calc = t.f1Calc.eve(H(d.z), d.z, at, d.s3.j, d.s3.S[3], d.vote + " = " + H(d.vote));
+    verdict = '<div class="verdict ' + (d.vote === WEP_SECRET[0] ? "ok" : "no") + '">' + esc((d.vote === WEP_SECRET[0] ? t.f1Right : t.f1Wrong)(H(d.vote))) + "</div>";
+  }
+  g.innerHTML = sgridHTML(S, null, marks);
+  document.getElementById("f1calc").textContent = calc;
+  document.getElementById("f1note").textContent = note;
+  document.getElementById("f1verdict").innerHTML = verdict;
+  const ty = f1Tally();
+  document.getElementById("f1tally").textContent = t.f1Tally(ty.n, ty.ok, ty.best);
+}
+function f1Go(p) { app.fp = Math.max(0, Math.min(6, p)); updateF1(); }
+function f1Another() { let x; do { x = Math.floor(Math.random() * 256); } while (x === app.fx); app.fx = x; updateF1(); }
+function f1Stay() { for (let k = 1; k <= 256; k++) { const x = (app.fx + k) % 256; if (f1Data(x).stay) { app.fx = x; break; } } updateF1(); }
 
 // 4.3: the birthday curve, the formula of the slide "How soon do repeats come?"
 const IV_N = Math.pow(2, 24), IV_N50 = Math.round(Math.sqrt(2 * Math.log(2) * IV_N));   // 4 823
@@ -1480,7 +1611,7 @@ function updateBd() {
     (r.length > 1 ? '<div class="ivruns">' + t.m3runs + " " + r.map(fmtInt).join(", ") + "</div>" : "");
 }
 
-// 4.3: the FMS attack of example2, packet by packet. The same packets, the same rule, the same votes as attack.py.
+// 4.4: the FMS attack, packet by packet. The same packets, the same rule, the same votes as attack.py.
 const FMS_SPEEDS = [20, 200, 2000, 20000];   // packets per second
 const FMS = { cap: null, ready: false, A: 0, p: 0, votes: new Uint32Array(256), weak: 0, recovered: [], lines: [], log: [],
               running: false, speed: 2, hold: 0, timer: 0, acc: 0, last: 0 };
@@ -1612,16 +1743,17 @@ function render() {
   document.getElementById("mhGrp").textContent = lv >= 3 ? t.stepOfSub(lv - 2) : t.stepOf(lv + 1);
   document.getElementById("mhTitle").textContent = (lv >= 3 ? PAGES[lv] + " " : "") + sub[0];
   document.getElementById("mhSub").textContent = sub[1];
-  if (lv !== 5 && FMS.running) { FMS.running = false; clearTimeout(FMS.timer); }
+  if (lv !== 6 && FMS.running) { FMS.running = false; clearTimeout(FMS.timer); }
   const ex = t.explain[lv];
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
-    [render0, render1, render2, renderM1, renderM2, renderM3][lv]() + "</div>";
+    [render0, render1, render2, renderM1, renderM2, renderM3, renderM4][lv]() + "</div>";
   if (lv === 0) updateL0();
   if (lv === 1) renderL1Body();
   if (lv === 2) renderL2Body();
   if (lv === 3) updateM1();
   if (lv === 4) updateM2();
-  if (lv === 5) { updateM3(); updateIvChart(); updateBd(); fmsPrepare(); updateFms(); }
+  if (lv === 5) { updateM3(); updateIvChart(); updateBd(); }
+  if (lv === 6) { updateF1(); fmsPrepare(); updateFms(); }
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
   try { history.replaceState(null, "", "#" + PAGES[lv]); } catch (e) {}
@@ -1633,13 +1765,13 @@ function goTo(level) {
 }
 function zoomIn() { if (app.level < LAST) goTo(app.level + 1); }
 function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
-// "#2", "#4" (= 4.1), "#4.2", "#4.3"; anything else: null
+// "#2", "#4" (= 4.1), "#4.2", "#4.3", "#4.4"; anything else: null
 function levelOfHash(h) {
   const m = /^#?(\d)(?:\.(\d))?$/.exec(h);
   if (!m) return null;
   const n = +m[1], k = m[2] === undefined ? 1 : +m[2];
   if (n >= 1 && n <= 3 && m[2] === undefined) return n - 1;
-  if (n === 4 && k >= 1 && k <= 3) return 2 + k;
+  if (n === 4 && k >= 1 && k <= 4) return 2 + k;
   return null;
 }
 
@@ -1682,6 +1814,11 @@ view.addEventListener("click", e => {
   else if (a === "prga-16") prgaGo(5 * (Math.floor(app.prgaPos / 5) + 16));
   else if (a === "s2pos") { app.s2pos = +el.dataset.b; view.querySelectorAll('[data-action="s2pos"]').forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.b === app.s2pos))); updateM2(); }
   else if (a === "fms-go") fmsGo();
+  else if (a === "f1-reset") f1Go(0);
+  else if (a === "f1-prev") f1Go(app.fp - 1);
+  else if (a === "f1-next") f1Go(app.fp + 1);
+  else if (a === "f1-another") f1Another();
+  else if (a === "f1-stay") f1Stay();
   else if (a === "fms-reset") fmsReset();
   else if (a === "run1") run1();
   else if (a === "run2") run2();
@@ -1738,6 +1875,8 @@ document.addEventListener("keydown", e => {
   else if (app.level === 1 && e.key === "p") ksaGo(app.ksaPos - 1);
   else if (app.level === 2 && (e.key === "n" || e.key === " ")) { e.preventDefault(); prgaGo(app.prgaPos + 1); }
   else if (app.level === 2 && e.key === "p") prgaGo(app.prgaPos - 1);
+  else if (app.level === 6 && (e.key === "n" || e.key === " ")) { e.preventDefault(); f1Go(app.fp + 1); }
+  else if (app.level === 6 && e.key === "p") f1Go(app.fp - 1);
 });
 
 window.addEventListener("hashchange", () => {
@@ -1747,7 +1886,7 @@ window.addEventListener("hashchange", () => {
 
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-let FMS_FAILS = null;   // the FMS check of example2 runs in pieces after the first paint
+let FMS_FAILS = null;   // the FMS check runs in pieces after the first paint
 const startLv = levelOfHash(location.hash);
 if (startLv !== null) app.level = startLv;
 render();
