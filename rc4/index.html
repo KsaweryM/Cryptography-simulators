@@ -838,6 +838,10 @@ const T = {
     m2top: "most common values of C2",
     m2exp: e => "Without the bias every value would appear about " + e + " times. The secret byte stands out, and no key was touched.",
     m2wait: "Press Run.",
+    chPres: "President", chPresS: "picks one of two", chSent: "the order sent", chSecret: "secret",
+    chEve: "Eve", chEveK: "knows both texts,", chEveK2: "not the choice", chEveQ: "HILL or HARBOR?",
+    chOnly: "only encrypted copies", chPile: (h, n) => "C2 = " + h + ": " + n, chGuess: p => "guess: " + p,
+    chCap: "The president has two orders ready and picks one. Eve knows both texts, but not which one was picked: she has to work it out from the encrypted copies.",
     prDiaPres: "President", prDiaOrder: "the order P, the same for all (for example)",
     prDiaKey: k => "key " + k, prDiaSol: k => "soldier " + k, prDiaSolS: k => "has key " + k + ", reads P",
     prDiaEve: "Eve listens", prDiaEveS: "sees every C, has no key",
@@ -848,7 +852,7 @@ const T = {
     prByte: "byte",
     prWhy: "<b>Why does the second letter give it away?</b> Each copy is C = P XOR Z, with a new Z for every soldier. For byte 2: C2 = P2 XOR Z2. Z2 is 0 for about 2 keys in 256 (4.2), every other value for about 1 in 256. So C2 = P2 twice as often as any other value.<br>If the order is HILL (P2 = 49, the letter I): C2 = 49 in about 2 copies of 256, and C2 = 41 in only about 1 of 256 (that needs Z2 = 49 XOR 41 = 08).<br>If it is HARBOR (P2 = 41, the letter A): the other way round.<br>Eve puts the copies with C2 = 49 on one pile and those with C2 = 41 on another, and picks the bigger pile. All other copies she ignores.",
     prOneH: "One battle",
-    prSoldiers: "soldiers:", prSend: "The president sends a new order", prAgain: "the same order again, new keys",
+    prSoldiers: "soldiers:", prSend: "The president sends a new order",
     prWait: "Press the button: the president picks HILL or HARBOR at random and sends it to every soldier. Eve does not see which.",
     prProg: (k, n) => "copy " + fmtInt(k) + " of " + fmtInt(n),
     prWho: k => "soldier " + fmtInt(k), prKey: "key: secret",
@@ -1017,6 +1021,10 @@ const T = {
     m2top: "najczęstsze wartości C2",
     m2exp: e => "Bez skrzywienia każda wartość pojawiłaby się około " + e + " razy. Tajny bajt się wyróżnia, a żadnego klucza nikt nie dotknął.",
     m2wait: "Naciśnij Uruchom.",
+    chPres: "Prezydent", chPresS: "wybiera jeden z dwóch", chSent: "wysłany rozkaz", chSecret: "tajny",
+    chEve: "Eve", chEveK: "zna oba teksty,", chEveK2: "nie zna wyboru", chEveQ: "HILL czy HARBOR?",
+    chOnly: "tylko zaszyfrowane kopie", chPile: (h, n) => "C2 = " + h + ": " + n, chGuess: p => "typ: " + p,
+    chCap: "Prezydent ma gotowe dwa rozkazy i wybiera jeden. Eve zna oba teksty, ale nie wie, który wybrał: musi to wywnioskować z zaszyfrowanych kopii.",
     prDiaPres: "Prezydent", prDiaOrder: "rozkaz P, ten sam dla wszystkich (przykład)",
     prDiaKey: k => "klucz " + k, prDiaSol: k => "żołnierz " + k, prDiaSolS: k => "ma klucz " + k + ", czyta P",
     prDiaEve: "Eve podsłuchuje", prDiaEveS: "widzi każde C, nie ma klucza",
@@ -1027,7 +1035,7 @@ const T = {
     prByte: "bajt",
     prWhy: "<b>Dlaczego druga litera zdradza rozkaz?</b> Każda kopia to C = P XOR Z, z nowym Z dla każdego żołnierza. Dla bajtu 2: C2 = P2 XOR Z2. Z2 wynosi 0 dla około 2 kluczy na 256 (4.2), każda inna wartość dla około 1 na 256. Więc C2 = P2 dwa razy częściej niż jakakolwiek inna wartość.<br>Jeśli rozkaz to HILL (P2 = 49, litera I): C2 = 49 w około 2 kopiach na 256, a C2 = 41 tylko w około 1 na 256 (to wymaga Z2 = 49 XOR 41 = 08).<br>Jeśli HARBOR (P2 = 41, litera A): na odwrót.<br>Eve odkłada kopie z C2 = 49 na jedną kupkę, te z C2 = 41 na drugą i wybiera większą kupkę. Wszystkie inne kopie pomija.",
     prOneH: "Jedna bitwa",
-    prSoldiers: "żołnierze:", prSend: "Prezydent wysyła nowy rozkaz", prAgain: "ten sam rozkaz jeszcze raz, nowe klucze",
+    prSoldiers: "żołnierze:", prSend: "Prezydent wysyła nowy rozkaz",
     prWait: "Naciśnij przycisk: prezydent losuje HILL albo HARBOR i wysyła rozkaz każdemu żołnierzowi. Eve nie widzi, który.",
     prProg: (k, n) => "kopia " + fmtInt(k) + " z " + fmtInt(n),
     prWho: k => "żołnierz " + fmtInt(k), prKey: "klucz: tajny",
@@ -1592,9 +1600,9 @@ function coin() { return crypto.getRandomValues(new Uint8Array(1))[0] & 1; }
 // one battle, shown copy by copy
 const BAT = { order: -1, N: 0, keys: null, z2: null, shown: 0, piles: [0, 0], coin: 0, timer: 0 };
 function prStop() { clearTimeout(BAT.timer); BAT.timer = 0; }
-function prSend(same) {
+function prSend() {
   prStop();
-  if (!same || BAT.order < 0) BAT.order = coin();
+  BAT.order = coin();
   BAT.N = app.bN;
   BAT.keys = randBytes(16 * BAT.N);
   BAT.z2 = new Uint8Array(BAT.N);
@@ -1620,7 +1628,7 @@ function prDiagram() {
   const t = L();
   if (!PRD.keys) PRD.keys = randBytes(16 * 4);
   const P = ORD_P[0];
-  const fig = (x, y, cls) => '<circle class="fig ' + cls + '" cx="' + x + '" cy="' + (y - 9) + '" r="7"/><path class="fig ' + cls + '" d="M' + (x - 11) + " " + (y + 13) + " Q" + (x - 11) + " " + (y + 1) + " " + x + " " + (y + 1) + " Q" + (x + 11) + " " + (y + 1) + " " + (x + 11) + " " + (y + 13) + 'Z"/>';
+  const fig = prFig;
   const ys = [42, 112, 182, 322], lbl = ["1", "2", "3", fmtInt(app.bN)];
   const PX = 196, PY = 182;   // the president's box: right edge and middle
   let h = '<svg class="prd" viewBox="0 0 900 420" role="img" aria-label="' + esc(t.prDiaCap) + '">' +
@@ -1656,6 +1664,55 @@ function prDiagram() {
     '<text class="h" x="604" y="388" style="font-size:13px">' + t.prDiaEve + '</text><text class="s" x="604" y="405">' + t.prDiaEveS + "</text></svg>";
   return h;
 }
+// a small person: head and shoulders
+function prFig(x, y, cls) {
+  return '<circle class="fig ' + cls + '" cx="' + x + '" cy="' + (y - 9) + '" r="7"/><path class="fig ' + cls + '" d="M' + (x - 11) + " " + (y + 13) + " Q" + (x - 11) + " " + (y + 1) + " " + x + " " + (y + 1) + " Q" + (x + 11) + " " + (y + 1) + " " + (x + 11) + " " + (y + 13) + 'Z"/>';
+}
+// 4.3: the choice. Two orders ready, the president picks one, Eve knows both and has to guess.
+// b = null: nobody knows yet; b = the battle: hidden while it runs, revealed (with Eve's guess) at the end
+function prChoice(b) {
+  const t = L(), done = b && b.shown === b.N;
+  const guess = done ? (b.piles[0] > b.piles[1] ? 0 : b.piles[1] > b.piles[0] ? 1 : b.coin) : -1;
+  let h = '<svg class="prd" viewBox="0 0 900 230" role="img" aria-label="' + esc(t.chCap) + '">' +
+    '<defs><marker id="prar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>';
+  // the two orders
+  [0, 1].forEach(o => {
+    const y = o ? 130 : 20, pick = done && b.order === o, dim = done && b.order !== o;
+    const m = ORDERS[o].msg;
+    h += '<g opacity="' + (dim ? 0.4 : 1) + '"><rect class="pbox" x="8" y="' + y + '" width="300" height="80" rx="10" style="stroke:' + ORD_COL[o] + ";stroke-width:" + (pick ? 3.5 : 1.5) + '"/>' +
+      '<text class="h" x="22" y="' + (y + 28) + '" style="fill:' + ORD_COL[o] + '">' + ORDERS[o].name + "</text>" +
+      '<text class="m" x="22" y="' + (y + 55) + '">' + esc(m[0]) + '<tspan class="b2">' + esc(m[1]) + "</tspan>" + esc(m.slice(2)) + "</text></g>";
+    const ay = o ? 170 : 60;
+    h += '<path d="M308 ' + ay + " C346 " + ay + " 340 115 372 115" + '" fill="none" stroke="' + (pick ? ORD_COL[o] : "var(--muted)") + '" stroke-width="' + (pick ? 3 : 1.5) + '"' + (pick ? "" : ' stroke-dasharray="5 4"') + (dim ? ' opacity=".4"' : "") + "/>";
+  });
+  if (!done) h += '<text x="344" y="121" text-anchor="middle" style="font-size:20px;font-weight:700;fill:var(--chg)">?</text>';
+  // the president
+  h += '<rect class="sbox" x="374" y="78" width="150" height="74" rx="10"/>' + prFig(400, 112, "pres") +
+    '<text class="h" x="418" y="108">' + t.chPres + '</text><text class="s" x="418" y="125">' + t.chPresS.split(" ").slice(0, 2).join(" ") + '</text><text class="s" x="418" y="140">' + t.chPresS.split(" ").slice(2).join(" ") + "</text>" +
+    '<path class="ln" d="M524 115H556" marker-end="url(#prar2)"/>';
+  // the order sent: a sealed box, opened at the end
+  const sc = done ? ORD_COL[b.order] : "var(--muted)";
+  h += '<rect x="558" y="80" width="126" height="70" rx="8" style="fill:var(--sunken);stroke:' + sc + ';stroke-width:' + (done ? 3 : 1.5) + '"/>' +
+    '<text class="s" x="621" y="99" text-anchor="middle">' + t.chSent + "</text>" +
+    (done ? '<text class="h" x="621" y="130" text-anchor="middle" style="font-size:18px;fill:' + sc + '">' + ORDERS[b.order].name + "</text>"
+          : '<text x="621" y="128" text-anchor="middle" style="font-size:22px;font-weight:700;fill:var(--muted)">🔒 ?</text><text class="s" x="621" y="144" text-anchor="middle">' + t.chSecret + "</text>");
+  // to Eve: only the encrypted copies
+  h += '<path class="air" d="M684 115H712"/><text class="s" x="621" y="172" text-anchor="middle">↘ ' + t.chOnly + "</text>";
+  // Eve and her question
+  h += '<rect class="ebox" x="714" y="20" width="180" height="190" rx="10"/>' + prFig(738, 50, "eve") +
+    '<text class="h" x="756" y="48">' + t.chEve + '</text><text class="s" x="726" y="74">' + t.chEveK + '</text><text class="s" x="726" y="89">' + t.chEveK2 + "</text>" +
+    '<text class="h" x="804" y="114" text-anchor="middle" style="font-size:14px">' + t.chEveQ + "</text>";
+  if (b) {
+    [0, 1].forEach(o => {
+      h += '<text class="m" x="726" y="' + (136 + 20 * o) + '" style="fill:' + ORD_COL[o] + ';font-weight:600">' + t.chPile(hx2(ORD_L[o]), fmtInt(b.piles[o])) + " (" + ORDERS[o].name + ")</text>";
+    });
+    if (done) {
+      const ok = guess === b.order;
+      h += '<text class="h" x="726" y="196" style="fill:' + (ok ? "var(--ok)" : "var(--bad)") + '">' + (ok ? "✓ " : "✗ ") + t.chGuess(ORDERS[guess].name) + "</text>";
+    }
+  } else h += '<text x="804" y="160" text-anchor="middle" style="font-size:34px;font-weight:700;fill:var(--chg)">?</text>';
+  return h + "</svg>";
+}
 function renderPr() {
   const t = L();
   const SH = Math.max(ORD_P[0].length, ORD_P[1].length);
@@ -1668,6 +1725,8 @@ function renderPr() {
   });
   const opts = PR_SOLDIERS.map(n => '<option value="' + n + '"' + (n === app.bN ? " selected" : "") + ">" + fmtInt(n) + "</option>").join("");
   return '<div class="card"><h3>' + t.prSetH + '</h3>' +
+    '<div class="schwrap">' + prChoice(null) + "</div>" +
+    '<p class="note" style="margin:4px 0 14px">' + t.chCap + "</p>" +
     '<div class="schwrap"><div id="prdia">' + prDiagram() + "</div></div>" +
     '<div class="btns" style="margin:4px 0 12px"><span class="note" style="flex:1 1 300px">' + t.prDiaCap + '</span><button data-action="pr-newkeys">' + DICE_SVG + " " + t.prDiaNew + "</button></div>" +
     '<p style="margin:0 0 4px">' + t.prSetP + "</p>" +
@@ -1675,7 +1734,8 @@ function renderPr() {
     '<div class="why">' + t.prWhy + "</div></div>" +
     '<div class="card"><h3>' + t.prOneH + "</h3>" +
     '<div class="btns"><label>' + t.prSoldiers + ' <select data-field="bn">' + opts + '</select></label><button class="dark" data-action="pr-send">' + t.prSend + '</button>' +
-    '<button data-action="pr-again" id="pragain">' + t.prAgain + "</button></div>" +
+    "</div>" +
+    '<div class="schwrap" style="margin-top:10px"><div id="prchoice"></div></div>' +
     '<div id="prbat" style="margin-top:8px"></div><p class="note" style="margin:8px 0 0">' + t.prTry + "</p></div>" +
     '<div class="card"><h3>' + t.prWinH + '</h3><p style="margin:0 0 8px">' + t.prWinP + "</p>" +
     '<div class="btns"><button class="dark" data-action="pr-run">' + t.prRun(100) + '</button><button data-action="pr-reset">' + t.prReset + '</button><span class="note" id="prwinst"></span></div>' +
@@ -1688,8 +1748,9 @@ function renderPr() {
 function updateBattle() {
   const o = document.getElementById("prbat");
   if (!o) return;
-  const t = L(), ag = document.getElementById("pragain");
-  if (ag) ag.disabled = BAT.order < 0;
+  const t = L();
+  const cw = document.getElementById("prchoice");
+  if (cw) cw.innerHTML = prChoice(BAT.order < 0 ? null : BAT);
   if (BAT.order < 0) { o.innerHTML = '<p class="note" style="margin:0">' + t.prWait + "</p>"; return; }
   const P = ORD_P[BAT.order], n = BAT.shown, done = n === BAT.N;
   let pk = "";
@@ -2252,9 +2313,8 @@ view.addEventListener("click", e => {
   else if (a === "run2") run2();
   else if (a === "iv-same") { app.iv2 = app.iv1; const i2 = view.querySelector('input[data-field="iv2"]'); if (i2) i2.value = app.iv2; updateM3(); }
   else if (a === "iv-rand") { const b = new Uint8Array(3); crypto.getRandomValues(b); app.iv2 = bytesHex(b, " ").toUpperCase(); const i2 = view.querySelector('input[data-field="iv2"]'); if (i2) i2.value = app.iv2; updateM3(); }
-  else if (a === "pr-send") prSend(false);
+  else if (a === "pr-send") prSend();
   else if (a === "pr-newkeys") prdNewKeys();
-  else if (a === "pr-again") prSend(true);
   else if (a === "pr-run") prRun();
   else if (a === "pr-reset") prReset();
   else if (a === "ivrun") ivRun();
