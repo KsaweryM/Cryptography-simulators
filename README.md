@@ -19,6 +19,8 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
   d and the power are in the mathematics section.
 - **Diffie-Hellman and ElGamal** (`diffie-hellman/`): black box, the powers of g, Mallory in the middle, ElGamal, one power.
 - **Elliptic curves** (`elliptic-curves/`): black box, adding points, the curve modulo 17, one addition.
+- **Digital signatures** (`signatures/`): black box (sign and verify), textbook RSA signatures on the key 187, forgeries without a hash,
+  hash-and-sign, and ECDSA with a repeated k on a small curve.
 - **Certificates and PKI** (`pki/`): black box (Mallory swaps a key, a CA signature stops her), inside a certificate (X.509 fields, DER
   bytes, fingerprint), chain of trust, validation checks, revocation (CRL, OCSP, stapling), certificates in TLS 1.3 and mTLS, pinning.
 
@@ -30,7 +32,6 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 - Hash functions
 - Message authentication codes (MAC)
 - Passwords and key derivation
-- Digital signatures
 - TLS 1.3
 - Secure messaging (Signal)
 - Post-quantum cryptography (PQC)

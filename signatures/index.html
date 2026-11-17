@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digital signatures explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  /* role colours = the slide colours of the signatures lecture:
+     Alice, her private key and her signature sIndigo (full), her public key sIndigo light;
+     Mallory and Eve sPink; the message sViolet; Bob and the verifier sTeal; the digest sBrown; mechanisms neutral */
+  --ali:#5C6BC0; --ali-ink:#FFFFFF; --ali-bg:#E3E6F5;
+  --mal:#EC407A; --mal-ink:#FFFFFF; --mal-bg:#FCE2EB;
+  --msg:#7E57C2; --msg-bg:#EBE5F5;
+  --bob:#26A69A; --bob-bg:#DEF2F0;
+  --dig:#8D6E63; --dig-bg:#EEE9E7;
+  --neu:#BCC4CC; --neu-bg:#EEF1F4;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
+    --ali:#5C6BC0; --ali-bg:#232846; --mal:#EC407A; --mal-bg:#3A1A26; --msg:#B39DDB; --msg-bg:#2A2142;
+    --bob:#4DB6AC; --bob-bg:#12302D; --dig:#BCAAA4; --dig-bg:#2E2522; --neu:#4A5663; --neu-bg:#222C37;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+textarea{width:100%;resize:vertical;min-height:44px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.more[hidden]{display:none}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.okl{color:var(--ok);font-weight:700}
+.badl{color:var(--bad);font-weight:700}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.flow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.arr{font-size:20px;color:var(--muted)}
+.mech{background:var(--ink);color:var(--surface);border-radius:8px;padding:7px 12px;font-weight:700;font-size:14px}
+.val{border:1.5px solid;border-radius:8px;padding:6px 10px;display:flex;flex-direction:column;gap:2px;font-size:13.5px;max-width:420px}
+.val .mono{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.val b{font-size:13px}
+.r-msg{border-color:var(--msg);background:var(--msg-bg)}
+.r-dig{border-color:var(--dig);background:var(--dig-bg)}
+.r-apriv,.r-asig{border-color:var(--ali);background:var(--ali);color:var(--ali-ink)}
+.r-apub{border-color:var(--ali);background:var(--ali-bg)}
+.r-mal{border-color:var(--mal);background:var(--mal);color:var(--mal-ink)}
+.r-malbg{border-color:var(--mal);background:var(--mal-bg)}
+.r-bob{border-color:var(--bob);background:var(--bob-bg)}
+.r-neu{border-color:var(--neu);background:var(--neu-bg)}
+.big{font-family:var(--mono);font-size:22px;font-weight:600}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.num{width:6em;font-size:16px;font-weight:600}
+table.t{border-collapse:collapse;font-size:14px}
+table.t td,table.t th{padding:4px 10px;border-bottom:1px solid var(--rule);text-align:left}
+table.t td.m{font-family:var(--mono)}
+.strip{display:flex;flex-wrap:wrap;gap:2px;margin-top:6px}
+.strip span{width:26px;height:20px;font-size:10px;font-family:var(--mono);display:flex;align-items:center;justify-content:center;border-radius:3px;background:var(--sunken)}
+.strip span.ok{background:var(--bob-bg);outline:1px solid var(--bob)}
+.strip span.cur{outline:2.5px solid var(--chg)}
+.grid svg{max-width:420px;width:100%;height:auto;display:block}
+.two{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.app{height:auto;display:block}.body{display:block}.side{border-right:0;border-bottom:1px solid var(--rule)}.main{display:block}.two{display:block}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// CORE-BEGIN
+/* ---------- SHA-256 (FIPS 180-4), on Uint8Array ---------- */
+const K256 = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function sha256(bytes) {
+  const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const len = bytes.length, total = ((len + 9 + 63) >> 6) << 6;
+  const m = new Uint8Array(total); m.set(bytes); m[len] = 0x80;
+  const bits = len * 8;
+  for (let i = 0; i < 8; i++) m[total - 1 - i] = Math.floor(bits / Math.pow(2, 8 * i)) & 255;
+  const w = new Uint32Array(64);
+  for (let off = 0; off < total; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = (m[off+4*i] << 24 | m[off+4*i+1] << 16 | m[off+4*i+2] << 8 | m[off+4*i+3]) >>> 0;
+    for (let i = 16; i < 64; i++) {
+      const a = w[i-15], b = w[i-2];
+      const s0 = ((a >>> 7 | a << 25) ^ (a >>> 18 | a << 14) ^ (a >>> 3)) >>> 0;
+      const s1 = ((b >>> 17 | b << 15) ^ (b >>> 19 | b << 13) ^ (b >>> 10)) >>> 0;
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const S1 = ((e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7)) >>> 0;
+      const ch = ((e & f) ^ (~e & g)) >>> 0;
+      const t1 = (h + S1 + ch + K256[i] + w[i]) >>> 0;
+      const S0 = ((a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10)) >>> 0;
+      const mj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+      const t2 = (S0 + mj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+    H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+  }
+  let hex = "";
+  for (let i = 0; i < 8; i++) hex += H[i].toString(16).padStart(8, "0");
+  return hex;
+}
+const utf8 = s => new TextEncoder().encode(s);
+const hashHex = s => sha256(utf8(s));
+const hashNum = s => BigInt("0x" + hashHex(s));
+
+/* ---------- modular arithmetic on BigInt ---------- */
+function modpow(b, e, m) { let r = 1n; b %= m; if (b < 0n) b += m; while (e > 0n) { if (e & 1n) r = r * b % m; b = b * b % m; e >>= 1n; } return r; }
+const mod = (a, m) => ((a % m) + m) % m;
+function inv(a, m) { let [r0, r1] = [mod(a, m), m], [s0, s1] = [1n, 0n]; while (r1 !== 0n) { const q = r0 / r1; [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; } return r0 === 1n ? mod(s0, m) : null; }
+
+/* ---------- RSA keys ---------- */
+// the small key of the slides: p = 17, q = 11, e = 7, d = 23
+const SMALL = { n: 187n, e: 7n, d: 23n };
+// two 1024-bit keys made once with the library "cryptography"; e = 65537
+const ALICE = { n: 0xb0189e28e7d345b61781e6afb10592814ccc9c95c1ebd8e2412716fb6d5c8c2e0a1615f93d64a1687a2c9ef109081376d022b841287cc094a65bf37de6f498f77c9051d9f42f441e903060c4e124a6a34b2a0a6adc1c02b4d438c88ba1947cc9aef4fae97cc7975b4ba90d57f56fb54eb46bb279030d741603a589dbe344baa7n, e: 65537n,
+  d: 0x8f54ca4f233a8cd044dbffc75b3fdcda8f872fa09981fd3b53aa9c8333a59397d9afd65cd302b87a108f87234ba59e2a24094e8e0285603ede1593e0137f5d8d214830221f25a55a9a44e6bbd0710be566f915863f97329515e6a8c1189740053f7df9167c9e0c3b3fcabddbb466bfe7889a7812cb1c7653fcd6e38d96ce2211n };
+const MALLORY = { n: 0xbf2e11f85a2af11387ac2fa7b694073afcf4da0875303bd8ec8eab0720e3df145a06247781f1a9c2cf01e78dd6a5d1ade9e21267f53067510e11fb67f24da5800f7878d78877482877e98080d0445cc01d655e60507ee157930234e68b1be287cd4ac2e66d5dd368b2b0390d34be209aff6694d448ea2ec9de07b732b6839657n, e: 65537n,
+  d: 0x8d2772d52f9ded09426efb7094f98ead1aff9dcc08da6815adf3588b96d928685a5f96a536283bf33dec660eefa0d6c3d59fb97f502540e333c44b1f6063bc011e96b361bd41ec4e65127401cd1efbe4c7af95740f46cf788e3564006a2716afa5322c9aa328cd3760c0730d66565aa793570e1620fd4e0403a61d4a99f62021n };
+const signHash = (K, text) => modpow(hashNum(text), K.d, K.n);              // hash-and-sign (no padding: for teaching)
+const verifyHash = (K, text, S) => modpow(S, K.e, K.n) === hashNum(text) % K.n;
+
+/* ---------- the small curve y^2 = x^3 + 2x + 2 mod 17, G = (5, 1), q = 19 ---------- */
+const EC = { p: 17n, a: 2n, b: 2n, G: [5n, 1n], q: 19n };
+function ecAdd(P, Q) {
+  if (P === null) return Q; if (Q === null) return P;
+  const p = EC.p;
+  if (P[0] === Q[0] && mod(P[1] + Q[1], p) === 0n) return null;
+  let s;
+  if (P[0] === Q[0] && P[1] === Q[1]) s = mod((3n * P[0] * P[0] + EC.a) * inv(2n * P[1], p), p);
+  else s = mod((Q[1] - P[1]) * inv(Q[0] - P[0], p), p);
+  const x = mod(s * s - P[0] - Q[0], p);
+  return [x, mod(s * (P[0] - x) - P[1], p)];
+}
+function ecMul(k, P) { let R = null; k = mod(k, EC.q); for (let i = 0n; i < k; i++) R = ecAdd(R, P); return R; }
+function ecdsaSign(d, k, z) {
+  const R = ecMul(k, EC.G); if (R === null) return null;
+  const r = mod(R[0], EC.q); const ki = inv(k, EC.q);
+  if (r === 0n || ki === null) return null;
+  const s = mod(ki * (z + r * d), EC.q);
+  return s === 0n ? null : { R, r, s };
+}
+function ecdsaVerify(Q, z, r, s) {
+  const w = inv(s, EC.q); if (w === null) return { ok: false };
+  const u1 = mod(z * w, EC.q), u2 = mod(r * w, EC.q);
+  const X = ecAdd(ecMul(u1, EC.G), ecMul(u2, Q));
+  return { w, u1, u2, X, ok: X !== null && mod(X[0], EC.q) === r };
+}
+function recover(z1, s1, z2, s2, r) {
+  const k = mod((z1 - z2) * inv(s1 - s2, EC.q), EC.q);
+  const d = mod((s1 * k - z1) * inv(r, EC.q), EC.q);
+  return { k, d };
+}
+
+/* ---------- self-test: official vectors and the numbers on the slides ---------- */
+function selfTest() {
+  const f = [];
+  const chk = (name, c) => { if (!c) f.push(name); };
+  chk("SHA-256 abc", hashHex("abc") === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  chk("SHA-256 empty", hashHex("") === "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  chk("SHA-256 Pay Bob 10", hashHex("Pay Bob 10 pounds.") === "ded9d3862c934a76ee6fb4f57ebd18525f31f2b11a64e05c0e16a255875f149e");
+  chk("11 -> 88", modpow(11n, 23n, 187n) === 88n && modpow(88n, 7n, 187n) === 11n);
+  chk("2, 3 -> 162, 181 -> 150", modpow(2n, 23n, 187n) === 162n && modpow(3n, 23n, 187n) === 181n && 162n * 181n % 187n === 150n && modpow(150n, 7n, 187n) === 6n);
+  chk("100 -> 144", modpow(100n, 7n, 187n) === 144n);
+  let all = true; for (let m = 0n; m < 187n; m++) if (modpow(modpow(m, 23n, 187n), 7n, 187n) !== m) all = false;
+  chk("all 187 come back", all);
+  const S = signHash(ALICE, "Bob, the meeting is moved to Friday 10:00. Alice");
+  chk("RSA-1024 sign", S.toString(16).startsWith("7265b2291e976e04") && verifyHash(ALICE, "Bob, the meeting is moved to Friday 10:00. Alice", S));
+  chk("RSA-1024 changed", !verifyHash(ALICE, "Bob, the meeting is moved to Friday 11:00. Alice", S));
+  chk("Q = 7G = (0, 6)", String(ecMul(7n, EC.G)) === "0,6");
+  const a = ecdsaSign(7n, 10n, 5n), b = ecdsaSign(7n, 10n, 11n);
+  chk("ECDSA (7, 13) and (7, 6)", a.r === 7n && a.s === 13n && b.r === 7n && b.s === 6n);
+  chk("ECDSA verify", ecdsaVerify([0n, 6n], 5n, 7n, 13n).ok && !ecdsaVerify([0n, 6n], 6n, 7n, 13n).ok);
+  const rc = recover(5n, 13n, 11n, 6n, 7n);
+  chk("recover k = 10, d = 7", rc.k === 10n && rc.d === 7n);
+  return f;
+}
+// CORE-END
+
+/* ===================== texts ===================== */
+const T = {
+  en: {
+    title: "Digital signatures explorer", home: "All simulators",
+    intro: "Sign with a private key, verify with the public key; then look inside RSA signatures and break ECDSA with a repeated k.",
+    stepOf: n => "Step " + n + " of 5", selfOk: "Self-test passed", selfBad: s => "Self-test FAILED: " + s,
+    keys: "← → : previous / next step", moreBelow: "More below",
+    steps: [["Black box: sign and verify", "Alice signs, anybody verifies"], ["Inside: textbook RSA", "S = M^d mod n on the key 187"],
+      ["Forgeries without a hash", "multiply signatures; any S"], ["Hash, then sign", "the forgeries stop working"], ["ECDSA and a repeated k", "a small curve, q = 19"]],
+    explain: [
+      ["What sign and verify do", "Alice signs a message with her private key. Anybody with her public key can verify it. Edit the message or the signature, or let Mallory sign with her own key, and watch verify."],
+      ["The RSA signature in its bare form", "Sign: S = M^d mod n with the private key. Verify: S^e mod n must give M back. Here the small key n = 187, e = 7, d = 23."],
+      ["Why textbook RSA signatures can be forged", "Mallory has no private key, but numbers let her cheat: signatures multiply, and any number is a signature of some message."],
+      ["Sign the digest, not the message", "Hash-and-sign: S = H(M)^d mod n. The same tricks now give signatures of numbers that are the digest of no known message. Key: the 1024-bit key of step 1."],
+      ["ECDSA on a small curve", "The curve y² = x³ + 2x + 2 mod 17 with G = (5, 1) of order q = 19. Sign with a secret k, verify with Q = dG. Then sign two messages with the same k."],
+    ],
+    msg: "message", sig: "signature", digest: "SHA-256 digest", alicePriv: "Alice's private key", alicePub: "Alice's public key",
+    malPriv: "Mallory's private key", verify: "verify", sign: "sign", valid: "True: valid", invalid: "False: not valid",
+    c11: "1. Alice signs", c12: "2. Mallory changes the message", c13: "3. Mallory signs with her own key",
+    c12t: "Mallory's version (edit it):", c13t: "Bob verifies Mallory's signature with Alice's public key:",
+    sigEdit: "Flip one bit of the signature", sigFlip: "signature with one bit flipped",
+    bits: n => n + " bits",
+    m: "message M (0 to 186)", S: "signature S = M²³ mod 187", back: "S⁷ mod 187", allBack: "All 187 messages: the signature checks for each one:",
+    tryM2: "Mallory keeps S and changes M to", mult: "1. Signatures multiply", rnd: "2. Any number is a signature",
+    m1: "M₁", m2: "M₂", s1s2: "S₁ × S₂ mod 187", prod: "M₁ × M₂ mod 187", checks: "checks", anyS: "Mallory picks S",
+    itSigns: "it is a valid signature of M = S⁷ mod 187 =", multWhy: "(M₁ᵈ)(M₂ᵈ) = (M₁M₂)ᵈ mod n: Mallory never used d.",
+    rndWhy: "Mallory cannot choose M, but if any number is a fine message, the pair (M, S) is enough.",
+    h1: "1. Two orders Alice hash-signed for Mallory", h2: "2. Mallory multiplies the signatures", target: "the order Mallory wants",
+    signsNum: "S₂₀ × S₅₀ signs the number", targetHash: "but the digest of this order is", search: "Search 100 000 orders for one with this digest",
+    searching: n => "searched " + n + " orders…", notFound: n => "none of " + n + " orders has this digest: to find one, Mallory would have to run SHA-256 backwards.",
+    hWhy: "Without the hash, the product was a valid signature of 20 × 50 = 1000. With the hash it signs a number that belongs to no message.",
+    e1: "1. Sign and verify", e2: "2. The same k twice", dlab: "private key d", klab: "secret k", zlab: "digest z (a toy number mod 19)",
+    Rlab: "R = kG", rlab: "r = x of R mod 19", slab: "s = (z + r·d) / k mod 19", sigLab: "signature (r, s)",
+    vlab: "verify: w = 1/s, u₁ = z·w, u₂ = r·w, X = u₁G + u₂Q; valid if x of X = r",
+    z2lab: "second digest z₂", sameR: "Both signatures have the same r: k was used twice.", diffR: "Different r: different k.",
+    recBtn: "Recover k and d", recK: "k = (z₁ − z₂) / (s₁ − s₂) mod 19", recD: "d = (s₁·k − z₁) / r mod 19",
+    recOk: "Mallory now has the private key: she can sign anything.", noSig: "No signature with these numbers (r or s is 0, or k = 0): choose another k.",
+    legend: "G: start point, Q = dG: Alice's public key, R = kG", needSameK: "Use the same k for both to see the attack.",
+  },
+  pl: {
+    title: "Podpis cyfrowy: symulator", home: "Wszystkie symulatory",
+    intro: "Podpis kluczem prywatnym, sprawdzenie kluczem publicznym; potem podpis RSA w środku i atak na ECDSA z powtórzonym k.",
+    stepOf: n => "Krok " + n + " z 5", selfOk: "Autotest zaliczony", selfBad: s => "Autotest NIEZALICZONY: " + s,
+    keys: "← → : poprzedni / następny krok", moreBelow: "Niżej jest więcej",
+    steps: [["Czarna skrzynka: sign i verify", "Alice podpisuje, każdy sprawdza"], ["W środku: podręcznikowe RSA", "S = M^d mod n na kluczu 187"],
+      ["Fałszerstwa bez skrótu", "mnożenie podpisów; dowolne S"], ["Najpierw skrót, potem podpis", "fałszerstwa przestają działać"], ["ECDSA i powtórzone k", "mała krzywa, q = 19"]],
+    explain: [
+      ["Co robią sign i verify", "Alice podpisuje wiadomość swoim kluczem prywatnym. Każdy z jej kluczem publicznym może to sprawdzić. Zmień wiadomość albo podpis albo pozwól Mallory podpisać jej własnym kluczem i patrz na verify."],
+      ["Podpis RSA w gołej postaci", "Podpis: S = M^d mod n kluczem prywatnym. Sprawdzenie: S^e mod n musi dać z powrotem M. Tu mały klucz n = 187, e = 7, d = 23."],
+      ["Dlaczego podręcznikowy podpis RSA da się podrobić", "Mallory nie ma klucza prywatnego, ale liczby pozwalają oszukiwać: podpisy się mnożą, a każda liczba jest podpisem jakiejś wiadomości."],
+      ["Podpisuj skrót, nie wiadomość", "Hash-and-sign: S = H(M)^d mod n. Te same sztuczki dają teraz podpisy liczb, które nie są skrótem żadnej znanej wiadomości. Klucz: 1024-bitowy klucz z kroku 1."],
+      ["ECDSA na małej krzywej", "Krzywa y² = x³ + 2x + 2 mod 17, G = (5, 1) rzędu q = 19. Podpis z tajnym k, sprawdzenie kluczem Q = dG. Potem dwie wiadomości z tym samym k."],
+    ],
+    msg: "wiadomość", sig: "podpis", digest: "skrót SHA-256", alicePriv: "klucz prywatny Alice", alicePub: "klucz publiczny Alice",
+    malPriv: "klucz prywatny Mallory", verify: "verify", sign: "sign", valid: "True: poprawny", invalid: "False: niepoprawny",
+    c11: "1. Alice podpisuje", c12: "2. Mallory zmienia wiadomość", c13: "3. Mallory podpisuje swoim kluczem",
+    c12t: "Wersja Mallory (edytuj):", c13t: "Bob sprawdza podpis Mallory kluczem publicznym Alice:",
+    sigEdit: "Odwróć jeden bit podpisu", sigFlip: "podpis z jednym odwróconym bitem",
+    bits: n => n + " bitów",
+    m: "wiadomość M (0 do 186)", S: "podpis S = M²³ mod 187", back: "S⁷ mod 187", allBack: "Wszystkie 187 wiadomości: podpis przechodzi dla każdej:",
+    tryM2: "Mallory zostawia S i zmienia M na", mult: "1. Podpisy się mnożą", rnd: "2. Każda liczba jest podpisem",
+    m1: "M₁", m2: "M₂", s1s2: "S₁ × S₂ mod 187", prod: "M₁ × M₂ mod 187", checks: "sprawdzenie", anyS: "Mallory wybiera S",
+    itSigns: "to poprawny podpis M = S⁷ mod 187 =", multWhy: "(M₁ᵈ)(M₂ᵈ) = (M₁M₂)ᵈ mod n: Mallory nie użyła d.",
+    rndWhy: "Mallory nie wybiera M, ale jeśli każda liczba jest dobrą wiadomością, para (M, S) wystarczy.",
+    h1: "1. Dwa zlecenia podpisane przez Alice (skrót) dla Mallory", h2: "2. Mallory mnoży podpisy", target: "zlecenie, którego chce Mallory",
+    signsNum: "S₂₀ × S₅₀ podpisuje liczbę", targetHash: "ale skrót tego zlecenia to", search: "Przeszukaj 100 000 zleceń w poszukiwaniu tego skrótu",
+    searching: n => "przeszukano " + n + " zleceń…", notFound: n => "żadne z " + n + " zleceń nie ma tego skrótu: Mallory musiałaby odwrócić SHA-256.",
+    hWhy: "Bez skrótu iloczyn był poprawnym podpisem 20 × 50 = 1000. Ze skrótem podpisuje liczbę, która nie należy do żadnej wiadomości.",
+    e1: "1. Podpis i sprawdzenie", e2: "2. To samo k dwa razy", dlab: "klucz prywatny d", klab: "tajne k", zlab: "skrót z (zabawkowa liczba mod 19)",
+    Rlab: "R = kG", rlab: "r = x punktu R mod 19", slab: "s = (z + r·d) / k mod 19", sigLab: "podpis (r, s)",
+    vlab: "verify: w = 1/s, u₁ = z·w, u₂ = r·w, X = u₁G + u₂Q; poprawny, gdy x punktu X = r",
+    z2lab: "drugi skrót z₂", sameR: "Oba podpisy mają to samo r: k użyto dwa razy.", diffR: "Różne r: różne k.",
+    recBtn: "Odzyskaj k i d", recK: "k = (z₁ − z₂) / (s₁ − s₂) mod 19", recD: "d = (s₁·k − z₁) / r mod 19",
+    recOk: "Mallory ma teraz klucz prywatny: może podpisać cokolwiek.", noSig: "Brak podpisu dla tych liczb (r lub s równe 0 albo k = 0): wybierz inne k.",
+    legend: "G: punkt startowy, Q = dG: klucz publiczny Alice, R = kG", needSameK: "Ustaw to samo k w obu, żeby zobaczyć atak.",
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+const app = {
+  level: 0, card: 1,
+  msg: "Bob, the meeting is moved to Friday 10:00. Alice", malMsg: "Bob, the meeting is moved to Friday 11:00. Alice", flip: false,
+  M: 11n, M2: 12n, m1: 2n, m2: 3n, anyS: 100n,
+  d: 7n, k: 10n, z: 5n, k2: 10n, z2: 11n, recovered: false, search: null,
+};
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const short = x => { const h = x.toString(16); return h.length <= 24 ? h : h.slice(0, 12) + "…" + h.slice(-12); };
+const okv = b => b ? '<span class="okl">✓ ' + L().valid + "</span>" : '<span class="badl">✗ ' + L().invalid + "</span>";
+const val = (cls, title, body, id) => '<div class="val ' + cls + '"' + (id ? ' id="' + id + '"' : "") + "><b>" + title + '</b><span class="mono">' + body + "</span></div>";
+const mech = t => '<span class="mech">⚙ ' + t + "</span>";
+const ARR = '<span class="arr">→</span>';
+const numIn = (f, v, min, max) => '<input class="num" type="number" data-f="' + f + '" value="' + v + '" min="' + min + '" max="' + max + '">';
+
+/* ---------- step 1 ---------- */
+function render0() {
+  const t = L();
+  return '<div class="card" id="c1"><h3>' + t.c11 + "</h3>" +
+    '<textarea data-f="msg" rows="2">' + esc(app.msg) + "</textarea>" +
+    '<div class="flow">' + val("r-msg", t.msg, "", "") + ARR + mech("SHA-256") + ARR + '<div id="o1d"></div>' + ARR + val("r-apriv", "🔑 " + t.alicePriv, "1024 " + t.bits("").trim()) + ARR + '<div id="o1s"></div></div>' +
+    '<div class="flow">' + mech(t.verify) + '<span class="note">' + t.alicePub + '</span><span id="o1v"></span></div>' +
+    '<div class="btns"><button data-a="flip">' + t.sigEdit + '</button><span id="o1f" class="note"></span></div></div>' +
+    '<div class="card" id="c2"><h3>' + t.c12 + '</h3><div class="note">' + t.c12t + '</div><textarea data-f="malMsg" rows="2">' + esc(app.malMsg) + "</textarea>" +
+    '<div class="flow">' + mech(t.verify) + '<span class="note">' + t.alicePub + " + " + t.sig + ' (Alice)</span><span id="o2v"></span></div></div>' +
+    '<div class="card" id="c3"><h3>' + t.c13 + '</h3><div class="flow">' + val("r-mal", "🔑 " + t.malPriv, "") + ARR + '<div id="o3s"></div></div>' +
+    '<div class="flow"><span class="note">' + t.c13t + '</span><span id="o3v"></span></div></div>';
+}
+function update0() {
+  const t = L();
+  const S = signHash(ALICE, app.msg);
+  const Sx = app.flip ? S ^ 1n : S;
+  set("o1d", val("r-dig", t.digest, hashHex(app.msg).slice(0, 16) + "…"));
+  set("o1s", val("r-asig", "✍ " + t.sig, short(Sx)));
+  set("o1v", okv(verifyHash(ALICE, app.msg, Sx)));
+  set("o1f", app.flip ? t.sigFlip : "");
+  set("o2v", okv(verifyHash(ALICE, app.malMsg, S)));
+  const SM = signHash(MALLORY, app.malMsg);
+  set("o3s", val("r-mal", "✍ " + t.sig + " (Mallory)", short(SM)));
+  set("o3v", okv(modpow(SM, ALICE.e, ALICE.n) === hashNum(app.malMsg) % ALICE.n));
+}
+
+/* ---------- step 2 ---------- */
+function render1() {
+  const t = L();
+  return '<div class="card"><div class="row"><label class="note">' + t.m + "</label>" + numIn("M", app.M, 0, 186) + "</div>" +
+    '<div class="flow" id="o21"></div><div class="row"><span class="note">' + t.tryM2 + "</span>" + numIn("M2", app.M2, 0, 186) + '<span id="o22"></span></div></div>' +
+    '<div class="card"><h3>' + t.allBack + '</h3><div class="strip" id="o23"></div></div>';
+}
+function update1() {
+  const t = L(); const M = app.M, S = modpow(M, 23n, 187n), B = modpow(S, 7n, 187n);
+  set("o21", val("r-msg", "M", String(M)) + ARR + val("r-apriv", "🔑 d = 23", "") + ARR + val("r-asig", "S", String(S)) + ARR + val("r-apub", "🔑 e = 7", "") + ARR + val("r-msg", t.back, String(B)) + okv(B === M));
+  set("o22", "S⁷ mod 187 = " + B + " " + okv(B === app.M2));
+  let h = ""; for (let m = 0n; m < 187n; m++) h += '<span class="ok' + (m === M ? " cur" : "") + '" title="M = ' + m + ", S = " + modpow(m, 23n, 187n) + '">' + m + "</span>";
+  set("o23", h);
+}
+
+/* ---------- step 3 ---------- */
+function render2() {
+  const t = L();
+  return '<div class="card" id="c1"><h3>' + t.mult + '</h3><div class="row">' + t.m1 + numIn("m1", app.m1, 0, 186) + t.m2 + numIn("m2", app.m2, 0, 186) + '</div><div id="o31"></div><div class="why">' + t.multWhy + "</div></div>" +
+    '<div class="card" id="c2"><h3>' + t.rnd + '</h3><div class="row">' + t.anyS + numIn("anyS", app.anyS, 0, 186) + '</div><div id="o32"></div><div class="why">' + t.rndWhy + "</div></div>";
+}
+function update2() {
+  const t = L(); const s1 = modpow(app.m1, 23n, 187n), s2 = modpow(app.m2, 23n, 187n), F = s1 * s2 % 187n, P = app.m1 * app.m2 % 187n;
+  set("o31", '<div class="flow">' + val("r-asig", "S₁ (Alice)", String(s1)) + val("r-asig", "S₂ (Alice)", String(s2)) + ARR + val("r-malbg", t.s1s2, String(F)) + ARR +
+    val("r-msg", t.prod, String(P)) + "<span>" + t.checks + ": " + F + "⁷ mod 187 = " + modpow(F, 7n, 187n) + " " + okv(modpow(F, 7n, 187n) === P) + "</span></div>");
+  const M = modpow(app.anyS, 7n, 187n);
+  set("o32", '<div class="flow">' + val("r-malbg", "S", String(app.anyS)) + "<span>" + t.itSigns + ' <b class="big">' + M + "</b> " + okv(modpow(M, 23n, 187n) === app.anyS) + "</span></div>");
+}
+
+/* ---------- step 4 ---------- */
+const O20 = "Pay Mallory 20 pounds. Alice", O50 = "Pay Mallory 50 pounds. Alice", O1000 = "Pay Mallory 1000 pounds. Alice";
+function render3() {
+  const t = L();
+  return '<div class="card"><h3>' + t.h1 + '</h3><div id="o41"></div></div>' +
+    '<div class="card"><h3>' + t.h2 + '</h3><div id="o42"></div><div class="btns"><button class="dark" data-a="search">' + t.search + '</button><span id="o43" class="note"></span></div><div class="why">' + t.hWhy + "</div></div>";
+}
+function update3() {
+  const t = L();
+  const s20 = signHash(ALICE, O20), s50 = signHash(ALICE, O50);
+  set("o41", '<div class="flow">' + val("r-msg", t.msg, O20) + ARR + val("r-asig", "S₂₀", short(s20)) + '</div><div class="flow">' + val("r-msg", t.msg, O50) + ARR + val("r-asig", "S₅₀", short(s50)) + "</div>");
+  const F = s20 * s50 % ALICE.n, num = modpow(F, ALICE.e, ALICE.n);
+  set("o42", '<div class="flow">' + val("r-malbg", "S₂₀ × S₅₀ mod n", short(F)) + "<span>" + t.signsNum + "</span>" + val("r-dig", "", short(num)) + "</div>" +
+    '<div class="flow">' + val("r-msg", t.target, O1000) + "<span>" + t.targetHash + "</span>" + val("r-dig", "", short(hashNum(O1000))) + okv(verifyHash(ALICE, O1000, F)) + "</div>");
+  if (app.search) set("o43", app.search.done ? t.notFound(app.search.n) : t.searching(app.search.n));
+}
+function runSearch() {
+  const s20 = signHash(ALICE, O20), s50 = signHash(ALICE, O50);
+  const target = modpow(s20 * s50 % ALICE.n, ALICE.e, ALICE.n);
+  app.search = { n: 0, done: false };
+  const tick = () => {
+    if (app.level !== 3 || !app.search) return;
+    for (let i = 0; i < 2000 && app.search.n < 100000; i++) { app.search.n++; if (hashNum("Pay Mallory " + app.search.n + " pounds. Alice") === target) { app.search.done = true; break; } }
+    if (app.search.n >= 100000) app.search.done = true;
+    update3();
+    if (!app.search.done) setTimeout(tick, 0);
+  };
+  tick();
+}
+
+/* ---------- step 5 ---------- */
+function curveSVG(marks) {
+  const c = 22, o = 30, H = o + 17 * c;
+  let s = '<svg viewBox="0 0 ' + (o + 17 * c + 10) + " " + (H + 30) + '" role="img">';
+  for (let x = 0; x < 17; x++) for (let y = 0; y < 17; y++) s += '<circle cx="' + (o + x * c) + '" cy="' + (H - y * c) + '" r="1.6" fill="var(--rule)"/>';
+  for (let x = 0n; x < 17n; x++) for (let y = 0n; y < 17n; y++) if (mod(y * y - (x * x * x + 2n * x + 2n), 17n) === 0n) s += '<circle cx="' + (o + Number(x) * c) + '" cy="' + (H - Number(y) * c) + '" r="4.5" fill="var(--ink)"/>';
+  for (let v = 0; v < 17; v += 2) s += '<text x="' + (o + v * c) + '" y="' + (H + 18) + '" font-size="10" text-anchor="middle" fill="var(--muted)">' + v + '</text><text x="' + (o - 14) + '" y="' + (H - v * c + 4) + '" font-size="10" text-anchor="middle" fill="var(--muted)">' + v + "</text>";
+  marks.forEach(m => { if (!m.P) return; const x = o + Number(m.P[0]) * c, y = H - Number(m.P[1]) * c;
+    s += '<circle cx="' + x + '" cy="' + y + '" r="9" fill="none" stroke="' + m.col + '" stroke-width="3"/><text x="' + (x + 12) + '" y="' + (y - 8) + '" font-size="13" font-weight="700" fill="' + m.col + '">' + m.lab + "</text>"; });
+  return s + "</svg>";
+}
+function render4() {
+  const t = L();
+  return '<div class="card" id="c1"><h3>' + t.e1 + '</h3><div class="two"><div class="grid" id="o5g"></div><div>' +
+    '<div class="row"><span class="note">' + t.dlab + "</span>" + numIn("d", app.d, 1, 18) + '<span class="note">' + t.klab + "</span>" + numIn("k", app.k, 1, 18) + '<span class="note">' + t.zlab + "</span>" + numIn("z", app.z, 0, 18) + "</div>" +
+    '<div id="o51"></div><div class="note">' + t.legend + "</div></div></div></div>" +
+    '<div class="card" id="c2"><h3>' + t.e2 + '</h3><div class="row"><span class="note">' + t.klab + " (2)</span>" + numIn("k2", app.k2, 1, 18) + '<span class="note">' + t.z2lab + "</span>" + numIn("z2", app.z2, 0, 18) + "</div>" +
+    '<div id="o52"></div><div class="btns"><button class="dark" data-a="recover">' + t.recBtn + '</button></div><div id="o53"></div></div>';
+}
+function update4() {
+  const t = L(); const Q = ecMul(app.d, EC.G); const a = ecdsaSign(app.d, app.k, app.z);
+  set("o5g", curveSVG([{ P: EC.G, col: "var(--ink)", lab: "G" }, { P: Q, col: "var(--ali)", lab: "Q" }, { P: a ? a.R : null, col: "var(--chg)", lab: "R" }]));
+  if (!a) { set("o51", '<p class="badl">' + t.noSig + "</p>"); set("o52", ""); return; }
+  const v = ecdsaVerify(Q, app.z, a.r, a.s);
+  set("o51", '<table class="t"><tr><td>Q = dG</td><td class="m">(' + Q + ")</td></tr><tr><td>" + t.Rlab + '</td><td class="m">(' + a.R + ")</td></tr><tr><td>" + t.rlab + '</td><td class="m">' + a.r + "</td></tr><tr><td>" + t.slab +
+    '</td><td class="m">' + a.s + "</td></tr><tr><td><b>" + t.sigLab + '</b></td><td class="m"><b>(' + a.r + ", " + a.s + ")</b></td></tr></table>" +
+    '<p class="note">' + t.vlab + ": w = " + v.w + ", u₁ = " + v.u1 + ", u₂ = " + v.u2 + ", X = (" + v.X + ") " + okv(v.ok) + "</p>");
+  const b = ecdsaSign(app.d, app.k2, app.z2);
+  if (!b) { set("o52", '<p class="badl">' + t.noSig + "</p>"); return; }
+  set("o52", '<div class="flow">' + val("r-asig", "z₁ = " + app.z, "(r, s₁) = (" + a.r + ", " + a.s + ")") + val("r-asig", "z₂ = " + app.z2, "(r, s₂) = (" + b.r + ", " + b.s + ")") + "</div><p>" +
+    (a.r === b.r ? '<b class="badl">' + t.sameR + "</b>" : '<span class="note">' + t.diffR + "</span>") + "</p>");
+  if (!app.recovered) { set("o53", ""); return; }
+  if (a.r !== b.r || a.s === b.s) { set("o53", '<p class="note">' + t.needSameK + "</p>"); return; }
+  const rc = recover(app.z, a.s, app.z2, b.s, a.r);
+  set("o53", '<table class="t"><tr><td>' + t.recK + '</td><td class="m">(' + app.z + " − " + app.z2 + ") / (" + a.s + " − " + b.s + ") = <b>" + rc.k + "</b></td></tr><tr><td>" + t.recD +
+    '</td><td class="m">(' + a.s + "·" + rc.k + " − " + app.z + ") / " + a.r + " = <b>" + rc.d + "</b> " + okv(rc.d === mod(app.d, EC.q)) + '</td></tr></table><p class="badl">' + t.recOk + "</p>");
+}
+
+/* ---------- frame ---------- */
+const view = document.getElementById("view");
+const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
+const RENDER = [render0, render1, render2, render3, render4], UPDATE = [update0, update1, update2, update3, update4];
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) => '<button class="step" data-step="' + i + '" aria-pressed="' + (i === app.level) + '"><span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+const hashStr = () => "#" + (app.level + 1) + (app.card > 1 ? "." + app.card : "");
+function render() {
+  const t = L();
+  document.documentElement.lang = lang; document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" + RENDER[app.level]();
+  UPDATE[app.level]();
+  document.getElementById("moreTxt").textContent = "↓ " + t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", hashStr()); } catch (e) {}
+}
+function goTo(l) { app.level = l; app.card = 1; app.search = null; render(); view.scrollTop = 0; }
+function scrollToCard() { if (app.card > 1) { const c = document.getElementById("c" + app.card); if (c) c.scrollIntoView(); } }
+function updateMore() { const b = document.getElementById("more"); b.hidden = view.scrollHeight - view.scrollTop - view.clientHeight < 40; }
+document.getElementById("more").addEventListener("click", () => view.scrollBy({ top: Math.round(view.clientHeight * 0.8), behavior: "smooth" }));
+view.addEventListener("scroll", updateMore); window.addEventListener("resize", updateMore);
+view.addEventListener("input", e => {
+  const f = e.target.dataset.f; if (!f) return;
+  const v = e.target.value;
+  if (f === "msg" || f === "malMsg") { app[f] = v; if (f === "msg") app.flip = false; }
+  else { if (!/^\d{1,4}$/.test(v.trim())) return; let n = BigInt(v.trim()); app[f] = n; app.recovered = false; }
+  UPDATE[app.level]();
+});
+view.addEventListener("click", e => {
+  const b = e.target.closest("[data-a]"); if (!b) return;
+  if (b.dataset.a === "flip") { app.flip = !app.flip; update0(); }
+  else if (b.dataset.a === "search") runSearch();
+  else if (b.dataset.a === "recover") { app.recovered = true; update4(); }
+});
+document.getElementById("steps").addEventListener("click", e => { const b = e.target.closest("[data-step]"); if (b) goTo(+b.dataset.step); });
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  lang = b.dataset.lang; try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {} render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName; if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (e.key === "ArrowRight" && app.level < 4) goTo(app.level + 1);
+  else if (e.key === "ArrowLeft" && app.level > 0) goTo(app.level - 1);
+});
+const SELF_FAILS = selfTest();
+function readHash() {
+  const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
+  if (hm && +hm[1] >= 1 && +hm[1] <= 5) { app.level = +hm[1] - 1; app.card = hm[2] ? Math.max(1, +hm[2]) : 1; }
+}
+window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { readHash(); render(); view.scrollTop = 0; scrollToCard(); } });
+readHash();
+render();
+requestAnimationFrame(scrollToCard);
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@
   --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
   --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B; --ok-bg:#E3F4E8; --bad-bg:#FBE7E5;
   --exec:#43A047;
-  /* roles, the same as on the slides of Lectures 6 to 9 */
+  /* roles, the same as on the slides of Lectures 9 to 12 */
   --alice-b:#5C6BC0; --alice-bg:#E8EAF6;
   --mal-b:#EC407A;   --mal-bg:#FCE4EC;
   --bob-b:#26A69A;   --bob-bg:#E0F2F1;
@@ -329,7 +329,7 @@ a.inl{color:var(--focus)}
 <script>
 "use strict";
 
-// DATA-BEGIN (made by gen.py from the files of Lectures 6 to 8 with python3 3.12.3 and cryptography 41.0.7)
+// DATA-BEGIN (made by gen.py from the files of Lectures 9 to 11 with python3 3.12.3 and cryptography 41.0.7)
 const DER_B64 = {
   bob6: "MIIBITCB1KADAgECAghPOpwucdBbiDAFBgMrZXAwOTELMAkGA1UEBhMCR0IxFjAUBgNVBAoMDVRydXN0eSBDQSBMdGQxEjAQBgNVBAMMCVRydXN0eSBDQTAeFw0yNjExMDEwMDAwMDBaFw0yNzAxMzAwMDAwMDBaMDUxCzAJBgNVBAYTAkdCMRAwDgYDVQQKDAdCb2IgTHRkMRQwEgYDVQQDDAtib2IuZXhhbXBsZTAqMAUGAytlcAMhAC+ouaaw1YeLkky0KxGI9OXxLPeqDW+qDy1xUwRwLjxAMAUGAytlcANBAFVfUa49iIFct8xH47Q7lsL8MiiReJpIxeCWyw6MJmaiZP6Tb3jgRZplJlkn7XFYEDiJHko0Ol5lNKCrYOkUYA0=",
   covLeaf: "MIIDgDCCAyegAwIBAgIQDiSB/nkUGcoOqq32ZZQrLDAKBggqhkjOPQQDAjA7MQswCQYDVQQGEwJVUzEeMBwGA1UEChMVR29vZ2xlIFRydXN0IFNlcnZpY2VzMQwwCgYDVQQDEwNXRTEwHhcNMjYxMDEzMDIyOTE2WhcNMjcwMTExMDMyOTE0WjAdMRswGQYDVQQDExJ3d3cuY292ZW50cnkuYWMudWswWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATf0DxtUvRpPtclExD233JV3FQmh618YtIffeM0DOuN5uaSqgiPoT/mMAcrmUyPAIoiUkl+O4avKHwCxUYqidP6o4ICKTCCAiUwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMBMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFIDuPbk6DT+fXEqJ5jpoOV0aGNHeMB8GA1UdIwQYMBaAFJB3kjVnxP+ozKnme9mAeXvMk/k4MDUGCCsGAQUFBwEBBCkwJzAlBggrBgEFBQcwAoYZaHR0cDovL2kucGtpLmdvb2cvd2UxLmNydDAdBgNVHREEFjAUghJ3d3cuY292ZW50cnkuYWMudWswEwYDVR0gBAwwCjAIBgZngQwBAgEwNgYDVR0fBC8wLTAroCmgJ4YlaHR0cDovL2MucGtpLmdvb2cvd2UxLzdJc1ptSWhaQ0hzLmNybDCCAQsGCisGAQQB1nkCBAIEgfwEgfkA9wB2AEaiOWfGDbZGh8ZvPfmZlHaTpqYRIIRX1VXn49Ch2bZGAAABoTNOr6oAAAQDAEcwRQIgX0MGPKLXmjUnjK4mp2WnBuoFjd5CVrLOdW+cE5ZIYFcCIQCF0QhXZjluKA+AJfDzpynQwkp6YmYZK5OaJbE5nkJRPgB9AKKBABhzThduHUfglUDzgbpUZpfNY6hDUHFuuAlO2vENAAABoTNOsVYACAAABQAiUcpsBAMARjBEAiBmI83gu5vKMA3xw0ypcH47gDEHrX3y4SiR2PonIp2BZgIgPjnoMzeAJZPAL1dDcKJKIVTRGt8QtiEmHWaHIs00wb0wCgYIKoZIzj0EAwIDRwAwRAIgQvkV55QZd4bdJHox/Mvjxl2gOLq4eMTKCa7S+9A0v+oCIE1FTOpSpIpUC1PM8RTIS9/zv91/GrDj6RKbzRro1Nyk",
@@ -434,7 +434,7 @@ const OIDS = {
 const oidName = o => OIDS[o] || o;
 const KU_BITS = ["digitalSignature", "contentCommitment", "keyEncipherment", "dataEncipherment", "keyAgreement", "keyCertSign", "cRLSign", "encipherOnly", "decipherOnly"];
 const CRL_REASONS = ["unspecified", "keyCompromise", "cACompromise", "affiliationChanged", "superseded", "cessationOfOperation", "certificateHold", "", "removeFromCRL", "privilegeWithdrawn", "aACompromise"];
-// CT logs of the shipped certificates (from Lecture7/Task6/ct_logs.py, Google log_list.json v3)
+// CT logs of the shipped certificates (from Lecture10/Task6/ct_logs.py, Google log_list.json v3)
 const CT_LOGS = { "46A23967C60DB64687C66F3DF999947693A6A611208457D555E7E3D0A1D9B646": "DigiCert Sphinx2027h1",
   "A2810018734E176E1D47E09540F381BA546697CD63A84350716EB8094EDAF10D": "Let's Encrypt Willow2027h1" };
 
@@ -629,12 +629,12 @@ const CERT = {};
 for (const k in DER_B64) if (!/^(crl|ocsp|bobKey)/.test(k)) CERT[k] = parseCert(b64d(DER_B64[k]), k);
 const CRL = { crl: parseCRL(b64d(DER_B64.crl)), crlOld: parseCRL(b64d(DER_B64.crlOld)), crlFake: parseCRL(b64d(DER_B64.crlFake)), crlWE1: parseCRL(b64d(DER_B64.crlWE1)) };
 const OCSP = { ocspBob: parseOCSP(b64d(DER_B64.ocspBob)), ocspCarol: parseOCSP(b64d(DER_B64.ocspCarol)), ocspGh: parseOCSP(b64d(DER_B64.ocspGh)) };
-// Lecture 6: Trusty CA signed Bob's certificate (no certificate of Trusty CA is shipped, only its public key)
+// Lecture 9: Trusty CA signed Bob's certificate (no certificate of Trusty CA is shipped, only its public key)
 const TRUSTY6_SPKI = edSpki(fromHex(CARD6.caPub));
 // Alice's trust store: two roots (a real one has about 120 to 150)
 const STORE = ["root", "gtsR4"];
 
-/* ---------- validation (RFC 5280 section 6, simplified, the way Lecture 8 shows it) ---------- */
+/* ---------- validation (RFC 5280 section 6, simplified, the way Lecture 11 shows it) ---------- */
 // host name against one SAN entry; a wildcard covers exactly one label on the left (RFC 9525)
 function nameMatch(pattern, host) {
   const p = pattern.toLowerCase(), h = host.toLowerCase().replace(/\.$/, "");
@@ -742,7 +742,7 @@ async function selfTest() {
     if (await pinOf(c.der) !== PY.cpin[k]) fails.push("cert pin " + k);
     if (c.der.length !== PY.len[k] || c.root.ce !== c.der.length) fails.push("length " + k);
   }
-  // CHECKED (Lecture 6 plan 7.1, Lecture 7 plan 7.1, Lecture 8 plan 7.7): the numbers on the slides
+  // CHECKED (Lecture 9 plan 7.1, Lecture 10 plan 7.1, Lecture 11 plan 7.7): the numbers on the slides
   if (fpStr(await sha256(CERT.bob6.der)) !== "E8:C5:56:C2:D8:3E:72:C3:FB:F0:53:83:64:04:97:A0:A6:72:48:1B:86:79:A6:F4:CB:82:B0:8E:11:71:F8:1C") fails.push("Bob's fingerprint");
   if (!fpStr(await sha256(CERT.covLeaf.der)).endsWith("B6:4F:CC:89") || !fpStr(await sha256(CERT.covLeaf.der)).startsWith("8D:A9:3B:6D")) fails.push("Coventry fingerprint");
   const flip = CERT.bob6.der.slice(); flip[100] ^= 1;
@@ -765,13 +765,13 @@ async function selfTest() {
     if (await certSignedBy(CERT[a], CERT[b]) !== PY.sig[pr]) fails.push("signature " + pr);
   }
   if (!(await verifySig(TRUSTY6_SPKI, CERT.bob6.sigAlg, CERT.bob6.tbsBytes, CERT.bob6.sig))) fails.push("Bob's certificate by Trusty CA");
-  // Lecture 6 Task 2: True, False, False
+  // Lecture 9 Task 2: True, False, False
   const card = s => new TextEncoder().encode("name=bob.example;key=" + s);
   const r1 = await verifySig(TRUSTY6_SPKI, "1.3.101.112", card(CARD6.bobPub), fromHex(CARD6.sig));
   const r2 = await verifySig(TRUSTY6_SPKI, "1.3.101.112", card(CARD6.malPub), fromHex(CARD6.sig));
   const r3 = await verifySig(TRUSTY6_SPKI, "1.3.101.112", card(CARD6.malPub), fromHex(CARD6.fakeSig));
   const r4 = await verifySig(edSpki(fromHex(CARD6.malPub)), "1.3.101.112", card(CARD6.malPub), fromHex(CARD6.fakeSig));
-  if (!(r1 && !r2 && !r3 && r4) || !CARD6.sig.startsWith("5d034483ee30")) fails.push("Lecture 6 Task 2");
+  if (!(r1 && !r2 && !r3 && r4) || !CARD6.sig.startsWith("5d034483ee30")) fails.push("Lecture 9 Task 2");
   // CRLs and OCSP answers
   for (const k of ["crl", "crlOld", "crlFake"]) if (await verifySig(CERT.int1.spki, CRL[k].sigAlg, CRL[k].tbsBytes, CRL[k].sig) !== PY.crl[k]) fails.push("CRL " + k);
   if (await verifySig(CERT.covWE1.spki, CRL.crlWE1.sigAlg, CRL.crlWE1.tbsBytes, CRL.crlWE1.sig) !== PY.crl.crlWE1) fails.push("WE1 CRL");
@@ -782,22 +782,22 @@ async function selfTest() {
     if (await verifySig(CERT[iss].spki, o.sigAlg, o.tbsBytes, o.sig) !== PY.ocsp[k] || o.cert.toUpperCase() !== PY.ocsp[k + "Status"] || o.der.length !== PY.ocsp[k + "Len"]) fails.push("OCSP " + k);
   }
   if (OCSP.ocspGh.serial !== "3E1D6026B4B0AEA279DCA2EFBBCED82B" || OCSP.ocspGh.nextUpdate - OCSP.ocspGh.thisUpdate < 7 * 86400000 - 2000) fails.push("github OCSP");
-  // Lecture 8 Task 6: 130 bytes; Bob OK, Mallory BAD, the old signature BAD
+  // Lecture 11 Task 6: 130 bytes; Bob OK, Mallory BAD, the old signature BAD
   const ct = cvContent(fromHex(CV6.today));
   if (ct.length !== PY.cv.len || ct.length !== 130 || hex(await sha256(ct)) !== PY.cv.contentSha256) fails.push("CertificateVerify content");
   const bs = CERT.bob.spki, sg = "1.2.840.10045.4.3.2";
   if (await verifySig(bs, sg, ct, fromHex(CV6.sigToday)) !== true || await verifySig(bs, sg, ct, fromHex(CV6.sigMallory)) !== false || await verifySig(bs, sg, ct, fromHex(CV6.sigOld)) !== false) fails.push("Task 6 signatures");
-  // Lecture 8 Task 3: the six chains give the six diagnoses
+  // Lecture 11 Task 3: the six chains give the six diagnoses
   const want = { case1: -1, case2: "date", case3: "name", case4: "ca", case5: "sig", case6: "eku" };
   for (const s of SCN4) if (want[s.task] !== undefined) {
     const r = await validate(s, s.host, NOW0, false);
     const got = r.first < 0 ? -1 : r.checks[r.first].id;
     if (got !== want[s.task]) fails.push("Task 3 " + s.task + ": " + got);
   }
-  // Lecture 8 Task 1: OpenSSL error numbers 18 and 20
+  // Lecture 11 Task 1: OpenSSL error numbers 18 and 20
   const e18 = await validate(SCN4.find(s => s.id === "self"), "bob.example", NOW0, false), e20 = await validate(SCN4.find(s => s.id === "noint"), "bob.example", NOW0, false);
   if (!e18.err || e18.err[1] !== 18 || !e20.err || e20.err[1] !== 20) fails.push("Task 1 errors 18 and 20");
-  // the wildcard rule of Lecture 6 slide 35 and Lecture 8 slide 23
+  // the wildcard rule of Lecture 9 slide 35 and Lecture 11 slide 23
   if (nameMatch("*.dave.example", "shop.dave.example") !== "wild" || nameMatch("*.dave.example", "dave.example") || nameMatch("*.dave.example", "a.b.dave.example") || nameMatch("bob.example", "BOB.example") !== "exact") fails.push("wildcard rule");
   // the Coventry chain is OK on 15 November 2026 and the cross-signed root is not used
   const cv = await validate(SCN4.find(s => s.id === "cov"), "www.coventry.ac.uk", NOW0, true);
@@ -825,15 +825,15 @@ const T = {
       ["Seven checks, one answer", "Before Alice trusts a chain she runs every check: signatures, dates, the name, may the issuers sign, what the key is for, the trust anchor and revocation (RFC 5280, simplified). Pick a chain, change the host name or the date, and see which check fails first and what OpenSSL and Chrome say."],
       ["When a certificate must die before it expires", "Carol's private key leaked on 10 November 2026, but her certificate is valid until 2028, so Trusty Issuing CA 1 revoked it. Alice can learn that from a list (CRL) or by asking (OCSP). Let Mallory block the network and compare soft-fail with hard-fail, then let the server staple the answer."],
       ["", ""],
-      ["Accept only the key you expect", "An app that talks only to its own server can pin it: it keeps the SHA-256 of the expected certificate or of its public key (SPKI) and refuses anything else, even a valid chain from another CA. Compare the two kinds of pin across three renewals of api.bob.example (Lecture 8, Task 8)."]],
-    selfOk: "✓ checked against python3 and the slides of Lectures 6 to 8", selfBad: f => "✗ self-test failed: " + f, selfRun: "self-test running…",
+      ["Accept only the key you expect", "An app that talks only to its own server can pin it: it keeps the SHA-256 of the expected certificate or of its public key (SPKI) and refuses anything else, even a valid chain from another CA. Compare the two kinds of pin across three renewals of api.bob.example (Lecture 11, Task 8)."]],
+    selfOk: "✓ checked against python3 and the slides of Lectures 9 to 11", selfBad: f => "✗ self-test failed: " + f, selfRun: "self-test running…",
     moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back", keys2: "In a story: N or Space next, P back",
     leg: { alice: "Alice", mal: "Mallory", bob: "Bob, his server and certificate", ca: "certificate authority, its signature", pub: "public key", prv: "private key" },
     storyOf: (i, n) => "Story " + i + " of " + n, sFirst: "First", sPrev: "Previous", sNext: "Next",
     storyTitle: ["Alice needs Bob's public key", "Bob sends his key", "Mallory swaps it", "Mallory reads everything", "Trusty CA signs a name card",
                  "Alice checks the card", "Mallory changes the key on the card", "Mallory signs her own card", "That card is a certificate"],
     story: [
-      "Alice wants to send Bob a secret, so she needs Bob's public key (32 bytes, Ed25519, the keys of Lecture 6). Bob's private key never leaves Bob. Between them is the network, and Mallory sits on it: she can read and change every packet.",
+      "Alice wants to send Bob a secret, so she needs Bob's public key (32 bytes, Ed25519, the keys of Lecture 9). Bob's private key never leaves Bob. Between them is the network, and Mallory sits on it: she can read and change every packet.",
       "Bob sends his public key over the network and Alice gets 32 bytes. How does she know they are Bob's? Nothing in the bytes says “Bob”.",
       "Mallory catches Bob's key and sends Alice her own key instead. Alice again gets 32 bytes and cannot tell the difference: a public key alone does not say whose it is.",
       "Alice encrypts her secret with the key she got, which is Mallory's. Mallory decrypts it, reads it, encrypts it again with Bob's real key and passes it on. Bob notices nothing. Encryption alone does not stop the man in the middle.",
@@ -857,7 +857,7 @@ const T = {
     aliceNeeds: "Alice needs in advance", aliceNeedsSub: "only the public key of Trusty CA; every card it signs can then be checked",
     caPubAtAlice: "Trusty CA public key", caPubAtAliceSub: "Alice had it before (trust store)",
     vOk: "the card is signed by Trusty CA", vBad: "this is not what Trusty CA signed",
-    tryT: "Try it yourself: change one character", tryNote: "Alice's check, computed in your browser: verify(public key of Trusty CA, card, signature). The bytes and signatures are those of Lecture 6, Task 2.",
+    tryT: "Try it yourself: change one character", tryNote: "Alice's check, computed in your browser: verify(public key of Trusty CA, card, signature). The bytes and signatures are those of Lecture 9, Task 2.",
     try1: "Bob's card, CA signature", try2: "Mallory's key, CA signature", try3: "Mallory's key, Mallory's signature",
     tryCard: "The card (the signed bytes)", trySig: "Signature:",
     nextT: "Where next", go2: "Open a real certificate", go3: "Where Alice gets the CA key",
@@ -867,9 +867,9 @@ const T = {
     bytesW: "bytes",
     fx: { size: "size", value: "value", stored: "stored as", days: "days", alg: "algorithm", key: "key bytes", count: "how many", bytes: "first bytes",
           der: (tag, hl, cl, a, b) => "tag 0x" + tag + ", header " + hl + " B, content " + cl + " B; bytes " + a + " to " + b },
-    certs2: ["Bob (Lecture 6)", "bob.example (Lecture 8)", "www.coventry.ac.uk", "WE1", "GTS Root R4"],
-    certs2sub: ["Bob's certificate from Lecture 6, Task 3: 293 bytes, Ed25519, signed by Trusty CA, no extensions.",
-                "Bob's server certificate from Lecture 8: ECDSA P-256 from Trusty Issuing CA 1, with the usual extensions.",
+    certs2: ["Bob (Lecture 9)", "bob.example (Lecture 11)", "www.coventry.ac.uk", "WE1", "GTS Root R4"],
+    certs2sub: ["Bob's certificate from Lecture 9, Task 3: 293 bytes, Ed25519, signed by Trusty CA, no extensions.",
+                "Bob's server certificate from Lecture 11: ECDSA P-256 from Trusty Issuing CA 1, with the usual extensions.",
                 "The real leaf of www.coventry.ac.uk, saved on 15 November 2026: 900 bytes, ECDSA P-256, from WE1 of Google Trust Services.",
                 "The real intermediate CA WE1 that signed the Coventry leaf (CA:TRUE, pathlen:0).",
                 "The real root GTS Root R4 from the trust store: it signs itself (issuer = subject), ECDSA P-384."],
@@ -894,7 +894,7 @@ const T = {
       crldp: "CRL Distribution Points: where to download the issuer's list of revoked certificates (step 5).",
       aia: "Authority Information Access: where to get the issuer's certificate (CA Issuers) and, in older certificates, the OCSP responder.",
       pol: "Certificate policies: under which rules it was issued. 2.23.140.1.2.1 means domain validated (DV), 2.23.140.1.2.2 organisation validated (OV).",
-      sct: "Signed Certificate Timestamps: promises from Certificate Transparency logs that the certificate is public. Chrome and Apple require them (Lecture 7).",
+      sct: "Signed Certificate Timestamps: promises from Certificate Transparency logs that the certificate is public. Chrome and Apple require them (Lecture 10).",
       sa: "The signature algorithm, again, outside the signed part.",
       sv: "The CA's signature over the bytes of tbsCertificate. Anyone with the CA's public key can check it.",
       other: "An extension this explorer does not decode." },
@@ -903,7 +903,7 @@ const T = {
     hexNote: "Orange: the bytes of the field you clicked; dark orange: its tag and length (type, length, value). Red frame: the bit you flip below.",
     pemNote: n => "PEM is the same DER in Base64, 64 characters per line, between two lines: " + n + " characters. Almost every certificate starts with MII, because 30 82 in Base64 always gives MII.",
     fpT: "The fingerprint: SHA-256 of the DER bytes",
-    fpNote: "The fingerprint is not part of the certificate; anybody computes it from the bytes. Flip one bit and the fingerprint changes completely. Bob's certificate, byte 100, bit 0 (a minute of notBefore): A2:C3:4F:BA…, as in Lecture 6.",
+    fpNote: "The fingerprint is not part of the certificate; anybody computes it from the bytes. Flip one bit and the fingerprint changes completely. Bob's certificate, byte 100, bit 0 (a minute of notBefore): A2:C3:4F:BA…, as in Lecture 9.",
     flipByte: "flip byte", flipBit: "bit",
     flipSigOk: "the signature still verifies", flipSigBad: "the CA's signature no longer verifies: a client rejects the changed certificate",
     flipBroken: "the changed bytes are no longer a certificate (the DER structure broke)",
@@ -936,12 +936,12 @@ const T = {
       unknown: "Mallory Root CA is not in Alice's store, so the chain leads nowhere Alice trusts.",
       self: "issuer = subject, the signature is fine, but the certificate is not in the store: OpenSSL 18, “self-signed certificate”." },
     scn: {
-      good: ["bob.example", "Bob's server sends his leaf and Trusty Issuing CA 1 (Lecture 8, Task 1). The root Trusty Root CA is in Alice's store."],
+      good: ["bob.example", "Bob's server sends his leaf and Trusty Issuing CA 1 (Lecture 11, Task 1). The root Trusty Root CA is in Alice's store."],
       cov: ["www.coventry.ac.uk (real)", "The real chain saved on 15 November 2026: the leaf, WE1 of Google Trust Services, and GTS Root R4 cross-signed by GlobalSign."],
-      noint: ["missing intermediate", "Bob's server sends only his leaf (Lecture 8, Task 1, no_intermediate)."],
+      noint: ["missing intermediate", "Bob's server sends only his leaf (Lecture 11, Task 1, no_intermediate)."],
       covnoint: ["Coventry without WE1", "The same real leaf, but the server forgot WE1."],
-      expired: ["expired leaf", "Bob's old certificate, valid until 1 October 2026 (Lecture 8, Task 1, expired)."],
-      expint: ["expired intermediate", "The leaf is valid, but Trusty Issuing CA 0 ended on 30 June 2026 (Lecture 8, Task 3, case 2)."],
+      expired: ["expired leaf", "Bob's old certificate, valid until 1 October 2026 (Lecture 11, Task 1, expired)."],
+      expint: ["expired intermediate", "The leaf is valid, but Trusty Issuing CA 0 ended on 30 June 2026 (Lecture 11, Task 3, case 2)."],
       wild: ["*.bob.example", "A wildcard certificate, and Alice types bob.example (Task 3, case 3). Try www.bob.example and a.b.bob.example."],
       notca: ["issuer not a CA", "Mallory has an honest certificate for mallory.example (CA:FALSE) and signs bob.example with its key (Task 3, case 4)."],
       fakeint: ["fake intermediate", "Mallory makes her own “Trusty Issuing CA 1”: the same name, her own key (Task 3, case 5)."],
@@ -949,7 +949,7 @@ const T = {
       wrong: ["wrong name", "A good certificate for carol.example; Alice asked for bob.example (Task 1, wrong_name)."],
       unknown: ["unknown CA", "A certificate for bob.example from Mallory Root CA, which is not in Alice's store (Task 1, unknown_ca)."],
       self: ["self-signed", "A self-signed certificate for bob.example (Task 1, self_signed)."],
-      revoked: ["revoked (Carol)", "Carol's certificate, serial 0x1002: her key leaked and Trusty Issuing CA 1 put it on its CRL (Lecture 8, Task 4)."] },
+      revoked: ["revoked (Carol)", "Carol's certificate, serial 0x1002: her key leaked and Trusty Issuing CA 1 put it on its CRL (Lecture 11, Task 4)."] },
     // step 4
     pick4: "Pick a chain", hostL: "Alice types", dateL: "Now", revL: "check revocation (the issuer's CRL)", reset4: "Reset",
     checksT: "The checks", pathIs: "Path:", inStore: "(in the trust store)", selfEnd: "self-signed, not in the store", noIssuer: "the issuer is missing",
@@ -1012,13 +1012,13 @@ const T = {
       "Bob sends his chain, leaf first. The chain is public: anybody, Mallory too, can copy it and send it. Alice validates it as in steps 3 and 4.",
       "Bob proves that he holds the private key of his leaf: he signs a hash of every message so far (the transcript). A copied certificate gives Mallory nothing, because she cannot make this signature.",
       "Both sides send a MAC over the transcript, with keys from the handshake. After that the application data flows.",
-      "The server can ask for a certificate too (CertificateRequest). Alice then sends her own Certificate and CertificateVerify, and Bob's server checks them against its own private CA (Lecture 8, Task 7)."],
+      "The server can ask for a certificate too (CertificateRequest). Alice then sends her own Certificate and CertificateVerify, and Bob's server checks them against its own private CA (Lecture 11, Task 7)."],
     d1T: "Two key shares", d1: "ClientHello carries Alice's key share and the server name (SNI) bob.example, so a server with many sites picks the right certificate. ServerHello carries Bob's key share. Both compute the same secret, and the rest of the handshake is encrypted with keys derived from it. Only the next two messages show who Bob is.",
     realLines: "openssl s_client -connect www.coventry.ac.uk:443 (15 November 2026):<br>New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384<br>Server Temp Key: X25519, 253 bits<br>Peer signature type: ECDSA · Peer signing digest: SHA256",
     d2T: "The Certificate message", d2: "Bob's Certificate message carries his chain, leaf first:", entryN: i => "entry " + (i + 1) + ":",
     d2b: "Each entry can also carry an OCSP staple (step 5). The root is not sent: Alice must already have it. www.coventry.ac.uk sends three certificates: its leaf, WE1 and a cross-signed GTS Root R4.",
     go4: "How Alice checks the chain", go5: "Stapling",
-    d3T: "What exactly is signed", d3: "The signed content is 130 bytes (RFC 8446, 4.4.3): 64 spaces, the context string, one zero byte and the SHA-256 transcript hash. Bob signs it with the private key of his leaf (ECDSA P-256, Lecture 8, Task 6); Alice verifies with the public key from that certificate.",
+    d3T: "What exactly is signed", d3: "The signed content is 130 bytes (RFC 8446, 4.4.3): 64 spaces, the context string, one zero byte and the SHA-256 transcript hash. Bob signs it with the private key of his leaf (ECDSA P-256, Lecture 11, Task 6); Alice verifies with the public key from that certificate.",
     cvToday: "Bob signs today's handshake", cvMal: "Mallory with a copy of the certificate", cvOld: "an old signature replayed", cvNew: "a new handshake",
     yesterday: "Bob, yesterday",
     seg1: "64 × 0x20", seg2: "context, 33 bytes", seg3: "separator", seg4: "transcript hash, 32 bytes",
@@ -1045,7 +1045,7 @@ const T = {
     pinWhyCert: "A certificate pin breaks at every renewal, even with the same key: the dates and the serial change, so the hash changes. The app needs an update first.",
     pinWhyKey: "A key pin survives a renewal with the same key. A new key breaks it, unless the app also pins a backup key that is kept offline for exactly this day.",
     pinHowT: "How a pin is computed", pinHow: "SHA-256 of the DER bytes of the certificate, or of its SubjectPublicKeyInfo, in Base64. The real values of the Coventry chain, computed now:",
-    hpkpT: "HPKP: pinning for the whole web, and its end", hpkp: "The header Public-Key-Pins (RFC 7469, 2015) let any web site pin its keys in browsers. A lost key or an attacker who set a pin locked visitors out for months (“HPKP suicide”), so browsers removed it between 2018 and 2020. Certificate Transparency (Lecture 7) now catches wrong certificates instead. Pin only when you control both the app and the server.",
+    hpkpT: "HPKP: pinning for the whole web, and its end", hpkp: "The header Public-Key-Pins (RFC 7469, 2015) let any web site pin its keys in browsers. A lost key or an attacker who set a pin locked visitors out for months (“HPKP suicide”), so browsers removed it between 2018 and 2020. Certificate Transparency (Lecture 10) now catches wrong certificates instead. Pin only when you control both the app and the server.",
   },
   pl: {
     title: "Certyfikaty i PKI krok po kroku", home: "Wszystkie symulatory",
@@ -1062,15 +1062,15 @@ const T = {
       ["Siedem sprawdzeń, jedna odpowiedź", "Zanim Alice zaufa łańcuchowi, robi wszystkie sprawdzenia: podpisy, daty, nazwa, czy wystawcy mogą podpisywać, do czego jest klucz, kotwica zaufania i unieważnienie (RFC 5280, w uproszczeniu). Wybierz łańcuch, zmień nazwę hosta albo datę i zobacz, które sprawdzenie zawodzi pierwsze i co mówią OpenSSL i Chrome."],
       ["Gdy certyfikat musi umrzeć przed końcem ważności", "Klucz prywatny Carol wyciekł 10 listopada 2026, a jej certyfikat jest ważny do 2028, więc Trusty Issuing CA 1 go unieważnił. Alice może się o tym dowiedzieć z listy (CRL) albo pytając (OCSP). Niech Mallory zablokuje sieć: porównaj soft-fail z hard-fail, a potem niech serwer dołączy odpowiedź (stapling)."],
       ["", ""],
-      ["Przyjmij tylko klucz, którego się spodziewasz", "Aplikacja, która rozmawia tylko z własnym serwerem, może go przypiąć: trzyma SHA-256 oczekiwanego certyfikatu albo jego klucza publicznego (SPKI) i odrzuca wszystko inne, nawet poprawny łańcuch od innego CA. Porównaj oba rodzaje pinów przy trzech odnowieniach api.bob.example (wykład 8, zadanie 8)."]],
-    selfOk: "✓ zgodne z python3 i slajdami wykładów 6 do 8", selfBad: f => "✗ autotest nie przeszedł: " + f, selfRun: "autotest trwa…",
+      ["Przyjmij tylko klucz, którego się spodziewasz", "Aplikacja, która rozmawia tylko z własnym serwerem, może go przypiąć: trzyma SHA-256 oczekiwanego certyfikatu albo jego klucza publicznego (SPKI) i odrzuca wszystko inne, nawet poprawny łańcuch od innego CA. Porównaj oba rodzaje pinów przy trzech odnowieniach api.bob.example (wykład 11, zadanie 8)."]],
+    selfOk: "✓ zgodne z python3 i slajdami wykładów 9 do 11", selfBad: f => "✗ autotest nie przeszedł: " + f, selfRun: "autotest trwa…",
     moreBelow: "Więcej poniżej", keys: "→ / Enter: następny krok · ← / Esc: wstecz", keys2: "W historii: N lub spacja dalej, P wstecz",
     leg: { alice: "Alice", mal: "Mallory", bob: "Bob, jego serwer i certyfikat", ca: "urząd certyfikacji, jego podpis", pub: "klucz publiczny", prv: "klucz prywatny" },
     storyOf: (i, n) => "Historia " + i + " z " + n, sFirst: "Od początku", sPrev: "Wstecz", sNext: "Dalej",
     storyTitle: ["Alice potrzebuje klucza publicznego Boba", "Bob wysyła swój klucz", "Mallory go podmienia", "Mallory czyta wszystko", "Trusty CA podpisuje wizytówkę",
                  "Alice sprawdza wizytówkę", "Mallory zmienia klucz na wizytówce", "Mallory podpisuje własną wizytówkę", "Ta wizytówka to certyfikat"],
     story: [
-      "Alice chce wysłać Bobowi sekret, więc potrzebuje klucza publicznego Boba (32 bajty, Ed25519, klucze z wykładu 6). Klucz prywatny Boba nigdy go nie opuszcza. Między nimi jest sieć, a w niej Mallory: może czytać i zmieniać każdy pakiet.",
+      "Alice chce wysłać Bobowi sekret, więc potrzebuje klucza publicznego Boba (32 bajty, Ed25519, klucze z wykładu 9). Klucz prywatny Boba nigdy go nie opuszcza. Między nimi jest sieć, a w niej Mallory: może czytać i zmieniać każdy pakiet.",
       "Bob wysyła swój klucz publiczny przez sieć i Alice dostaje 32 bajty. Skąd wie, że to klucz Boba? Nic w tych bajtach nie mówi „Bob”.",
       "Mallory łapie klucz Boba i wysyła Alice swój własny. Alice znów dostaje 32 bajty i nie widzi różnicy: sam klucz publiczny nie mówi, czyj jest.",
       "Alice szyfruje sekret kluczem, który dostała, czyli kluczem Mallory. Mallory odszyfrowuje, czyta, szyfruje ponownie prawdziwym kluczem Boba i przekazuje dalej. Bob niczego nie zauważa. Samo szyfrowanie nie powstrzymuje człowieka pośrodku.",
@@ -1094,7 +1094,7 @@ const T = {
     aliceNeeds: "Alice musi mieć wcześniej", aliceNeedsSub: "tylko klucz publiczny Trusty CA; wtedy sprawdzi każdą wizytówkę, którą CA podpisało",
     caPubAtAlice: "klucz publiczny Trusty CA", caPubAtAliceSub: "Alice miała go wcześniej (magazyn zaufania)",
     vOk: "wizytówkę podpisało Trusty CA", vBad: "to nie jest to, co podpisało Trusty CA",
-    tryT: "Spróbuj sam: zmień jeden znak", tryNote: "Sprawdzenie Alice liczone w Twojej przeglądarce: verify(klucz publiczny Trusty CA, wizytówka, podpis). Bajty i podpisy są z wykładu 6, zadanie 2.",
+    tryT: "Spróbuj sam: zmień jeden znak", tryNote: "Sprawdzenie Alice liczone w Twojej przeglądarce: verify(klucz publiczny Trusty CA, wizytówka, podpis). Bajty i podpisy są z wykładu 9, zadanie 2.",
     try1: "wizytówka Boba, podpis CA", try2: "klucz Mallory, podpis CA", try3: "klucz Mallory, podpis Mallory",
     tryCard: "Wizytówka (podpisane bajty)", trySig: "Podpis:",
     nextT: "Dokąd dalej", go2: "Otwórz prawdziwy certyfikat", go3: "Skąd Alice ma klucz CA",
@@ -1103,9 +1103,9 @@ const T = {
     bytesW: "bajtów",
     fx: { size: "rozmiar", value: "wartość", stored: "zapisana jako", days: "dni", alg: "algorytm", key: "bajty klucza", count: "ile", bytes: "pierwsze bajty",
           der: (tag, hl, cl, a, b) => "znacznik 0x" + tag + ", nagłówek " + hl + " B, treść " + cl + " B; bajty od " + a + " do " + b },
-    certs2: ["Bob (wykład 6)", "bob.example (wykład 8)", "www.coventry.ac.uk", "WE1", "GTS Root R4"],
-    certs2sub: ["Certyfikat Boba z wykładu 6, zadanie 3: 293 bajty, Ed25519, podpisany przez Trusty CA, bez rozszerzeń.",
-                "Certyfikat serwera Boba z wykładu 8: ECDSA P-256 od Trusty Issuing CA 1, ze zwykłymi rozszerzeniami.",
+    certs2: ["Bob (wykład 9)", "bob.example (wykład 11)", "www.coventry.ac.uk", "WE1", "GTS Root R4"],
+    certs2sub: ["Certyfikat Boba z wykładu 9, zadanie 3: 293 bajty, Ed25519, podpisany przez Trusty CA, bez rozszerzeń.",
+                "Certyfikat serwera Boba z wykładu 11: ECDSA P-256 od Trusty Issuing CA 1, ze zwykłymi rozszerzeniami.",
                 "Prawdziwy liść www.coventry.ac.uk zapisany 15 listopada 2026: 900 bajtów, ECDSA P-256, od WE1 z Google Trust Services.",
                 "Prawdziwe pośrednie CA WE1, które podpisało liść Coventry (CA:TRUE, pathlen:0).",
                 "Prawdziwy root GTS Root R4 z magazynu zaufania: podpisuje sam siebie (wystawca = podmiot), ECDSA P-384."],
@@ -1130,7 +1130,7 @@ const T = {
       crldp: "CRL Distribution Points: skąd pobrać listę unieważnionych certyfikatów wystawcy (krok 5).",
       aia: "Authority Information Access: skąd wziąć certyfikat wystawcy (CA Issuers) i, w starszych certyfikatach, adres respondera OCSP.",
       pol: "Polityki certyfikacji: według jakich zasad go wydano. 2.23.140.1.2.1 to weryfikacja domeny (DV), 2.23.140.1.2.2 weryfikacja organizacji (OV).",
-      sct: "Signed Certificate Timestamps: obietnice logów Certificate Transparency, że certyfikat jest publiczny. Chrome i Apple ich wymagają (wykład 7).",
+      sct: "Signed Certificate Timestamps: obietnice logów Certificate Transparency, że certyfikat jest publiczny. Chrome i Apple ich wymagają (wykład 10).",
       sa: "Algorytm podpisu, jeszcze raz, poza częścią podpisywaną.",
       sv: "Podpis CA nad bajtami tbsCertificate. Każdy, kto ma klucz publiczny CA, może go sprawdzić.",
       other: "Rozszerzenie, którego ten symulator nie dekoduje." },
@@ -1139,7 +1139,7 @@ const T = {
     hexNote: "Pomarańczowe: bajty klikniętego pola; ciemnopomarańczowe: jego znacznik i długość (typ, długość, wartość). Czerwona ramka: bit, który odwracasz niżej.",
     pemNote: n => "PEM to ten sam DER w Base64, po 64 znaki w linii, między dwiema liniami: " + n + " znaków. Prawie każdy certyfikat zaczyna się od MII, bo 30 82 w Base64 to zawsze MII.",
     fpT: "Odcisk palca: SHA-256 bajtów DER",
-    fpNote: "Odcisk nie jest częścią certyfikatu; każdy liczy go z bajtów. Odwróć jeden bit, a odcisk zmieni się cały. Certyfikat Boba, bajt 100, bit 0 (minuta w notBefore): A2:C3:4F:BA…, jak na wykładzie 6.",
+    fpNote: "Odcisk nie jest częścią certyfikatu; każdy liczy go z bajtów. Odwróć jeden bit, a odcisk zmieni się cały. Certyfikat Boba, bajt 100, bit 0 (minuta w notBefore): A2:C3:4F:BA…, jak na wykładzie 9.",
     flipByte: "odwróć bajt", flipBit: "bit",
     flipSigOk: "podpis nadal się zgadza", flipSigBad: "podpis CA już się nie zgadza: klient odrzuci zmieniony certyfikat",
     flipBroken: "zmienione bajty nie są już certyfikatem (zepsuła się struktura DER)",
@@ -1171,12 +1171,12 @@ const T = {
       unknown: "Mallory Root CA nie ma w magazynie Alice, więc łańcuch nie prowadzi do nikogo, komu Alice ufa.",
       self: "Wystawca = podmiot, podpis jest dobry, ale certyfikatu nie ma w magazynie: OpenSSL 18, „self-signed certificate”." },
     scn: {
-      good: ["bob.example", "Serwer Boba wysyła liść i Trusty Issuing CA 1 (wykład 8, zadanie 1). Root Trusty Root CA jest w magazynie Alice."],
+      good: ["bob.example", "Serwer Boba wysyła liść i Trusty Issuing CA 1 (wykład 11, zadanie 1). Root Trusty Root CA jest w magazynie Alice."],
       cov: ["www.coventry.ac.uk (prawdziwy)", "Prawdziwy łańcuch zapisany 15 listopada 2026: liść, WE1 z Google Trust Services i GTS Root R4 podpisany krzyżowo przez GlobalSign."],
-      noint: ["brak pośredniego", "Serwer Boba wysyła tylko liść (wykład 8, zadanie 1, no_intermediate)."],
+      noint: ["brak pośredniego", "Serwer Boba wysyła tylko liść (wykład 11, zadanie 1, no_intermediate)."],
       covnoint: ["Coventry bez WE1", "Ten sam prawdziwy liść, ale serwer zapomniał o WE1."],
-      expired: ["wygasły liść", "Stary certyfikat Boba, ważny do 1 października 2026 (wykład 8, zadanie 1, expired)."],
-      expint: ["wygasły pośredni", "Liść jest ważny, ale Trusty Issuing CA 0 skończył się 30 czerwca 2026 (wykład 8, zadanie 3, case 2)."],
+      expired: ["wygasły liść", "Stary certyfikat Boba, ważny do 1 października 2026 (wykład 11, zadanie 1, expired)."],
+      expint: ["wygasły pośredni", "Liść jest ważny, ale Trusty Issuing CA 0 skończył się 30 czerwca 2026 (wykład 11, zadanie 3, case 2)."],
       wild: ["*.bob.example", "Certyfikat z gwiazdką, a Alice wpisuje bob.example (zadanie 3, case 3). Spróbuj www.bob.example i a.b.bob.example."],
       notca: ["wystawca nie jest CA", "Mallory ma uczciwy certyfikat dla mallory.example (CA:FALSE) i jego kluczem podpisuje bob.example (zadanie 3, case 4)."],
       fakeint: ["fałszywy pośredni", "Mallory robi własny „Trusty Issuing CA 1”: ta sama nazwa, jej klucz (zadanie 3, case 5)."],
@@ -1184,7 +1184,7 @@ const T = {
       wrong: ["zła nazwa", "Dobry certyfikat dla carol.example, a Alice chciała bob.example (zadanie 1, wrong_name)."],
       unknown: ["nieznane CA", "Certyfikat dla bob.example od Mallory Root CA, którego nie ma w magazynie Alice (zadanie 1, unknown_ca)."],
       self: ["samopodpisany", "Samopodpisany certyfikat dla bob.example (zadanie 1, self_signed)."],
-      revoked: ["unieważniony (Carol)", "Certyfikat Carol, numer 0x1002: jej klucz wyciekł i Trusty Issuing CA 1 wpisał go na swoją CRL (wykład 8, zadanie 4)."] },
+      revoked: ["unieważniony (Carol)", "Certyfikat Carol, numer 0x1002: jej klucz wyciekł i Trusty Issuing CA 1 wpisał go na swoją CRL (wykład 11, zadanie 4)."] },
     pick4: "Wybierz łańcuch", hostL: "Alice wpisuje", dateL: "Teraz", revL: "sprawdź unieważnienie (CRL wystawcy)", reset4: "Od początku",
     checksT: "Sprawdzenia", pathIs: "Ścieżka:", inStore: "(w magazynie zaufania)", selfEnd: "samopodpisany, nie ma go w magazynie", noIssuer: "brak wystawcy",
     sigBy: (c, p, a) => c + " podpisany przez " + p + " <span class=\"note\">(" + a + ", sprawdzone teraz w WebCrypto)</span>",
@@ -1244,13 +1244,13 @@ const T = {
       "Bob wysyła swój łańcuch, liść pierwszy. Łańcuch jest publiczny: każdy, także Mallory, może go skopiować i wysłać. Alice sprawdza go jak w krokach 3 i 4.",
       "Bob dowodzi, że ma klucz prywatny swojego liścia: podpisuje skrót wszystkich dotychczasowych komunikatów (transkrypt). Skopiowany certyfikat nic Mallory nie daje, bo tego podpisu nie zrobi.",
       "Obie strony wysyłają MAC nad transkryptem, kluczami z handshake'u. Potem płyną dane aplikacji.",
-      "Serwer też może poprosić o certyfikat (CertificateRequest). Wtedy Alice wysyła własne Certificate i CertificateVerify, a serwer Boba sprawdza je względem swojego prywatnego CA (wykład 8, zadanie 7)."],
+      "Serwer też może poprosić o certyfikat (CertificateRequest). Wtedy Alice wysyła własne Certificate i CertificateVerify, a serwer Boba sprawdza je względem swojego prywatnego CA (wykład 11, zadanie 7)."],
     d1T: "Dwa udziały klucza", d1: "ClientHello niesie udział Alice i nazwę serwera (SNI) bob.example, więc serwer z wieloma stronami wybiera właściwy certyfikat. ServerHello niesie udział Boba. Obie strony liczą ten sam sekret, a reszta handshake'u jest szyfrowana kluczami z niego wyprowadzonymi. Kim jest Bob, pokażą dopiero dwa następne komunikaty.",
     realLines: "openssl s_client -connect www.coventry.ac.uk:443 (15 listopada 2026):<br>New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384<br>Server Temp Key: X25519, 253 bits<br>Peer signature type: ECDSA · Peer signing digest: SHA256",
     d2T: "Komunikat Certificate", d2: "Komunikat Certificate Boba niesie jego łańcuch, liść pierwszy:", entryN: i => "wpis " + (i + 1) + ":",
     d2b: "Każdy wpis może też nieść odpowiedź OCSP (stapling, krok 5). Roota się nie wysyła: Alice musi go już mieć. www.coventry.ac.uk wysyła trzy certyfikaty: liść, WE1 i GTS Root R4 podpisany krzyżowo.",
     go4: "Jak Alice sprawdza łańcuch", go5: "Stapling",
-    d3T: "Co dokładnie jest podpisywane", d3: "Podpisywana treść ma 130 bajtów (RFC 8446, 4.4.3): 64 spacje, tekst kontekstu, jeden bajt zero i skrót SHA-256 transkryptu. Bob podpisuje ją kluczem prywatnym swojego liścia (ECDSA P-256, wykład 8, zadanie 6); Alice sprawdza kluczem publicznym z tego certyfikatu.",
+    d3T: "Co dokładnie jest podpisywane", d3: "Podpisywana treść ma 130 bajtów (RFC 8446, 4.4.3): 64 spacje, tekst kontekstu, jeden bajt zero i skrót SHA-256 transkryptu. Bob podpisuje ją kluczem prywatnym swojego liścia (ECDSA P-256, wykład 11, zadanie 6); Alice sprawdza kluczem publicznym z tego certyfikatu.",
     cvToday: "Bob podpisuje dzisiejszy handshake", cvMal: "Mallory z kopią certyfikatu", cvOld: "powtórzony stary podpis", cvNew: "nowy handshake",
     yesterday: "Boba, wczoraj",
     seg1: "64 × 0x20", seg2: "kontekst, 33 bajty", seg3: "separator", seg4: "skrót transkryptu, 32 bajty",
@@ -1276,7 +1276,7 @@ const T = {
     pinWhyCert: "Pin certyfikatu pęka przy każdym odnowieniu, nawet z tym samym kluczem: zmieniają się daty i numer seryjny, więc zmienia się skrót. Najpierw trzeba zaktualizować aplikację.",
     pinWhyKey: "Pin klucza przetrwa odnowienie z tym samym kluczem. Nowy klucz go psuje, chyba że aplikacja przypina też klucz zapasowy, trzymany offline właśnie na ten dzień.",
     pinHowT: "Jak liczy się pin", pinHow: "SHA-256 bajtów DER certyfikatu albo jego SubjectPublicKeyInfo, w Base64. Prawdziwe wartości łańcucha Coventry, liczone teraz:",
-    hpkpT: "HPKP: pinning dla całej sieci i jego koniec", hpkp: "Nagłówek Public-Key-Pins (RFC 7469, 2015) pozwalał każdej stronie przypiąć klucze w przeglądarkach. Zgubiony klucz albo napastnik, który ustawił pin, zamykał odwiedzającym stronę na miesiące („HPKP suicide”), więc przeglądarki usunęły go w latach 2018 do 2020. Dziś złe certyfikaty wyłapuje Certificate Transparency (wykład 7). Przypinaj tylko, gdy masz w ręku i aplikację, i serwer.",
+    hpkpT: "HPKP: pinning dla całej sieci i jego koniec", hpkp: "Nagłówek Public-Key-Pins (RFC 7469, 2015) pozwalał każdej stronie przypiąć klucze w przeglądarkach. Zgubiony klucz albo napastnik, który ustawił pin, zamykał odwiedzającym stronę na miesiące („HPKP suicide”), więc przeglądarki usunęły go w latach 2018 do 2020. Dziś złe certyfikaty wyłapuje Certificate Transparency (wykład 10). Przypinaj tylko, gdy masz w ręku i aplikację, i serwer.",
   },
 };
 
@@ -1289,7 +1289,7 @@ const NSTEPS = 7;
 // "now" for every check: 15 November 2026, the day the lecture files were saved (all the shipped certificates are valid then)
 const NOW0 = Date.UTC(2026, 10, 15, 12, 0, 0);
 
-// the chains Alice's browser can get; pile = what the server sends, leaf first (Lecture 8 Tasks 1 and 3, the real Coventry chain)
+// the chains Alice's browser can get; pile = what the server sends, leaf first (Lecture 11 Tasks 1 and 3, the real Coventry chain)
 const SCN_ALL = {
   good:    { pile: ["bob", "int1"], host: "bob.example", task: "case1" },
   cov:     { pile: ["covLeaf", "covWE1", "gtsR4x"], host: "www.coventry.ac.uk" },
@@ -2058,7 +2058,7 @@ function readHash() {
   }
   if (app.level === 1 && m[3]) {
     app.f2 = m[3];
-    // a field Bob's Lecture 6 certificate does not have: show it in the first certificate that has it
+    // a field Bob's Lecture 9 certificate does not have: show it in the first certificate that has it
     if (!fieldsOf(CERT[CERTS2[app.c2]]).find(f => f.id === app.f2)) {
       const i = CERTS2.findIndex(k => fieldsOf(CERT[k]).find(f => f.id === app.f2));
       if (i >= 0) app.c2 = i; else app.f2 = "subject";
