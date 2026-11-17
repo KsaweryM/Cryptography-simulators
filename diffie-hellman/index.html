@@ -438,10 +438,11 @@ function selfTest() {
   //    q = 353, alpha = 3, XA = 97, XB = 233 -> YA = 40, YB = 248, K = 160 (checked again with Python 3).
   d = dhExchange(353n, 3n, 97n, 233n);
   eq("DH Stallings", [d.A, d.B, d.sAlice, d.sBob].join(), "40,248,160,160");
-  // 4. Slides "Why this g?" and "A bad g": the powers of 5 and of 2 mod 23.
+  // 4. Slides "Why this g?" and "A bad g": the powers of 5 and of 22 mod 23; g = 2 has half the cycle (fine, as in RFC 3526).
   eq("powers of 5", powersList(23n, 5n, 22).join(" "), "5 2 10 4 20 8 17 16 11 9 22 18 21 13 19 3 15 6 7 12 14 1");
   eq("order of 2", orderOf(23n, 2n, 100), 11);
   eq("order of 5", orderOf(23n, 5n, 100), 22);
+  eq("order of 22", orderOf(23n, 22n, 100), 2);
   // 5. ElGamal on the slides "The keys", "Encrypt", "Decrypt", "The same message twice":
   //    x = 6 -> y = 8; M = 10, k = 3 -> (10, 14); s = 6, s^-1 = 4, M = 10; k = 7 -> (17, 5).
   const y = modPow(5n, 6n, 23n);
@@ -539,10 +540,11 @@ const T = {
     expo: "exponent e", play: "▶ play", stop: "■ stop",
     distinctAll: (n, p) => "g reaches all " + n + " numbers from 1 to " + (p - 1) + ": a good g.",
     distinctFew: (n, p) => "g reaches only " + n + " different numbers, then they repeat: a bad g, fewer for Eve to try.",
+    distinctHalf: (n, p) => "g reaches " + n + " different numbers, half of 1 to " + (p - 1) + ": still fine, only 1 bit less for Eve. Real standards (RFC 3526) choose g like this.",
     distinctBig: "p is too big to count all the powers here.",
     distinctRfc: "For this group g = 2 reaches (p - 1)/2 different numbers: about 2^2047.",
     noClock: "The clock is drawn for p up to 61. Below: the first powers.",
-    tryG: "Try another g:", goodG: "g = 5 (good)", badG: "g = 2 (bad)",
+    tryG: "Try another g:", goodG: "g = 5 (good)", badG: "g = 22 (bad)",
     rowE: "e", rowV: "g^e mod p",
     fwdTitle: "Forward: easy", backTitle: "Back: hard",
     fwdText: (n, bits) => "Alice knows a and computes A in " + n + " " + (n === 1 ? "multiplication" : "multiplications") + " (square-and-multiply). A 2048-bit p with a 256-bit a needs at most about 512, a few milliseconds.",
@@ -654,10 +656,11 @@ const T = {
     expo: "wykładnik e", play: "▶ odtwórz", stop: "■ stop",
     distinctAll: (n, p) => "g dochodzi do wszystkich " + n + " liczb od 1 do " + (p - 1) + ": dobre g.",
     distinctFew: (n, p) => "g daje tylko " + n + " " + plN(n, "różną liczbę", "różne liczby", "różnych liczb") + ", potem się powtarzają: złe g, Eve ma mniej do sprawdzenia.",
+    distinctHalf: (n, p) => "g daje " + n + " różnych liczb, połowę z 1 do " + (p - 1) + ": to nadal dobrze, Eve zyskuje tylko 1 bit. Prawdziwe standardy (RFC 3526) wybierają g właśnie tak.",
     distinctBig: "p jest za duże, żeby tu policzyć wszystkie potęgi.",
     distinctRfc: "W tej grupie g = 2 daje (p - 1)/2 różnych liczb: około 2^2047.",
     noClock: "Tarcza jest rysowana dla p do 61. Niżej: pierwsze potęgi.",
-    tryG: "Wypróbuj inne g:", goodG: "g = 5 (dobre)", badG: "g = 2 (złe)",
+    tryG: "Wypróbuj inne g:", goodG: "g = 5 (dobre)", badG: "g = 22 (złe)",
     rowE: "e", rowV: "g^e mod p",
     fwdTitle: "W przód: łatwo", backTitle: "Wstecz: trudno",
     fwdText: (n, bits) => "Alice zna a i liczy A w " + n + " " + plN(n, "mnożeniu", "mnożeniach", "mnożeniach") + " (kwadrat i mnożenie). Przy p o 2048 bitach i a o 256 bitach to najwyżej około 512, kilka milisekund.",
@@ -900,7 +903,7 @@ function render1() {
   const isRfc = P.p === RFC3526_P;
   let h = '<div class="card"><h3 id="c_title"></h3>' +
     '<div class="btns" style="margin-bottom:6px"><span class="lbl">' + t.tryG + '</span><label class="inl" style="font-weight:600">g = ' + inp("g") + "</label>" +
-    (P.p === 23n ? '<button data-action="setg" data-g="5">' + t.goodG + '</button><button data-action="setg" data-g="2">' + t.badG + "</button>" : "") + "</div>" +
+    (P.p === 23n ? '<button data-action="setg" data-g="5">' + t.goodG + '</button><button data-action="setg" data-g="22">' + t.badG + "</button>" : "") + "</div>" +
     '<div class="clockrow"><div id="c_clock"></div><div class="clockside">' +
       (isRfc ? "" : '<div class="ctl"><span class="lbl">' + t.expo + '</span><button data-action="ce" data-d="-1">&minus;</button>' +
         '<input type="range" min="1" max="1" value="1" data-field="clockE" id="c_range"><button data-action="ce" data-d="1">+</button>' +
@@ -972,7 +975,9 @@ function update1() {
     setHTML("c_eq", fmt(P.g) + "<sup>" + e + "</sup> mod " + fmt(P.p) + " = <b>" + fmt(v) + "</b>");
   } else setHTML("c_eq", "");
   setHTML("c_count", isRfc ? (P.g === 2n ? t.distinctRfc : t.distinctBig) : ord === null ? t.distinctBig :
-    (ord === n ? '<span class="okline">' + esc(t.distinctAll(ord, Number(P.p))) + "</span>" : '<span class="badline">' + esc(t.distinctFew(ord, Number(P.p))) + "</span>"));
+    (ord === n ? '<span class="okline">' + esc(t.distinctAll(ord, Number(P.p))) + "</span>" :
+     2 * ord === n ? '<span class="okline">' + esc(t.distinctHalf(ord, Number(P.p))) + "</span>" :
+     '<span class="badline">' + esc(t.distinctFew(ord, Number(P.p))) + "</span>"));
   setHTML("c_note", drawClock ? t.clockNote : isRfc ? "" : t.noClock);
   // the table of powers (like the slide "Why this g?")
   if (isRfc) setHTML("c_table", "");
