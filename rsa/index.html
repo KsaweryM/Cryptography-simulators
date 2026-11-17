@@ -9,13 +9,18 @@
   --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
   --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
   --const-b:#BCC4CC; --const-bg:#EEF1F4;
-  --key-b:#E2A60E;   --key-bg:#FDF3DC;
-  --ctr-b:#2FA84F;   --ctr-bg:#E3F4E8;
-  --non-b:#2F6FDB;   --non-bg:#E5EDFB;
-  --ct-b:#8A5CD8;   --ct-bg:#F1EAFD;
+  /* role colours = the slide colours of the RSA lecture: public key sTeal light, private key sTeal full,
+     message sViolet, ciphertext sBrown, shared symmetric key sAmber, Alice sIndigo, Bob sTeal, Eve sPink */
+  --key-b:#00796B;   --key-bg:#26A69A;  --key-ink:#0B2421;
+  --ctr-b:#26A69A;   --ctr-bg:#DEF2F0;
+  --non-b:#7E57C2;   --non-bg:#EBE5F5;
+  --ct-b:#8D6E63;   --ct-bg:#EEE9E7;
+  --sym-b:#FFB300;  --sym-bg:#FFE8B2;
+  --alice:#5C6BC0; --bob:#26A69A; --evec:#EC407A;
+  --gok-b:#2FA84F;  --gok-bg:#E3F4E8;
   --p:#2F6FDB; --z:#9A6B00; --c:#7446C4;
-  --g0:#2F6FDB; --g1:#2FA84F; --g2:#E5484D; --g3:#E2A60E;
-  --eve-bg:#FDE9EA;
+  --g0:#2F6FDB; --g1:#2FA84F; --g2:#EC407A; --g3:#E2A60E;
+  --eve-bg:#FCE2EB;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
 }
@@ -23,23 +28,25 @@
   :root:not([data-theme="light"]){
     --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
     --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
-    --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
-    --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
-    --ct-b:#B596F5; --ct-bg:#2A2142;
+    --const-b:#4A5663; --const-bg:#222C37; --key-b:#80CBC4; --key-bg:#26A69A; --key-ink:#0B2421;
+    --ctr-b:#4DB6AC; --ctr-bg:#12302D; --non-b:#B39DDB; --non-bg:#2A2142;
+    --ct-b:#BCAAA4; --ct-bg:#2E2522; --sym-b:#FFCA28; --sym-bg:#3A2E10;
+    --alice:#9FA8DA; --bob:#4DB6AC; --evec:#F48FB1; --gok-b:#4CC877; --gok-bg:#15301E;
     --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
-    --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
-    --eve-bg:#3A1A1C;
+    --g0:#7FA8F0; --g1:#4CC877; --g2:#F48FB1; --g3:#F5C044;
+    --eve-bg:#3A1A26;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
   --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
-  --const-b:#4A5663; --const-bg:#222C37; --key-b:#F5C044; --key-bg:#3A2E10;
-  --ctr-b:#4CC877; --ctr-bg:#15301E; --non-b:#7FA8F0; --non-bg:#1A2740;
-  --ct-b:#B596F5; --ct-bg:#2A2142;
+  --const-b:#4A5663; --const-bg:#222C37; --key-b:#80CBC4; --key-bg:#26A69A; --key-ink:#0B2421;
+  --ctr-b:#4DB6AC; --ctr-bg:#12302D; --non-b:#B39DDB; --non-bg:#2A2142;
+  --ct-b:#BCAAA4; --ct-bg:#2E2522; --sym-b:#FFCA28; --sym-bg:#3A2E10;
+  --alice:#9FA8DA; --bob:#4DB6AC; --evec:#F48FB1; --gok-b:#4CC877; --gok-bg:#15301E;
   --p:#7FA8F0; --z:#F5C044; --c:#B596F5;
-  --g0:#7FA8F0; --g1:#4CC877; --g2:#FF6B6F; --g3:#F5C044;
-  --eve-bg:#3A1A1C;
+  --g0:#7FA8F0; --g1:#4CC877; --g2:#F48FB1; --g3:#F5C044;
+  --eve-bg:#3A1A26;
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%}
@@ -118,7 +125,11 @@ input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface
 
 /* roles: one colour per role in every step */
 .role-pub{border-color:var(--ctr-b);background:var(--ctr-bg)}
-.role-sec{border-color:var(--key-b);background:var(--key-bg)}
+.role-sec{border-color:var(--key-b);background:var(--key-bg);color:var(--key-ink)}
+.role-sec small,.role-sec .note{color:var(--key-ink);opacity:.8}
+.role-sym{border-color:var(--sym-b);background:var(--sym-bg)}
+.role-neu{border-color:var(--const-b);background:var(--const-bg)}
+.who-a{color:var(--alice)} .who-b{color:var(--bob)} .who-e{color:var(--evec)}
 .role-msg{border-color:var(--non-b);background:var(--non-bg)}
 .role-ct{border-color:var(--ct-b);background:var(--ct-bg)}
 .role-eve{border-color:var(--g2);background:var(--eve-bg)}
@@ -236,7 +247,7 @@ input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface
 .whyline{font-family:var(--mono);font-size:15px;font-weight:600;margin:3px 0 3px 12px;word-break:break-word;line-height:1.7}
 .whyline sup,.sumline sup{font-size:11px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:3px}
-.gc{font-family:var(--mono);font-size:12.5px;padding:3px 0;border-radius:5px;border:1px solid var(--ctr-b);background:var(--ctr-bg)}
+.gc{font-family:var(--mono);font-size:12.5px;padding:3px 0;border-radius:5px;border:1px solid var(--gok-b);background:var(--gok-bg)}
 .gc:hover{background:var(--sunken)}
 .gc.shared{border:2px solid var(--chg);background:var(--chg-bg);font-weight:700}
 .gc.cur{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -283,6 +294,9 @@ h4.sub:first-of-type{margin-top:0}
 /* every box filled with a role colour has a border in that role colour (doubled class: wins over .node, .kbox, .chip, .pill, .hn, .legend span) */
 .role-pub.role-pub{border-color:var(--ctr-b)}
 .role-sec.role-sec{border-color:var(--key-b)}
+.role-sym.role-sym{border-color:var(--sym-b)}
+.role-neu.role-neu{border-color:var(--const-b)}
+.role-sec.role-sec small,.role-sec.role-sec .note,.role-sec.role-sec .kv,.role-sec.role-sec .nh{color:var(--key-ink)}
 .role-msg.role-msg{border-color:var(--non-b)}
 .role-ct.role-ct{border-color:var(--ct-b)}
 .role-eve.role-eve{border-color:var(--g2)}
@@ -499,7 +513,7 @@ function numsToText(a) { return a.map(x => (x < 0x110000n ? String.fromCodePoint
 
 /* Test values and where they come from (every one also recomputed with Python 3.12 pow() in a scratch script):
    1. W. Stallings, "Cryptography and Network Security", RSA example; the same numbers are on the lecture 3
-      slides "Making the keys", "The example: encrypt 88", "The example: decrypt 11":
+      slides "Making the keys" and "The example: 88 -> 11 -> 88" (and on the fast-exponentiation page):
       p = 17, q = 11, n = 187, phi = 160, e = 7, d = 23, 88^7 mod 187 = 11, 11^23 mod 187 = 88,
       88^1, 88^2, 88^4 mod 187 = 88, 77, 132; 11^1, 11^2, 11^4, 11^8, 11^16 mod 187 = 11, 121, 55, 33, 154.
    2. Euclid's algorithm for gcd(160, 7): 160 = 22*7 + 6, 7 = 1*6 + 1, 6 = 6*1 + 0; 1 = 23*7 - 1*160
@@ -508,10 +522,10 @@ function numsToText(a) { return a.map(x => (x < 0x110000n ? String.fromCodePoint
    4. Wikipedia "RSA (cryptosystem)", worked example (the version with Euler's phi; the current article uses
       lambda = 780 and d = 413 instead): p = 61, q = 53, n = 3233, phi = 3120, e = 17, d = 2753,
       65^17 mod 3233 = 2790, 2790^2753 mod 3233 = 65.
-   5. Lecture 3, Task 4 (slide "Solution: your own RSA", Task4/solution/my_rsa.py): p = 37908704904578413183,
+   5. Lecture 3, Task 5 "your own RSA" (Task5/solution/my_rsa.py): p = 37908704904578413183,
       q = 58606630333925820283, e = 65537, d = 1367151349159148221410861819858768950381,
       2026 -> C = 736246060401132335090489988934276767570.
-   6. Lecture 3, Task 5: with n = 187, e = 7, d = 23 every P from 0 to 186 comes back; 17 -> 85 -> 17.
+   6. Lecture 3, Task 4 "does it always work": with n = 187, e = 7, d = 23 every P from 0 to 186 comes back; 17 -> 85 -> 17.
    7. Lecture 3, Task 6 (Task6/pin.py; the constants keep their old name TASK7_): the bank's 2048-bit n, e = 65537,
       and C; PIN 4821 gives C.
    8. Invariant: decrypt(encrypt(m)) = m for every m < n with the preset keys of this page.
@@ -567,17 +581,17 @@ function selfTest() {
   const W = makeKeys(61n, 53n, 17n);
   if (!W.ok || W.n !== 3233n || W.phi !== 3120n || W.d !== 2753n) fails.push("keys 61, 53, 17");
   if (encrypt(65n, W) !== 2790n || decrypt(2790n, W) !== 65n) fails.push("65 -> 2790");
-  // 5. Task 4 (20-digit primes)
+  // 5. "your own RSA" (20-digit primes)
   const p5 = 37908704904578413183n, q5 = 58606630333925820283n, phi5 = (p5 - 1n) * (q5 - 1n);
   const d5 = modInverse(65537n, phi5);
-  if (d5 !== 1367151349159148221410861819858768950381n) fails.push("Task 4: d");
-  if (modPow(2026n, 65537n, p5 * q5) !== 736246060401132335090489988934276767570n) fails.push("Task 4: C");
-  if (modPow(736246060401132335090489988934276767570n, d5, p5 * q5) !== 2026n) fails.push("Task 4: back");
-  // 6. Task 5
-  for (let m = 0n; m < 187n; m++) if (decrypt(encrypt(m, { n: 187n, e: 7n }), { n: 187n, d: 23n }) !== m) { fails.push("Task 5: " + m); break; }
-  if (encrypt(17n, { n: 187n, e: 7n }) !== 85n) fails.push("Task 5: 17 -> 85");
-  // 7. Task 6 (2048 bits)
-  if (modPow(4821n, TASK7_E, TASK7_N) !== TASK7_C) fails.push("Task 6: PIN 4821");
+  if (d5 !== 1367151349159148221410861819858768950381n) fails.push("own RSA: d");
+  if (modPow(2026n, 65537n, p5 * q5) !== 736246060401132335090489988934276767570n) fails.push("own RSA: C");
+  if (modPow(736246060401132335090489988934276767570n, d5, p5 * q5) !== 2026n) fails.push("own RSA: back");
+  // 6. "does it always work"
+  for (let m = 0n; m < 187n; m++) if (decrypt(encrypt(m, { n: 187n, e: 7n }), { n: 187n, d: 23n }) !== m) { fails.push("always: " + m); break; }
+  if (encrypt(17n, { n: 187n, e: 7n }) !== 85n) fails.push("always: 17 -> 85");
+  // 7. the bank PIN (2048 bits)
+  if (modPow(4821n, TASK7_E, TASK7_N) !== TASK7_C) fails.push("bank PIN 4821");
   // 8. invariants: every preset, every m (or 400 spread values), and the trace equals modPow
   for (const [p, q, e] of PRESETS) {
     const k = makeKeys(p, q, e);
@@ -625,15 +639,15 @@ const T = {
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
     stepOf: n => "Step " + n + " of 5 · RSA",
     steps: [["Black box", "Alice encrypts, Bob decrypts, Eve listens"], ["Making the keys", "p, q, n, phi, e, and d, the inverse of e"],
-            ["Why decryption works", "(m^e)^d mod n = m, for every m"], ["Eve tries to break it", "factor n, then phi, d and m"],
-            ["Textbook RSA is not enough", "the same m gives the same c, e = 3, hybrid encryption"]],
+            ["Why decryption works", "(Pᵉ)ᵈ mod n = P, for every P"], ["Eve tries to break it", "factor n, then phi, d and P"],
+            ["Textbook RSA is not enough", "the same P gives the same C, e = 3, hybrid encryption"]],
     explain: [
-      ["A padlock anyone can close", "Bob has a key pair. Alice encrypts her message m with Bob's public key, Bob decrypts with his private key. Eve sees n, e and c, and that does not help her. Change the message and watch c. Click a key to see how Bob made it, or a box to see the power inside."],
+      ["A padlock anyone can close", "Bob has a key pair. Alice encrypts her message P with Bob's public key, Bob decrypts with his private key. Eve sees n, e and C, and that does not help her. Change the message and watch C. Click a key to see how Bob made it, or a box to see the power inside."],
       ["Five steps from two primes", "Bob picks two secret primes p and q. n and e become public; phi and d stay secret. d is the inverse of e modulo phi; the extended Euclidean algorithm finds it. Try the presets or your own primes. Click a key at the bottom to use it."],
-      ["Why Bob gets m back", "Alice computes c = m<sup>e</sup> mod n, Bob computes c<sup>d</sup> mod n. Because e × d = 1 + k × phi, Bob's power is m<sup>1 + k × phi</sup>, and Euler's theorem turns it back into m. Below: the two powers, the reason with your numbers, and a check of every m."],
-      ["Everything Eve needs is hidden in n", "Eve has n, e and c. If she finds p and q, she computes phi and d exactly as Bob did, and then reads m. For a tiny n this takes a moment. Make n bigger and watch the time grow, then see what that means for a 2048-bit n."],
-      ["The same m always gives the same c", "Textbook RSA has no randomness. Anyone can encrypt with the public key, so Eve encrypts her guesses and compares them with c. If the message comes from a small set (a PIN, yes or no), she finds it without d. A short message with e = 3 falls even faster. Real RSA adds random padding and carries only a symmetric key."]],
-    selfOk: "✓ checked against Stallings, Wikipedia and the lecture tasks", selfBad: f => "✗ self-test failed: " + f,
+      ["Why Bob gets P back", "Alice computes C = P<sup>e</sup> mod n, Bob computes C<sup>d</sup> mod n. Because e × d = 1 + k × phi, Bob's power is P<sup>1 + k × phi</sup>, and Euler's theorem turns it back into P. Below: the two powers, the reason with your numbers, and a check of every P."],
+      ["Everything Eve needs is hidden in n", "Eve has n, e and C. If she finds p and q, she computes phi and d exactly as Bob did, and then reads P. For a tiny n this takes a moment. Make n bigger and watch the time grow, then see what that means for a 2048-bit n."],
+      ["The same P always gives the same C", "Textbook RSA has no randomness. Anyone can encrypt with the public key, so Eve encrypts her guesses and compares them with C. If the message comes from a small set (a PIN, yes or no), she finds it without d. A short message with e = 3 falls even faster. Real RSA adds random padding and carries only a symmetric key."]],
+    selfOk: "✓ checked against Stallings, Wikipedia and the worked examples", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
     fixKeys: "Bob's keys are not valid. Fix p, q or e in step 2.", goKeys: "go to step 2",
     alice: "Alice", bob: "Bob", eve: "Eve",
@@ -641,39 +655,39 @@ const T = {
     pubSub: "everybody may know it · click: how it was made", prvSub: "only Bob knows it · click: how it was made",
     modeNum: "a number", modeText: "a short text",
     card1: "Alice sends Bob a message",
-    mNode: "message m", mHint: n => "a number from 0 to " + n, mTextHint: "one number per letter",
-    cNode: "ciphertext c", outNode: "Bob: m",
+    mNode: "message P", mHint: n => "a number from 0 to " + n, mTextHint: "one number per letter",
+    cNode: "ciphertext C", outNode: "Bob: P",
     encBox: "encrypt", decBox: "decrypt", boxSub: "click to look inside",
     eveSees: "sees", eveNot: "does not see", eveNotWhat: "(nor p, q, phi)",
-    eveFactor: (n, p, q) => "To get d, she would need phi, so p and q. " + n + " = " + p + " × " + q + " is easy to factor because n is tiny. A 2048-bit n (617 digits) is not (Task 3).",
-    errM: n => "m must be a whole number from 0 to " + n + ".",
+    eveFactor: (n, p, q) => "To get d, she would need phi, so p and q. " + n + " = " + p + " × " + q + " is easy to factor because n is tiny. A 2048-bit n (617 digits) is not.",
+    errM: n => "P must be a whole number from 0 to " + n + ".",
     errText: (ch, code, n) => "The letter “" + ch + "” has the code " + code + ", which is not smaller than n = " + n + ". Pick bigger primes in step 2.",
     errEmpty: "Type a few letters.",
     cardDetails1: "The two powers",
     rowAlice: "Alice computes", rowBob: "Bob computes", clickPow: "Click a line to see the power in step 3.",
-    rowLetter: "letter", rowCode: "m (its code)", rowC: "c", rowBack: "Bob: m back", rowLetter2: "Bob reads",
-    textNote: "Each letter is encrypted on its own, only because n is tiny here. Real RSA turns the whole short text into one big number (as rsa_ready.py does in Task 2), and real messages go with hybrid encryption.",
-    legPub: "public: everybody may know it", legSec: "secret: only Bob", legMsg: "message m", legCt: "ciphertext c", legEve: "Eve, who listens",
+    rowLetter: "letter", rowCode: "P (its code)", rowC: "C", rowBack: "Bob: P back", rowLetter2: "Bob reads",
+    textNote: "Each letter is encrypted on its own, only because n is tiny here. Real RSA turns the whole short text into one big number (as rsa_ready.py does), and real messages go with hybrid encryption.",
+    legPub: "public: everybody may know it", legSec: "secret: only Bob", legMsg: "message P", legCt: "ciphertext C", legEve: "Eve, who listens",
     chan: "public channel", chanSub: "(the internet)", stays: "never leaves Bob", listens: "listens to everything on the channel",
     sameOk: "✓ the same as Alice's",
     storyOf: (k, N) => "step " + k + " of " + N, sFirst: "⏮ start again", sPrev: "◀ previous step", sNext: "next step ▶",
     keysStory: "story: n or Space next · p back",
     storyTitle: ["Alice and Bob", "Bob makes a key pair", "Bob publishes his public key", "Alice writes her message", "Alice encrypts",
-                 "Alice sends c", "Bob decrypts", "Bob reads the message", "What Eve has"],
+                 "Alice sends C", "Bob decrypts", "Bob reads the message", "What Eve has"],
     story: [
       V => "Alice wants to send Bob a secret message. They are far apart, and the only link between them is a public channel: the internet. Eve listens to everything on it.",
       V => "Bob makes a key pair: a public key {e, n} = {" + V.e + ", " + V.n + "} and a private key {d, n} = {" + V.d + ", " + V.n + "}. The private key never leaves Bob.",
       V => "Bob sends his public key {" + V.e + ", " + V.n + "} over the channel to Alice. Eve sees it too and writes down e and n. That is fine: anybody may know a public key.",
       V => V.text ? "Alice writes a short text. Each letter becomes a number (its code), and every code must be smaller than n = " + V.n + ". Type your own text."
-                  : "Alice's message is a number m from 0 to " + (V.n - 1n) + ", smaller than n. Type your own m.",
-      V => V.text ? "Alice encrypts each letter code with Bob's public key: c = m<sup>e</sup> mod n. For example " + esc(V.ch) + ": " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>."
-                  : "Alice encrypts m with Bob's public key: c = m<sup>e</sup> mod n = " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>.",
-      V => V.text ? "Alice sends the numbers c = " + V.cs + " over the channel. Eve copies them into her notebook too."
-                  : "Alice sends c = " + V.c + " over the channel. Eve copies c into her notebook too.",
-      V => V.text ? "Bob decrypts each c with his private key: m = c<sup>d</sup> mod n. For example " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>, the code of " + esc(V.ch) + "."
-                  : "Bob decrypts c with his private key: m = c<sup>d</sup> mod n = " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>.",
-      V => V.text ? "Bob reads “" + esc(V.backText) + "”, the same text Alice wrote ✓" : "Bob reads m = " + V.back + ", the same number Alice sent ✓",
-      V => "Eve has n, e and c, but not d. To get d she would have to factor n: " + V.n + " = " + V.p + " × " + V.q + " is easy because n is tiny, but nobody can factor a 2048-bit n (617 digits). Now everything is live: change " + (V.text ? "the text" : "m") + ", click a key or a dark box to look inside."],
+                  : "Alice's message is a number P from 0 to " + (V.n - 1n) + ", smaller than n. Type your own P.",
+      V => V.text ? "Alice encrypts each letter code with Bob's public key: C = P<sup>e</sup> mod n. For example " + esc(V.ch) + ": " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>."
+                  : "Alice encrypts P with Bob's public key: C = P<sup>e</sup> mod n = " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>.",
+      V => V.text ? "Alice sends the numbers C = " + V.cs + " over the channel. Eve copies them into her notebook too."
+                  : "Alice sends C = " + V.c + " over the channel. Eve copies C into her notebook too.",
+      V => V.text ? "Bob decrypts each C with his private key: P = C<sup>d</sup> mod n. For example " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>, the code of " + esc(V.ch) + "."
+                  : "Bob decrypts C with his private key: P = C<sup>d</sup> mod n = " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>.",
+      V => V.text ? "Bob reads “" + esc(V.backText) + "”, the same text Alice wrote ✓" : "Bob reads P = " + V.back + ", the same number Alice sent ✓",
+      V => "Eve has n, e and C, but not d. To get d she would have to factor n: " + V.n + " = " + V.p + " × " + V.q + " is easy because n is tiny, but nobody can factor a 2048-bit n (617 digits). Now everything is live: change " + (V.text ? "the text" : "P") + ", click a key or a dark box to look inside."],
     // step 2
     cardKeys: "Bob makes his key pair", presets: "examples:",
     preNames: ["17, 11, e = 7 (the slides)", "11, 13, e = 23 (phi = 120)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
@@ -695,39 +709,39 @@ const T = {
     cardTwo: "The two keys", twoNote: "Click a key to use it: one power modulo n.",
     trash: "p, q and phi: not needed any more; keep them secret or delete them. Whoever knows p and q can compute d.",
     // step 3
-    cardPow: "The two powers", baseM: "Alice's m",
+    cardPow: "The two powers", baseM: "Alice's P",
     powAlice: "Alice encrypts", powBob: "Bob decrypts",
-    sumTitle: "As on the slides, by powers of two:",
+    sumTitle: "By powers of two:",
     count: (sq, mul, naive) => "The computer did " + sq + " " + (sq === 1 ? "squaring" : "squarings") + " and " + mul + " " + (mul === 1 ? "multiplication" : "multiplications") + ", not " + naive + " " + (naive === 1n ? "multiplication" : "multiplications") + " one by one.",
-    countBig: "A 2048-bit exponent takes about 2048 squarings. This is why Python's pow(m, e, n) is fast.",
+    countBig: "A 2048-bit exponent takes about 2048 squarings. This is why Python's pow(P, e, n) is fast.",
     linkPow: "How a power mod n is computed fast ▶",
     mod: "mod",
-    cardWhy: "Why c^d gives m back",
+    cardWhy: "Why C<sup>d</sup> gives P back",
     whyA: "(a) What d was made for (step 2):",
     whyA2: (k) => "So e × d = 1 + k × phi, here with k = " + k + ".",
     whyB: "(b) What Bob's power really is:",
-    whyEuler: "Euler's theorem: if gcd(m, n) = 1, then m<sup>phi</sup> mod n = 1. Then (m<sup>phi</sup>)<sup>k</sup> = 1 and Bob gets m × 1 = m.",
+    whyEuler: "Euler's theorem: if gcd(P, n) = 1, then P<sup>phi</sup> mod n = 1. Then (P<sup>phi</sup>)<sup>k</sup> = 1 and Bob gets P × 1 = P.",
     whyCop: (m, n) => "gcd(" + m + ", " + n + ") = 1, so Euler's theorem applies ✓",
-    whyShare: (m, n, g) => "gcd(" + m + ", " + n + ") = " + g + ": m shares a factor with n, so Euler's theorem does not apply and m<sup>phi</sup> mod n is not 1. It still works: the Chinese remainder theorem checks it modulo p and modulo q separately (not shown here). The grid below shows every such m coming back.",
-    whyEnd: "Bob gets back Alice's m ✓",
-    cardGrid: "Does it always work? (Task 5)",
-    gridAll: (n) => "Every m from 0 to " + (n - 1n) + " encrypted with e and decrypted with d: all " + n + " come back ✓",
-    gridPart: (k, n) => "n = " + n + " is too big to try every m here: " + k + " values tried (the smallest ones and multiples of p and q), all come back ✓",
+    whyShare: (m, n, g) => "gcd(" + m + ", " + n + ") = " + g + ": P shares a factor with n, so Euler's theorem does not apply and P<sup>phi</sup> mod n is not 1. It still works: the Chinese remainder theorem checks it modulo p and modulo q separately (not shown here). The grid below shows every such P coming back.",
+    whyEnd: "Bob gets back Alice's P ✓",
+    cardGrid: "Does it always work?",
+    gridAll: (n) => "Every P from 0 to " + (n - 1n) + " encrypted with e and decrypted with d: all " + n + " come back ✓",
+    gridPart: (k, n) => "n = " + n + " is too big to try every P here: " + k + " values tried (the smallest ones and multiples of p and q), all come back ✓",
     gridBad: (k) => "✗ " + k + " values did not come back",
-    gridLeg: "framed: m shares a factor with n (a multiple of p or q). Euler's theorem does not cover these, and they work too. Click a number to use it as m.",
+    gridLeg: "framed: P shares a factor with n (a multiple of p or q). Euler's theorem does not cover these, and they work too. Click a number to use it as P.",
     gridShown: (k) => "Showing the first " + k + ".",
     // step 4: Eve tries to break it
     cardEve: "Eve attacks Bob's key",
-    eveIntro: (e, n, c) => "Eve knows the public key {e, n} = {" + e + ", " + n + "} and caught c = " + c + ". To get d she needs phi, so p and q. She divides n by 2, 3, 5, 7, 9, ... until one goes in without a remainder.",
+    eveIntro: (e, n, c) => "Eve knows the public key {e, n} = {" + e + ", " + n + "} and caught C = " + c + ". To get d she needs phi, so p and q. She divides n by 2, 3, 5, 7, 9, ... until one goes in without a remainder.",
     bFactor: "Eve: factor n", bFactorAgain: "factor again",
     divRow: (n, i, q, r) => n + " ÷ " + i + " = " + q + ", remainder " + r,
     divCount: (k) => k + " " + (k === 1 ? "division" : "divisions"),
     facFound: (k, n, p, q) => "Found after " + k + " " + (k === 1 ? "division" : "divisions") + ": n = " + n + " = " + p + " × " + q,
     facStop: (k, s) => "Stopped after " + s + " s and " + k + " divisions: n is too big for trial division in this browser. Eve gives up.",
-    eveSteps: ["1. factor n", "2. phi = (p - 1)(q - 1)", "3. d = the inverse of e mod phi", "4. decrypt c"],
+    eveSteps: ["1. factor n", "2. phi = (p - 1)(q - 1)", "3. d = the inverse of e mod phi", "4. decrypt C"],
     eveSame: "the same d as Bob's private key",
-    eveRead: "Alice's m ✓ Eve read it without Bob's private key.",
-    eveNoM: "Type a valid m in step 1 or 3 to give Eve a c.",
+    eveRead: "Alice's P ✓ Eve read it without Bob's private key.",
+    eveNoM: "Type a valid P in step 1 or 3 to give Eve a C.",
     cardSize: "How long for a bigger n?",
     sizeIntro: "Pick the size of n. The page makes a random n = p × q (two random primes, tested with Miller-Rabin) and Eve factors it by trial division, here in your browser, for at most 3 seconds.",
     bitsLbl: (b) => "n: " + b + " bits (about " + Math.round(b * 0.30103) + " digits)",
@@ -741,49 +755,49 @@ const T = {
     estS: (x) => "about " + x + " s", estYears: (e10) => "about 10<sup>" + e10 + "</sup> years",
     estAge: "The universe is about 1.4 × 10<sup>10</sup> years old.",
     thBits: "bits", thN: "n", thDiv: "divisions", thTime: "time", thRes: "result", resFound: "p found", resStop: "stopped",
-    nfs: "Real attackers do not use trial division: the general number field sieve is far faster. The public record is RSA-250 (829 bits, factored in 2020 with about 2700 CPU core-years). A 2048-bit n is still far out of reach.",
+    nfs: "Real attackers do not use trial division: the general number field sieve is far faster. The public record is RSA-896 (896 bits, factored in September 2026 on up to 2048 graphics cards). In 2020, RSA-250 (829 bits) took about 2700 years of one processor core. A 2048-bit n is still far out of reach.",
     // step 5
     // step 4
     cardSame: "The same message, the same ciphertext",
     sameNote: "Alice's text from step 1, encrypted letter by letter with Bob's public key. Equal letters give equal ciphertexts (framed), every time. Eve does not need d to see which letters repeat.",
     sameNone: "No letter repeats in this text. Type one with a repeated letter in step 1, for example HELLO BOB.",
     cardGuess: "Eve guesses and checks",
-    guessIntro: (c, n, e) => "Eve caught c = " + c + ". She knows the public key {e, n} = {" + e + ", " + n + "}, and she knows Alice sends a PIN (a number below 10 000). She encrypts every guess and compares it with c.",
+    guessIntro: (c, n, e) => "Eve caught C = " + c + ". She knows the public key {e, n} = {" + e + ", " + n + "}, and she knows Alice sends a PIN (a number below 10 000). She encrypts every guess and compares it with C.",
     guessRange: (lim) => "guesses: 0 to " + lim,
-    bGuess: "Eve: try every guess", bGuessBig: "the same on the 2048-bit key of Task 6",
-    found: (m, k, ms) => "Found m = " + m + " after " + k + " " + (k === 1 ? "guess" : "guesses") + " (" + ms + " ms), without the private key.",
-    notFound: k => "Not found in " + k + " guesses: Alice's m is not below 10 000, so Eve's assumption was wrong. With a big message space this attack fails; with a PIN it always works.",
+    bGuess: "Eve: try every guess", bGuessBig: "the same on the bank's 2048-bit key",
+    found: (m, k, ms) => "Found P = " + m + " after " + k + " " + (k === 1 ? "guess" : "guesses") + " (" + ms + " ms), without the private key.",
+    notFound: k => "Not found in " + k + " guesses: Alice's P is not below 10 000, so Eve's assumption was wrong. With a big message space this attack fails; with a PIN it always works.",
     lastTries: "the last guesses:",
-    bigIntro: "Task 6: the bank's public key has 2048 bits (n has 617 digits) and e = 65537. Eve caught C. Same trick, same result: the key size does not help.",
+    bigIntro: "A bank encrypts PINs with textbook RSA. Its public key has 2048 bits (n has 617 digits) and e = 65537. Eve caught C. Same trick, same result: the key size does not help.",
     bigRun: (k) => "trying… " + k + " guesses",
     bigFound: (pin, k, s) => "PIN " + pin + " found after " + k + " guesses in " + s + " s, in your browser.",
-    showN: "the 2048-bit n of Task 6",
+    showN: "the bank's 2048-bit n",
     cardE3: "e = 3 and a short message: no key needed",
-    e3Intro: "Bob's key here: a fixed 2048-bit n with e = 3 (a valid key, d exists). Alice sends a short text as one number m (its bytes, as rsa_ready.py does). If m<sup>3</sup> is smaller than n, the remainder does nothing: c = m<sup>3</sup> exactly, and Eve takes the ordinary cube root.",
-    e3n: "n (2048 bits)", e3Lbl: "Alice's text", e3m: "m (the bytes as one number)", e3c: "c = m^3 mod n", e3r: "Eve: the cube root of c", e3read: "Eve reads",
-    e3Bits: (a, b) => "m<sup>3</sup> has " + a + " bits, n has " + b + " bits.",
-    e3Ok: "m<sup>3</sup> < n, so c = m<sup>3</sup>: the cube root gives m, and Eve reads the text without d.",
-    e3Fail: "m<sup>3</sup> > n, so c wrapped modulo n: the cube root gives nonsense. With this n the attack works up to 85 bytes.",
-    e3Fix: "This is why real RSA pads the message with random bytes (OAEP) before encrypting: the padded m is almost as big as n, so m<sup>3</sup> always wraps.",
+    e3Intro: "Bob's key here: a fixed 2048-bit n with e = 3 (a valid key, d exists). Alice sends a short text as one number P (its bytes, as rsa_ready.py does). If P<sup>3</sup> is smaller than n, the remainder does nothing: C = P<sup>3</sup> exactly, and Eve takes the ordinary cube root.",
+    e3n: "n (2048 bits)", e3Lbl: "Alice's text", e3m: "P (the bytes as one number)", e3c: "C = P<sup>3</sup> mod n", e3r: "Eve: the cube root of C", e3read: "Eve reads",
+    e3Bits: (a, b) => "P<sup>3</sup> has " + a + " bits, n has " + b + " bits.",
+    e3Ok: "P<sup>3</sup> < n, so C = P<sup>3</sup>: the cube root gives P, and Eve reads the text without d.",
+    e3Fail: "P<sup>3</sup> > n, so C wrapped modulo n: the cube root gives nonsense. With this n the attack works up to 85 bytes.",
+    e3Fix: "This is why real RSA pads the message with random bytes (OAEP) before encrypting: the padded P is almost as big as n, so P<sup>3</sup> always wraps.",
     cardMist: "Two common mistakes",
-    mistA: "m ≥ n: the result wraps modulo n",
-    mistAIn: "m (try one bigger than n)",
-    mistARes: (m, n, c, back) => "c = " + sup(m, "e") + " mod " + n + " = " + c + ", and Bob gets " + back + " = m mod n, not " + m + ".",
-    mistAOk: "This m is smaller than n, so it comes back. Try a bigger one.",
-    mistANote: "m and m + n give the same c. A long message has to be split, or, as in practice, RSA carries only a short key.",
+    mistA: "P ≥ n: the result wraps modulo n",
+    mistAIn: "P (try one bigger than n)",
+    mistARes: (m, n, c, back) => "C = " + sup(m, "e") + " mod " + n + " = " + c + ", and Bob gets " + back + " = P mod n, not " + m + ".",
+    mistAOk: "This P is smaller than n, so it comes back. Try a bigger one.",
+    mistANote: "P and P + n give the same C. A long message has to be split, or, as in practice, RSA carries only a short key.",
     mistB: "e not coprime to phi: there is no d",
     mistBRes: (e, phi, g) => "e = " + e + ": gcd(" + e + ", " + phi + ") = " + g + ". Then e × d mod phi is always a multiple of " + g + ", never 1, so no d exists. Step 2 refuses such an e.",
     mistBNone: "Every small odd e is coprime to this phi.",
     mistBTry: (e) => "try e = " + e + " in step 2",
     cardHyb: "Hybrid encryption: what is really sent",
-    hybIntro: "RSA is slow and its m must be smaller than n, so in practice RSA encrypts only a fresh random key, and the message itself goes with a fast symmetric cipher (AES-256-GCM or ChaCha20-Poly1305).",
+    hybIntro: "RSA is slow and its P must be smaller than n, so in practice RSA encrypts only a fresh random key, and the message itself goes with a fast symmetric cipher (AES-256-GCM or ChaCha20-Poly1305).",
     hybKey: "1. Alice picks a random 256-bit key K", hybRsa: "2. RSA-2048 (with OAEP) encrypts K with Bob's public key", hybSym: "3. AES or ChaCha20 encrypts the message with K",
     hybMsg: (b) => "message: " + b + " " + (b === 1 ? "byte" : "bytes") + " (Alice's text from step 1)",
     hybOut: "Alice sends:", hybParts: (b) => ["RSA(K): 256 bytes", "nonce: 12 bytes", "ciphertext: " + b + " bytes", "tag: 16 bytes"],
     hybBob: "Bob decrypts K with his private key (one RSA operation), then the message with K. A 5 MB photo needs the same single RSA operation; only the symmetric part grows.",
     bNewKey: "new K",
     cardReal: "What real RSA does",
-    real: ["<b>Random padding (OAEP).</b> Before encrypting, random bytes are added to the message in a fixed way. The same PIN then gives a different c every time, and Eve's guesses no longer match. Bob removes the padding after decrypting. Every library does this for you.",
+    real: ["<b>Random padding (OAEP).</b> Before encrypting, random bytes are added to the message in a fixed way. The same PIN then gives a different C every time, and Eve's guesses no longer match. Bob removes the padding after decrypting. Every library does this for you.",
            "<b>Big keys.</b> n has at least 2048 bits (617 digits), so nobody can factor it to find p, q and d. The small numbers on this page are only for learning.",
            "<b>Only a key.</b> RSA is slow, so in practice it carries only a random symmetric key (hybrid encryption), and ChaCha20 or AES encrypts the data."],
     realNote: "This page shows textbook RSA only. It does not show OAEP.",
@@ -791,22 +805,22 @@ const T = {
     leakIntro: "Eve recorded every ciphertext Alice sent (here: the letters of her text from step 1). Years later she steals Bob's private key d.",
     bLeak: "Eve steals d", bUnleak: "undo",
     leakRec: "recorded", leakOpen: "opened with d",
-    leakNote: "A leaked private key opens all recorded messages, from everybody who wrote to Bob, and all new ones until Bob changes his key. The fix is keys that live for one session only (forward secrecy, next lecture).",
+    leakNote: "A leaked private key opens all recorded messages, from everybody who wrote to Bob, and all new ones until Bob changes his key. The fix is keys that live for one session only (forward secrecy).",
   },
   pl: {
     title: "Eksplorator RSA", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
     stepOf: n => "Krok " + n + " z 5 · RSA",
     steps: [["Czarna skrzynka", "Alice szyfruje, Bob odszyfrowuje, Eve podsłuchuje"], ["Tworzenie kluczy", "p, q, n, phi, e oraz d, odwrotność e"],
-            ["Dlaczego odszyfrowanie działa", "(m^e)^d mod n = m dla każdego m"], ["Eve próbuje złamać RSA", "rozkłada n, potem liczy phi, d i m"],
-            ["Podręcznikowe RSA nie wystarcza", "to samo m daje to samo c, e = 3, szyfrowanie hybrydowe"]],
+            ["Dlaczego odszyfrowanie działa", "(Pᵉ)ᵈ mod n = P dla każdego P"], ["Eve próbuje złamać RSA", "rozkłada n, potem liczy phi, d i P"],
+            ["Podręcznikowe RSA nie wystarcza", "to samo P daje to samo C, e = 3, szyfrowanie hybrydowe"]],
     explain: [
-      ["Kłódka, którą każdy może zamknąć", "Bob ma parę kluczy. Alice szyfruje wiadomość m kluczem publicznym Boba, a Bob odszyfrowuje ją swoim kluczem prywatnym. Eve widzi n, e i c, i nic jej to nie daje. Zmień wiadomość i patrz na c. Kliknij klucz, żeby zobaczyć, jak Bob go zrobił, albo pole, żeby zajrzeć do potęgi."],
+      ["Kłódka, którą każdy może zamknąć", "Bob ma parę kluczy. Alice szyfruje wiadomość P kluczem publicznym Boba, a Bob odszyfrowuje ją swoim kluczem prywatnym. Eve widzi n, e i C, i nic jej to nie daje. Zmień wiadomość i patrz na C. Kliknij klucz, żeby zobaczyć, jak Bob go zrobił, albo pole, żeby zajrzeć do potęgi."],
       ["Pięć kroków od dwóch liczb pierwszych", "Bob wybiera dwie tajne liczby pierwsze p i q. n i e są jawne, phi i d zostają tajne. d to odwrotność e modulo phi; znajduje ją rozszerzony algorytm Euklidesa. Wypróbuj przykłady albo własne liczby. Kliknij klucz na dole, żeby go użyć."],
-      ["Dlaczego Bob odzyskuje m", "Alice liczy c = m<sup>e</sup> mod n, a Bob liczy c<sup>d</sup> mod n. Ponieważ e × d = 1 + k × phi, potęga Boba to m<sup>1 + k × phi</sup>, a twierdzenie Eulera zamienia ją z powrotem w m. Niżej: obie potęgi, uzasadnienie na Twoich liczbach i sprawdzenie każdego m."],
-      ["Wszystko, czego Eve potrzebuje, jest ukryte w n", "Eve ma n, e i c. Jeśli znajdzie p i q, policzy phi i d dokładnie tak jak Bob, a potem odczyta m. Dla malutkiego n to chwila. Zwiększ n i patrz, jak rośnie czas, a potem zobacz, co to znaczy dla 2048-bitowego n."],
-      ["To samo m zawsze daje to samo c", "Podręcznikowe RSA nie ma losowości. Każdy może szyfrować kluczem publicznym, więc Eve szyfruje swoje strzały i porównuje je z c. Jeśli wiadomość pochodzi z małego zbioru (PIN, tak lub nie), Eve znajdzie ją bez d. Krótka wiadomość przy e = 3 pada jeszcze szybciej. Prawdziwe RSA dodaje losowe dopełnienie i przenosi tylko klucz symetryczny."]],
-    selfOk: "✓ sprawdzone z przykładami Stallingsa, Wikipedii i zadań z wykładu", selfBad: f => "✗ samotest nie przeszedł: " + f,
+      ["Dlaczego Bob odzyskuje P", "Alice liczy C = P<sup>e</sup> mod n, a Bob liczy C<sup>d</sup> mod n. Ponieważ e × d = 1 + k × phi, potęga Boba to P<sup>1 + k × phi</sup>, a twierdzenie Eulera zamienia ją z powrotem w P. Niżej: obie potęgi, uzasadnienie na Twoich liczbach i sprawdzenie każdego P."],
+      ["Wszystko, czego Eve potrzebuje, jest ukryte w n", "Eve ma n, e i C. Jeśli znajdzie p i q, policzy phi i d dokładnie tak jak Bob, a potem odczyta P. Dla malutkiego n to chwila. Zwiększ n i patrz, jak rośnie czas, a potem zobacz, co to znaczy dla 2048-bitowego n."],
+      ["To samo P zawsze daje to samo C", "Podręcznikowe RSA nie ma losowości. Każdy może szyfrować kluczem publicznym, więc Eve szyfruje swoje strzały i porównuje je z C. Jeśli wiadomość pochodzi z małego zbioru (PIN, tak lub nie), Eve znajdzie ją bez d. Krótka wiadomość przy e = 3 pada jeszcze szybciej. Prawdziwe RSA dodaje losowe dopełnienie i przenosi tylko klucz symetryczny."]],
+    selfOk: "✓ sprawdzone z przykładami Stallingsa, Wikipedii i ćwiczeń", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
     fixKeys: "Klucze Boba są niepoprawne. Popraw p, q albo e w kroku 2.", goKeys: "przejdź do kroku 2",
     alice: "Alice", bob: "Bob", eve: "Eve",
@@ -814,39 +828,39 @@ const T = {
     pubSub: "może go znać każdy · kliknij: skąd się wziął", prvSub: "zna go tylko Bob · kliknij: skąd się wziął",
     modeNum: "liczba", modeText: "krótki tekst",
     card1: "Alice wysyła Bobowi wiadomość",
-    mNode: "wiadomość m", mHint: n => "liczba od 0 do " + n, mTextHint: "jedna liczba na literę",
-    cNode: "szyfrogram c", outNode: "Bob: m",
+    mNode: "wiadomość P", mHint: n => "liczba od 0 do " + n, mTextHint: "jedna liczba na literę",
+    cNode: "szyfrogram C", outNode: "Bob: P",
     encBox: "szyfruj", decBox: "odszyfruj", boxSub: "kliknij, by zajrzeć",
     eveSees: "widzi", eveNot: "nie widzi", eveNotWhat: "(ani p, q, phi)",
-    eveFactor: (n, p, q) => "Żeby policzyć d, potrzebowałaby phi, czyli p i q. " + n + " = " + p + " × " + q + " łatwo rozłożyć, bo n jest malutkie. 2048-bitowego n (617 cyfr) się nie da (zadanie 3).",
-    errM: n => "m musi być liczbą całkowitą od 0 do " + n + ".",
+    eveFactor: (n, p, q) => "Żeby policzyć d, potrzebowałaby phi, czyli p i q. " + n + " = " + p + " × " + q + " łatwo rozłożyć, bo n jest malutkie. 2048-bitowego n (617 cyfr) się nie da.",
+    errM: n => "P musi być liczbą całkowitą od 0 do " + n + ".",
     errText: (ch, code, n) => "Litera „" + ch + "” ma kod " + code + ", który nie jest mniejszy od n = " + n + ". Wybierz większe liczby pierwsze w kroku 2.",
     errEmpty: "Wpisz kilka liter.",
     cardDetails1: "Dwie potęgi",
     rowAlice: "Alice liczy", rowBob: "Bob liczy", clickPow: "Kliknij wiersz, żeby zobaczyć potęgę w kroku 3.",
-    rowLetter: "litera", rowCode: "m (jej kod)", rowC: "c", rowBack: "Bob: m z powrotem", rowLetter2: "Bob czyta",
-    textNote: "Każda litera jest szyfrowana osobno tylko dlatego, że n jest tu malutkie. Prawdziwe RSA zamienia cały krótki tekst w jedną dużą liczbę (jak rsa_ready.py w zadaniu 2), a prawdziwe wiadomości idą szyfrowaniem hybrydowym.",
-    legPub: "jawne: może znać każdy", legSec: "tajne: tylko Bob", legMsg: "wiadomość m", legCt: "szyfrogram c", legEve: "Eve, która podsłuchuje",
+    rowLetter: "litera", rowCode: "P (jej kod)", rowC: "C", rowBack: "Bob: P z powrotem", rowLetter2: "Bob czyta",
+    textNote: "Każda litera jest szyfrowana osobno tylko dlatego, że n jest tu malutkie. Prawdziwe RSA zamienia cały krótki tekst w jedną dużą liczbę (jak rsa_ready.py), a prawdziwe wiadomości idą szyfrowaniem hybrydowym.",
+    legPub: "jawne: może znać każdy", legSec: "tajne: tylko Bob", legMsg: "wiadomość P", legCt: "szyfrogram C", legEve: "Eve, która podsłuchuje",
     chan: "publiczny kanał", chanSub: "(internet)", stays: "nie opuszcza Boba", listens: "podsłuchuje wszystko w kanale",
     sameOk: "✓ to samo, co u Alice",
     storyOf: (k, N) => "krok " + k + " z " + N, sFirst: "⏮ od początku", sPrev: "◀ poprzedni krok", sNext: "następny krok ▶",
     keysStory: "historia: n albo spacja dalej · p wstecz",
     storyTitle: ["Alice i Bob", "Bob tworzy parę kluczy", "Bob publikuje klucz publiczny", "Alice pisze wiadomość", "Alice szyfruje",
-                 "Alice wysyła c", "Bob odszyfrowuje", "Bob czyta wiadomość", "Co ma Eve"],
+                 "Alice wysyła C", "Bob odszyfrowuje", "Bob czyta wiadomość", "Co ma Eve"],
     story: [
       V => "Alice chce wysłać Bobowi tajną wiadomość. Są daleko od siebie i łączy ich tylko publiczny kanał: internet. Eve podsłuchuje wszystko, co nim płynie.",
       V => "Bob tworzy parę kluczy: klucz publiczny {e, n} = {" + V.e + ", " + V.n + "} i klucz prywatny {d, n} = {" + V.d + ", " + V.n + "}. Klucz prywatny nigdy nie opuszcza Boba.",
       V => "Bob wysyła swój klucz publiczny {" + V.e + ", " + V.n + "} przez kanał do Alice. Eve też go widzi i zapisuje e oraz n. Nic nie szkodzi: klucz publiczny może znać każdy.",
       V => V.text ? "Alice pisze krótki tekst. Każda litera staje się liczbą (swoim kodem), a każdy kod musi być mniejszy od n = " + V.n + ". Wpisz własny tekst."
-                  : "Wiadomość Alice to liczba m od 0 do " + (V.n - 1n) + ", mniejsza od n. Wpisz własne m.",
-      V => V.text ? "Alice szyfruje kod każdej litery kluczem publicznym Boba: c = m<sup>e</sup> mod n. Na przykład " + esc(V.ch) + ": " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>."
-                  : "Alice szyfruje m kluczem publicznym Boba: c = m<sup>e</sup> mod n = " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>.",
-      V => V.text ? "Alice wysyła przez kanał liczby c = " + V.cs + ". Eve też przepisuje je do swojego notesu."
-                  : "Alice wysyła c = " + V.c + " przez kanał. Eve też przepisuje c do swojego notesu.",
-      V => V.text ? "Bob odszyfrowuje każde c swoim kluczem prywatnym: m = c<sup>d</sup> mod n. Na przykład " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>, czyli kod litery " + esc(V.ch) + "."
-                  : "Bob odszyfrowuje c swoim kluczem prywatnym: m = c<sup>d</sup> mod n = " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>.",
-      V => V.text ? "Bob odczytuje „" + esc(V.backText) + "”, ten sam tekst, który napisała Alice ✓" : "Bob odczytuje m = " + V.back + ", tę samą liczbę, którą wysłała Alice ✓",
-      V => "Eve ma n, e i c, ale nie ma d. Żeby je policzyć, musiałaby rozłożyć n na czynniki: " + V.n + " = " + V.p + " × " + V.q + " to łatwe, bo n jest malutkie, ale 2048-bitowego n (617 cyfr) nikt nie rozłoży. Teraz wszystko działa na żywo: zmień " + (V.text ? "tekst" : "m") + ", kliknij klucz albo ciemne pole, żeby zajrzeć do środka."],
+                  : "Wiadomość Alice to liczba P od 0 do " + (V.n - 1n) + ", mniejsza od n. Wpisz własne P.",
+      V => V.text ? "Alice szyfruje kod każdej litery kluczem publicznym Boba: C = P<sup>e</sup> mod n. Na przykład " + esc(V.ch) + ": " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>."
+                  : "Alice szyfruje P kluczem publicznym Boba: C = P<sup>e</sup> mod n = " + sup(V.m, V.e) + " mod " + V.n + " = <b>" + V.c + "</b>.",
+      V => V.text ? "Alice wysyła przez kanał liczby C = " + V.cs + ". Eve też przepisuje je do swojego notesu."
+                  : "Alice wysyła C = " + V.c + " przez kanał. Eve też przepisuje C do swojego notesu.",
+      V => V.text ? "Bob odszyfrowuje każde C swoim kluczem prywatnym: P = C<sup>d</sup> mod n. Na przykład " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>, czyli kod litery " + esc(V.ch) + "."
+                  : "Bob odszyfrowuje C swoim kluczem prywatnym: P = C<sup>d</sup> mod n = " + sup(V.c, V.d) + " mod " + V.n + " = <b>" + V.back + "</b>.",
+      V => V.text ? "Bob odczytuje „" + esc(V.backText) + "”, ten sam tekst, który napisała Alice ✓" : "Bob odczytuje P = " + V.back + ", tę samą liczbę, którą wysłała Alice ✓",
+      V => "Eve ma n, e i C, ale nie ma d. Żeby je policzyć, musiałaby rozłożyć n na czynniki: " + V.n + " = " + V.p + " × " + V.q + " to łatwe, bo n jest malutkie, ale 2048-bitowego n (617 cyfr) nikt nie rozłoży. Teraz wszystko działa na żywo: zmień " + (V.text ? "tekst" : "P") + ", kliknij klucz albo ciemne pole, żeby zajrzeć do środka."],
     cardKeys: "Bob tworzy parę kluczy", presets: "przykłady:",
     preNames: ["17, 11, e = 7 (ze slajdów)", "11, 13, e = 23 (phi = 120)", "61, 53, e = 17 (Wikipedia)", "1009, 1013, e = 65537"],
     inP: "p (pierwsza, tajna)", inQ: "q (pierwsza, tajna)", inE: "e (jawne)", inLimit: "na tej stronie liczby pierwsze poniżej 10⁹",
@@ -866,38 +880,38 @@ const T = {
     linkEuclid: "Jak działa rozszerzony algorytm Euklidesa ▶",
     cardTwo: "Dwa klucze", twoNote: "Kliknij klucz, żeby go użyć: jedna potęga modulo n.",
     trash: "p, q i phi: już niepotrzebne; trzymaj je w tajemnicy albo usuń. Kto zna p i q, ten policzy d.",
-    cardPow: "Dwie potęgi", baseM: "m od Alice",
+    cardPow: "Dwie potęgi", baseM: "P od Alice",
     powAlice: "Alice szyfruje", powBob: "Bob odszyfrowuje",
-    sumTitle: "Jak na slajdach, potęgami dwójki:",
+    sumTitle: "Potęgami dwójki:",
     count: (sq, mul, naive) => "Komputer wykonał " + sq + " " + plN(sq, "podniesienie", "podniesienia", "podniesień") + " do kwadratu i " + mul + " " + plN(mul, "mnożenie", "mnożenia", "mnożeń") + ", a nie " + naive + " " + plN(naive > 1000n ? 100 + Number(naive % 100n) : Number(naive), "mnożenia", "mnożeń", "mnożeń") + " po kolei.",
-    countBig: "Wykładnik 2048-bitowy to około 2048 podniesień do kwadratu. Dlatego pow(m, e, n) w Pythonie jest szybkie.",
+    countBig: "Wykładnik 2048-bitowy to około 2048 podniesień do kwadratu. Dlatego pow(P, e, n) w Pythonie jest szybkie.",
     linkPow: "Jak szybko liczy się potęgę mod n ▶",
     mod: "mod",
-    cardWhy: "Dlaczego c^d daje z powrotem m",
+    cardWhy: "Dlaczego C<sup>d</sup> daje z powrotem P",
     whyA: "(a) Po to Bob zrobił d (krok 2):",
     whyA2: (k) => "Czyli e × d = 1 + k × phi, tutaj z k = " + k + ".",
     whyB: "(b) Czym naprawdę jest potęga Boba:",
-    whyEuler: "Twierdzenie Eulera: jeśli gcd(m, n) = 1, to m<sup>phi</sup> mod n = 1. Wtedy (m<sup>phi</sup>)<sup>k</sup> = 1 i Bob dostaje m × 1 = m.",
+    whyEuler: "Twierdzenie Eulera: jeśli gcd(P, n) = 1, to P<sup>phi</sup> mod n = 1. Wtedy (P<sup>phi</sup>)<sup>k</sup> = 1 i Bob dostaje P × 1 = P.",
     whyCop: (m, n) => "gcd(" + m + ", " + n + ") = 1, więc twierdzenie Eulera działa ✓",
-    whyShare: (m, n, g) => "gcd(" + m + ", " + n + ") = " + g + ": m ma wspólny dzielnik z n, więc twierdzenie Eulera nie działa i m<sup>phi</sup> mod n nie jest równe 1. A jednak wynik się zgadza: chińskie twierdzenie o resztach sprawdza to osobno modulo p i modulo q (tu bez dowodu). Siatka niżej pokazuje, że każde takie m wraca.",
-    whyEnd: "Bob odzyskuje m od Alice ✓",
-    cardGrid: "Czy to zawsze działa? (zadanie 5)",
-    gridAll: (n) => "Każde m od 0 do " + (n - 1n) + " zaszyfrowane przez e i odszyfrowane przez d: wszystkie " + n + " wracają ✓",
-    gridPart: (k, n) => "n = " + n + " jest za duże, żeby tu sprawdzić każde m: sprawdzono " + k + " wartości (najmniejsze i wielokrotności p oraz q), wszystkie wracają ✓",
+    whyShare: (m, n, g) => "gcd(" + m + ", " + n + ") = " + g + ": P ma wspólny dzielnik z n, więc twierdzenie Eulera nie działa i P<sup>phi</sup> mod n nie jest równe 1. A jednak wynik się zgadza: chińskie twierdzenie o resztach sprawdza to osobno modulo p i modulo q (tu bez dowodu). Siatka niżej pokazuje, że każde takie P wraca.",
+    whyEnd: "Bob odzyskuje P od Alice ✓",
+    cardGrid: "Czy to zawsze działa?",
+    gridAll: (n) => "Każde P od 0 do " + (n - 1n) + " zaszyfrowane przez e i odszyfrowane przez d: wszystkie " + n + " wracają ✓",
+    gridPart: (k, n) => "n = " + n + " jest za duże, żeby tu sprawdzić każde P: sprawdzono " + k + " wartości (najmniejsze i wielokrotności p oraz q), wszystkie wracają ✓",
     gridBad: (k) => "✗ " + k + " wartości nie wróciło",
-    gridLeg: "w ramkach: m ma wspólny dzielnik z n (wielokrotność p albo q). Twierdzenie Eulera ich nie obejmuje, a też działają. Kliknij liczbę, żeby użyć jej jako m.",
+    gridLeg: "w ramkach: P ma wspólny dzielnik z n (wielokrotność p albo q). Twierdzenie Eulera ich nie obejmuje, a też działają. Kliknij liczbę, żeby użyć jej jako P.",
     gridShown: (k) => "Widać pierwsze " + k + ".",
     cardEve: "Eve atakuje klucz Boba",
-    eveIntro: (e, n, c) => "Eve zna klucz publiczny {e, n} = {" + e + ", " + n + "} i przechwyciła c = " + c + ". Żeby policzyć d, potrzebuje phi, czyli p i q. Dzieli n przez 2, 3, 5, 7, 9, ..., aż któraś liczba podzieli n bez reszty.",
+    eveIntro: (e, n, c) => "Eve zna klucz publiczny {e, n} = {" + e + ", " + n + "} i przechwyciła C = " + c + ". Żeby policzyć d, potrzebuje phi, czyli p i q. Dzieli n przez 2, 3, 5, 7, 9, ..., aż któraś liczba podzieli n bez reszty.",
     bFactor: "Eve: rozłóż n", bFactorAgain: "rozłóż jeszcze raz",
     divRow: (n, i, q, r) => n + " : " + i + " = " + q + ", reszta " + r,
     divCount: (k) => k + " " + plN(k, "dzielenie", "dzielenia", "dzieleń"),
     facFound: (k, n, p, q) => "Znalezione po " + k + " " + plN(k, "dzieleniu", "dzieleniach", "dzieleniach") + ": n = " + n + " = " + p + " × " + q,
     facStop: (k, s) => "Zatrzymane po " + s + " s i " + k + " dzieleniach: n jest za duże na dzielenie próbne w tej przeglądarce. Eve się poddaje.",
-    eveSteps: ["1. rozłóż n", "2. phi = (p - 1)(q - 1)", "3. d = odwrotność e mod phi", "4. odszyfruj c"],
+    eveSteps: ["1. rozłóż n", "2. phi = (p - 1)(q - 1)", "3. d = odwrotność e mod phi", "4. odszyfruj C"],
     eveSame: "to samo d, co w kluczu prywatnym Boba",
-    eveRead: "m od Alice ✓ Eve odczytała je bez klucza prywatnego Boba.",
-    eveNoM: "Wpisz poprawne m w kroku 1 albo 3, żeby Eve miała jakieś c.",
+    eveRead: "P od Alice ✓ Eve odczytała je bez klucza prywatnego Boba.",
+    eveNoM: "Wpisz poprawne P w kroku 1 albo 3, żeby Eve miała jakieś C.",
     cardSize: "Ile to potrwa dla większego n?",
     sizeIntro: "Wybierz rozmiar n. Strona losuje n = p × q (dwie losowe liczby pierwsze sprawdzone testem Millera-Rabina), a Eve rozkłada je dzieleniem próbnym, tutaj w Twojej przeglądarce, najwyżej przez 3 sekundy.",
     bitsLbl: (b) => "n: " + b + " bitów (około " + Math.round(b * 0.30103) + " cyfr)",
@@ -911,47 +925,47 @@ const T = {
     estS: (x) => "około " + x + " s", estYears: (e10) => "około 10<sup>" + e10 + "</sup> lat",
     estAge: "Wszechświat ma około 1,4 × 10<sup>10</sup> lat.",
     thBits: "bity", thN: "n", thDiv: "dzielenia", thTime: "czas", thRes: "wynik", resFound: "p znalezione", resStop: "zatrzymane",
-    nfs: "Prawdziwi atakujący nie dzielą próbnie: ogólne sito ciała liczbowego (GNFS) jest dużo szybsze. Publiczny rekord to RSA-250 (829 bitów, rozłożone w 2020 roku, około 2700 lat pracy jednego rdzenia). 2048-bitowe n jest nadal daleko poza zasięgiem.",
+    nfs: "Prawdziwi atakujący nie dzielą próbnie: ogólne sito ciała liczbowego (GNFS) jest dużo szybsze. Publiczny rekord to RSA-896 (896 bitów, rozłożone we wrześniu 2026 roku na nawet 2048 kartach graficznych). W 2020 roku RSA-250 (829 bitów) zajęło około 2700 lat pracy jednego rdzenia. 2048-bitowe n jest nadal daleko poza zasięgiem.",
     cardSame: "Ta sama wiadomość, ten sam szyfrogram",
     sameNote: "Tekst Alice z kroku 1, zaszyfrowany litera po literze kluczem publicznym Boba. Takie same litery dają takie same szyfrogramy (w ramkach), za każdym razem. Eve nie potrzebuje d, żeby zobaczyć, które litery się powtarzają.",
     sameNone: "W tym tekście żadna litera się nie powtarza. Wpisz w kroku 1 tekst z powtórzoną literą, na przykład HELLO BOB.",
     cardGuess: "Eve zgaduje i sprawdza",
-    guessIntro: (c, n, e) => "Eve przechwyciła c = " + c + ". Zna klucz publiczny {e, n} = {" + e + ", " + n + "} i wie, że Alice wysyła PIN (liczbę mniejszą od 10 000). Szyfruje każdy strzał i porównuje z c.",
+    guessIntro: (c, n, e) => "Eve przechwyciła C = " + c + ". Zna klucz publiczny {e, n} = {" + e + ", " + n + "} i wie, że Alice wysyła PIN (liczbę mniejszą od 10 000). Szyfruje każdy strzał i porównuje z C.",
     guessRange: (lim) => "strzały: od 0 do " + lim,
-    bGuess: "Eve: sprawdź wszystkie strzały", bGuessBig: "to samo na 2048-bitowym kluczu z zadania 6",
-    found: (m, k, ms) => "Znalezione m = " + m + " po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " (" + ms + " ms), bez klucza prywatnego.",
-    notFound: k => "Nie znaleziono w " + k + " strzałach: m od Alice nie jest mniejsze od 10 000, więc założenie Eve było błędne. Przy dużym zbiorze wiadomości ten atak zawodzi; przy PIN-ie działa zawsze.",
+    bGuess: "Eve: sprawdź wszystkie strzały", bGuessBig: "to samo na 2048-bitowym kluczu banku",
+    found: (m, k, ms) => "Znalezione P = " + m + " po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " (" + ms + " ms), bez klucza prywatnego.",
+    notFound: k => "Nie znaleziono w " + k + " strzałach: P od Alice nie jest mniejsze od 10 000, więc założenie Eve było błędne. Przy dużym zbiorze wiadomości ten atak zawodzi; przy PIN-ie działa zawsze.",
     lastTries: "ostatnie strzały:",
-    bigIntro: "Zadanie 6: klucz publiczny banku ma 2048 bitów (n ma 617 cyfr), a e = 65537. Eve przechwyciła C. Ta sama sztuczka, ten sam wynik: długość klucza nie pomaga.",
+    bigIntro: "Bank szyfruje PIN-y podręcznikowym RSA. Jego klucz publiczny ma 2048 bitów (n ma 617 cyfr), a e = 65537. Eve przechwyciła C. Ta sama sztuczka, ten sam wynik: długość klucza nie pomaga.",
     bigRun: (k) => "sprawdzam… " + k + " " + plN(k, "strzał", "strzały", "strzałów"),
     bigFound: (pin, k, s) => "PIN " + pin + " znaleziony po " + k + " " + plN(k, "strzale", "strzałach", "strzałach") + " w " + s + " s, w Twojej przeglądarce.",
-    showN: "2048-bitowe n z zadania 6",
+    showN: "2048-bitowe n banku",
     cardE3: "e = 3 i krótka wiadomość: klucz niepotrzebny",
-    e3Intro: "Klucz Boba w tym przykładzie: stałe 2048-bitowe n i e = 3 (poprawny klucz, d istnieje). Alice wysyła krótki tekst jako jedną liczbę m (jego bajty, jak rsa_ready.py). Jeśli m<sup>3</sup> jest mniejsze od n, reszta z dzielenia nic nie zmienia: c = m<sup>3</sup> dokładnie, a Eve liczy zwykły pierwiastek sześcienny.",
-    e3n: "n (2048 bitów)", e3Lbl: "tekst Alice", e3m: "m (bajty jako jedna liczba)", e3c: "c = m^3 mod n", e3r: "Eve: pierwiastek sześcienny z c", e3read: "Eve czyta",
-    e3Bits: (a, b) => "m<sup>3</sup> ma " + a + " " + plN(a, "bit", "bity", "bitów") + ", n ma " + b + " bitów.",
-    e3Ok: "m<sup>3</sup> < n, więc c = m<sup>3</sup>: pierwiastek sześcienny daje m i Eve czyta tekst bez d.",
-    e3Fail: "m<sup>3</sup> > n, więc c zawinęło się modulo n: pierwiastek daje bzdury. Przy tym n atak działa do 85 bajtów.",
-    e3Fix: "Dlatego prawdziwe RSA przed szyfrowaniem dopełnia wiadomość losowymi bajtami (OAEP): dopełnione m jest prawie tak duże jak n, więc m<sup>3</sup> zawsze się zawija.",
+    e3Intro: "Klucz Boba w tym przykładzie: stałe 2048-bitowe n i e = 3 (poprawny klucz, d istnieje). Alice wysyła krótki tekst jako jedną liczbę P (jego bajty, jak rsa_ready.py). Jeśli P<sup>3</sup> jest mniejsze od n, reszta z dzielenia nic nie zmienia: C = P<sup>3</sup> dokładnie, a Eve liczy zwykły pierwiastek sześcienny.",
+    e3n: "n (2048 bitów)", e3Lbl: "tekst Alice", e3m: "P (bajty jako jedna liczba)", e3c: "C = P<sup>3</sup> mod n", e3r: "Eve: pierwiastek sześcienny z C", e3read: "Eve czyta",
+    e3Bits: (a, b) => "P<sup>3</sup> ma " + a + " " + plN(a, "bit", "bity", "bitów") + ", n ma " + b + " bitów.",
+    e3Ok: "P<sup>3</sup> < n, więc C = P<sup>3</sup>: pierwiastek sześcienny daje P i Eve czyta tekst bez d.",
+    e3Fail: "P<sup>3</sup> > n, więc C zawinęło się modulo n: pierwiastek daje bzdury. Przy tym n atak działa do 85 bajtów.",
+    e3Fix: "Dlatego prawdziwe RSA przed szyfrowaniem dopełnia wiadomość losowymi bajtami (OAEP): dopełnione P jest prawie tak duże jak n, więc P<sup>3</sup> zawsze się zawija.",
     cardMist: "Dwa częste błędy",
-    mistA: "m ≥ n: wynik zawija się modulo n",
-    mistAIn: "m (spróbuj większego od n)",
-    mistARes: (m, n, c, back) => "c = " + sup(m, "e") + " mod " + n + " = " + c + ", a Bob dostaje " + back + " = m mod n, a nie " + m + ".",
-    mistAOk: "To m jest mniejsze od n, więc wraca. Spróbuj większego.",
-    mistANote: "m i m + n dają to samo c. Długą wiadomość trzeba podzielić albo, jak w praktyce, przenosić RSA tylko krótki klucz.",
+    mistA: "P ≥ n: wynik zawija się modulo n",
+    mistAIn: "P (spróbuj większego od n)",
+    mistARes: (m, n, c, back) => "C = " + sup(m, "e") + " mod " + n + " = " + c + ", a Bob dostaje " + back + " = P mod n, a nie " + m + ".",
+    mistAOk: "To P jest mniejsze od n, więc wraca. Spróbuj większego.",
+    mistANote: "P i P + n dają to samo C. Długą wiadomość trzeba podzielić albo, jak w praktyce, przenosić RSA tylko krótki klucz.",
     mistB: "e ma wspólny dzielnik z phi: d nie istnieje",
     mistBRes: (e, phi, g) => "e = " + e + ": gcd(" + e + ", " + phi + ") = " + g + ". Wtedy e × d mod phi jest zawsze wielokrotnością " + g + ", nigdy 1, więc d nie istnieje. Krok 2 nie przyjmie takiego e.",
     mistBNone: "Każde małe nieparzyste e jest względnie pierwsze z tym phi.",
     mistBTry: (e) => "spróbuj e = " + e + " w kroku 2",
     cardHyb: "Szyfrowanie hybrydowe: co naprawdę się wysyła",
-    hybIntro: "RSA jest wolne, a jego m musi być mniejsze od n, więc w praktyce RSA szyfruje tylko świeży losowy klucz, a samą wiadomość szyfruje szybki szyfr symetryczny (AES-256-GCM albo ChaCha20-Poly1305).",
+    hybIntro: "RSA jest wolne, a jego P musi być mniejsze od n, więc w praktyce RSA szyfruje tylko świeży losowy klucz, a samą wiadomość szyfruje szybki szyfr symetryczny (AES-256-GCM albo ChaCha20-Poly1305).",
     hybKey: "1. Alice losuje 256-bitowy klucz K", hybRsa: "2. RSA-2048 (z OAEP) szyfruje K kluczem publicznym Boba", hybSym: "3. AES albo ChaCha20 szyfruje wiadomość kluczem K",
     hybMsg: (b) => "wiadomość: " + b + " " + plN(b, "bajt", "bajty", "bajtów") + " (tekst Alice z kroku 1)",
     hybOut: "Alice wysyła:", hybParts: (b) => ["RSA(K): 256 bajtów", "nonce: 12 bajtów", "szyfrogram: " + b + " " + plN(b, "bajt", "bajty", "bajtów"), "tag: 16 bajtów"],
     hybBob: "Bob odszyfrowuje K kluczem prywatnym (jedna operacja RSA), a potem wiadomość kluczem K. Zdjęcie 5 MB wymaga tej samej jednej operacji RSA; rośnie tylko część symetryczna.",
     bNewKey: "nowy K",
     cardReal: "Co robi prawdziwe RSA",
-    real: ["<b>Losowe dopełnienie (OAEP).</b> Przed szyfrowaniem do wiadomości dokleja się w ustalony sposób losowe bajty. Ten sam PIN daje wtedy za każdym razem inne c i strzały Eve przestają pasować. Bob usuwa dopełnienie po odszyfrowaniu. Każda biblioteka robi to za nas.",
+    real: ["<b>Losowe dopełnienie (OAEP).</b> Przed szyfrowaniem do wiadomości dokleja się w ustalony sposób losowe bajty. Ten sam PIN daje wtedy za każdym razem inne C i strzały Eve przestają pasować. Bob usuwa dopełnienie po odszyfrowaniu. Każda biblioteka robi to za nas.",
            "<b>Duże klucze.</b> n ma co najmniej 2048 bitów (617 cyfr), więc nikt nie rozłoży go na p i q, żeby policzyć d. Małe liczby na tej stronie służą tylko do nauki.",
            "<b>Tylko klucz.</b> RSA jest wolne, więc w praktyce przenosi tylko losowy klucz symetryczny (szyfrowanie hybrydowe), a dane szyfruje ChaCha20 albo AES."],
     realNote: "Ta strona pokazuje tylko podręcznikowe RSA. Nie pokazuje OAEP.",
@@ -959,7 +973,7 @@ const T = {
     leakIntro: "Eve nagrywała każdy szyfrogram od Alice (tutaj: litery jej tekstu z kroku 1). Po latach kradnie klucz prywatny Boba d.",
     bLeak: "Eve kradnie d", bUnleak: "cofnij",
     leakRec: "nagrane", leakOpen: "otwarte przez d",
-    leakNote: "Wyciek klucza prywatnego otwiera wszystkie nagrane wiadomości od wszystkich, którzy pisali do Boba, i wszystkie nowe, dopóki Bob nie zmieni klucza. Rozwiązanie to klucze, które żyją tylko przez jedną sesję (forward secrecy, następny wykład).",
+    leakNote: "Wyciek klucza prywatnego otwiera wszystkie nagrane wiadomości od wszystkich, którzy pisali do Boba, i wszystkie nowe, dopóki Bob nie zmieni klucza. Rozwiązanie to klucze, które żyją tylko przez jedną sesję (forward secrecy).",
   },
 };
 
@@ -1021,6 +1035,7 @@ function legendHTML() {
 /* ---------- step 1: black box, told as a story in STORY_N small steps ---------- */
 const STORY_N = 9;
 const GLOBE_SVG = '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 10h16M10 2c-3 3-3 13 0 16M10 2c3 3 3 13 0 16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+const PERSON_A = PERSON_SVG.replace('<svg ', '<svg class="who-a" '), PERSON_B = PERSON_SVG.replace('<svg ', '<svg class="who-b" ');
 const BIG_PERSON = PERSON_SVG.replace('width="18" height="18"', 'width="64" height="64"');
 // st = the story step where an element appears, en = where it goes away, nw = the steps where it is new (default: st)
 const sa = (st, nw, en) => ' data-st="' + st + '"' + (nw ? ' data-nw="' + nw + '"' : "") + (en ? ' data-en="' + en + '"' : "");
@@ -1035,11 +1050,11 @@ function render0() {
   const ar = (pts, c, m, st, extra) => ln(pts, c, m, sa(st) + (extra || ""));
   return '<div class="card"><div class="cardhead"><h3>' + t.card1 + '</h3><span class="tabs">' + tab("num", t.modeNum) + tab("text", t.modeText) + "</span></div>" +
     '<div class="schwrap"><div class="sch1">' +
-      '<div class="zone zone-a"><div class="zh">' + PERSON_SVG + t.alice + "</div></div>" +
-      '<div class="zone zone-b"><div class="zh">' + PERSON_SVG + t.bob + "</div></div>" +
+      '<div class="zone zone-a"><div class="zh">' + PERSON_A + t.alice + "</div></div>" +
+      '<div class="zone zone-b"><div class="zh">' + PERSON_B + t.bob + "</div></div>" +
       '<div class="zone zone-c"><div class="zh">' + GLOBE_SVG + t.chan + "<small>" + t.chanSub + "</small></div></div>" +
-      '<div class="bigp" style="left:115px"' + sa(1, "-", 2) + ">" + BIG_PERSON + t.alice + "</div>" +
-      '<div class="bigp" style="left:648px"' + sa(1, "-", 2) + ">" + BIG_PERSON + t.bob + "</div>" +
+      '<div class="bigp" style="left:115px"' + sa(1, "-", 2) + ">" + BIG_PERSON.replace('<svg ', '<svg class="who-a" ') + t.alice + "</div>" +
+      '<div class="bigp" style="left:648px"' + sa(1, "-", 2) + ">" + BIG_PERSON.replace('<svg ', '<svg class="who-b" ') + t.bob + "</div>" +
       '<svg class="arrows" width="876" height="520" aria-hidden="true"><defs>' + mk("a_pub", "var(--ctr-b)") + mk("a_sec", "var(--key-b)") + mk("a_ink", "var(--ink)") + mk("a_eve", "var(--g2)") + "</defs>" +
         ar("266,134 266,182", "var(--ctr-b)", "a_pub", 5) + ar("624,134 624,182", "var(--key-b)", "a_sec", 7) +
         ar("172,226 188,226", "var(--ink)", "a_ink", 5) + ar("342,226 366,226", "var(--ink)", "a_ink", 6) +
@@ -1047,14 +1062,14 @@ function render0() {
         ar("445,308 445,336", "var(--g2)", "a_eve", 1, ' stroke-dasharray="6 4"') + "</svg>" +
       '<button class="kbox role-pub s1-pub" data-action="go" data-to="1"' + sa(2, "2 3") + '><span class="nh">' + LOCK_SVG + t.pubKey + '</span><span class="kv">e = ' + K.e + (String(K.n).length > 8 ? "<br>" : ",&nbsp; ") + "n = " + K.n + "</span><small>" + t.pubSub + "</small></button>" +
       '<button class="kbox role-sec s1-prv" data-action="go" data-to="1"' + sa(2) + '><span class="stays">' + LOCK_SVG.replace('width="18" height="18"', 'width="11" height="11"') + t.stays + '</span><span class="nh">' + KEY_SVG + t.prvKey + '</span><span class="kv">d = ' + K.d + (String(K.n).length > 8 ? "<br>" : ",&nbsp; ") + "n = " + K.n + "</span><small>" + t.prvSub + "</small></button>" +
-      '<div class="node role-msg s1-m"' + sa(4) + '><div class="nh">' + PERSON_SVG + t.alice + ": " + t.mNode + "</div>" + mIn + '<div class="err" id="s1merr"></div></div>' +
-      '<button class="box s1-enc" data-action="pow" data-dir="enc"' + sa(5) + ">" + t.encBox + '<span class="f">c = m<sup>e</sup> mod n</span><small>' + t.boxSub + "</small></button>" +
+      '<div class="node role-msg s1-m"' + sa(4) + '><div class="nh">' + PERSON_A + t.alice + ": " + t.mNode + "</div>" + mIn + '<div class="err" id="s1merr"></div></div>' +
+      '<button class="box s1-enc" data-action="pow" data-dir="enc"' + sa(5) + ">" + t.encBox + '<span class="f">C = P<sup>e</sup> mod n</span><small>' + t.boxSub + "</small></button>" +
       '<div class="calc calc-e" id="s1ce"' + sa(5) + "></div>" +
       '<div class="node role-ct s1-c"' + sa(6) + '><div class="nh">' + t.cNode + '</div><div id="s1c"></div></div>' +
-      '<button class="box s1-dec" data-action="pow" data-dir="dec"' + sa(7) + ">" + t.decBox + '<span class="f">m = c<sup>d</sup> mod n</span><small>' + t.boxSub + "</small></button>" +
+      '<button class="box s1-dec" data-action="pow" data-dir="dec"' + sa(7) + ">" + t.decBox + '<span class="f">P = C<sup>d</sup> mod n</span><small>' + t.boxSub + "</small></button>" +
       '<div class="calc calc-d" id="s1cd"' + sa(7) + "></div>" +
-      '<div class="node role-msg s1-out"' + sa(8) + '><div class="nh">' + PERSON_SVG + t.outNode + '</div><div id="s1out"></div></div>' +
-      '<div class="node role-eve s1-eve"' + sa(1, "1 9") + '><div class="nh">' + EAR_SVG + t.eve + '</div><div id="s1eve"></div></div>' +
+      '<div class="node role-msg s1-out"' + sa(8) + '><div class="nh">' + PERSON_B + t.outNode + '</div><div id="s1out"></div></div>' +
+      '<div class="node role-eve s1-eve"' + sa(1, "1 9") + '><div class="nh">' + EAR_SVG.replace('<svg ', '<svg class="who-e" ') + t.eve + '</div><div id="s1eve"></div></div>' +
     "</div></div>" + '<div data-st="9" data-inl>' + legendHTML() + "</div></div>" +
     '<div class="card" data-st="9" data-inl><h3>' + t.cardDetails1 + '</h3><div id="s1det"></div></div>';
 }
@@ -1070,7 +1085,7 @@ function storyBarHTML() {
 }
 // the real numbers the story talks about
 function storyVals() {
-  const K = app.K, V = { e: K.e, n: K.n, d: K.d, p: K.p < K.q ? K.p : K.q, q: K.p < K.q ? K.q : K.p, text: app.mode === "text",
+  const K = app.K, V = { e: K.e, n: K.n, d: K.d, p: K.p, q: K.q, text: app.mode === "text",
     m: "?", c: "?", back: "?", ch: "?", cs: "?", backText: "?" };
   if (!V.text) {
     if (mOK()) { V.m = app.m; V.c = encrypt(app.m, K); V.back = decrypt(V.c, K); }
@@ -1128,8 +1143,8 @@ function updateL0() {
       cd.innerHTML = sup(c, K.d) + " mod " + K.n + " = " + back;
       cShow = String(c);
       det.innerHTML = '<table class="ftab">' +
-        '<tr data-action="pow" data-dir="enc" style="cursor:pointer"><td class="lbl">' + t.rowAlice + "</td><td>c = " + sup(app.m, K.e) + " mod " + K.n + " = <b>" + c + "</b></td></tr>" +
-        '<tr data-action="pow" data-dir="dec" style="cursor:pointer"><td class="lbl">' + t.rowBob + "</td><td>m = " + sup(c, K.d) + " mod " + K.n + " = <b>" + back + "</b></td></tr></table>" +
+        '<tr data-action="pow" data-dir="enc" style="cursor:pointer"><td class="lbl">' + t.rowAlice + "</td><td>C = " + sup(app.m, K.e) + " mod " + K.n + " = <b>" + c + "</b></td></tr>" +
+        '<tr data-action="pow" data-dir="dec" style="cursor:pointer"><td class="lbl">' + t.rowBob + "</td><td>P = " + sup(c, K.d) + " mod " + K.n + " = <b>" + back + "</b></td></tr></table>" +
         '<p class="note" style="margin:6px 0 0">' + t.clickPow + "</p>";
     }
   } else {
@@ -1152,9 +1167,9 @@ function updateL0() {
   }
   // Eve's notebook fills up as the story goes
   eve.innerHTML = '<div class="eveline nl" data-st="1" data-nw="-" data-en="3" data-inl>' + t.listens + "</div>" +
-    '<div class="eveline nl" data-st="3" data-inl><b>' + t.eveSees + ':</b> <span class="v">n = ' + K.n + ", e = " + K.e + '<span class="nl" data-st="6" data-inl>, c = ' + esc(cShow) + "</span></span></div>" +
+    '<div class="eveline nl" data-st="3" data-inl><b>' + t.eveSees + ':</b> <span class="v">n = ' + K.n + ", e = " + K.e + '<span class="nl" data-st="6" data-inl>, C = ' + esc(cShow) + "</span></span></div>" +
     '<div class="eveline nl" data-st="9" data-nw="-" data-inl><b>' + t.eveNot + ':</b> <span class="v">d</span> ' + t.eveNotWhat + "</div>" +
-    '<div class="eveline note nl" data-st="9" data-nw="-" data-inl>' + t.eveFactor(K.n, K.p < K.q ? K.p : K.q, K.p < K.q ? K.q : K.p) + "</div>";
+    '<div class="eveline note nl" data-st="9" data-nw="-" data-inl>' + t.eveFactor(K.n, K.p, K.q) + "</div>";
   updateStory();
 }
 function letterTable(ms, cs, back, markSame) {
@@ -1278,7 +1293,7 @@ function updateL2() {
     pw.innerHTML = why.innerHTML = '<p class="err">' + t.errM(K.n - 1n) + "</p>";
   } else {
     const m = app.m, c = encrypt(m, K);
-    pw.innerHTML = powHTML(t.powAlice, "c", m, K.e, K.n, "role-ct") + powHTML(t.powBob, "m", c, K.d, K.n, "role-msg") +
+    pw.innerHTML = powHTML(t.powAlice, "C", m, K.e, K.n, "role-ct") + powHTML(t.powBob, "P", c, K.d, K.n, "role-msg") +
       '<p class="note" style="margin:8px 0 0">' + t.countBig + "</p>" +
       '<a class="golink" href="../math/fast-exponentiation/index.html?m=' + m + "&amp;e=" + K.e + "&amp;n=" + K.n + '#2">' + t.linkPow + "</a>";
     // the reason, with these numbers
@@ -1288,7 +1303,7 @@ function updateL2() {
     let h = "<p style=\"margin:0\">" + t.whyA + "</p>" +
       ln1("e × d = " + K.e + " × " + K.d + " = " + ed + " = 1 + " + k + " × " + K.phi) + '<p style="margin:0 0 10px">' + t.whyA2(k) + "</p>" +
       "<p style=\"margin:0\">" + t.whyB + "</p>" +
-      ln1("c<sup>d</sup> = (m<sup>e</sup>)<sup>d</sup> = m<sup>e × d</sup> = m<sup>1 + k × phi</sup> = m × (m<sup>phi</sup>)<sup>k</sup> (mod n)") +
+      ln1("C<sup>d</sup> = (P<sup>e</sup>)<sup>d</sup> = P<sup>e × d</sup> = P<sup>1 + k × phi</sup> = P × (P<sup>phi</sup>)<sup>k</sup> (mod n)") +
       ln1(sup(c, K.d) + " = (" + sup(m, K.e) + ")<sup>" + K.d + "</sup> = " + sup(m, ed) + " = " + m + " × (" + sup(m, K.phi) + ")<sup>" + k + "</sup> (mod " + K.n + ")") +
       '<p style="margin:8px 0 4px">' + t.whyEuler + "</p>" +
       ln1(sup(m, K.phi) + " mod " + K.n + " = <b>" + mphi + "</b>");
@@ -1397,13 +1412,14 @@ function updateL3() {
     let h = '<div class="divs">' + divRows(F.st, 8) + '</div><p class="note" style="margin:4px 0 8px">' + t.divCount(F.st.count) + ", " + (F.ms / 1000).toFixed(2) + " s</p>";
     if (F.stopped) h += '<p class="badline">' + t.facStop(F.st.count, (F.ms / 1000).toFixed(1)) + "</p>";
     else if (F.st.f !== null) {
-      const p = F.st.f, q = K.n / p, phi = (p - 1n) * (q - 1n), d = modInverse(K.e, phi);
+      // shown in the order of Bob's p and q (187 = 17 × 11, as on the slides), whichever factor Eve found first
+      const p = F.st.f === K.q ? K.p : F.st.f, q = K.n / p, phi = (p - 1n) * (q - 1n), d = modInverse(K.e, phi);
       const rows = [
         [t.eveSteps[0], "n = " + K.n + " = <b>" + p + " × " + q + "</b>"],
         [t.eveSteps[1], "phi = " + (p - 1n) + " × " + (q - 1n) + " = <b>" + phi + "</b>"],
         [t.eveSteps[2], "d = <b>" + d + "</b>" + (d === K.d ? ' <span class="note">(' + t.eveSame + ")</span>" : "") +
           ' <a class="note" href="../math/extended-euclid/index.html?a=' + phi + "&amp;b=" + K.e + '#3">' + t.linkEuclid + "</a>"],
-        [t.eveSteps[3], c === null ? '<span class="err">' + t.eveNoM + "</span>" : "m = " + sup(c, d) + " mod " + K.n + " = <b>" + modPow(c, d, K.n) + '</b> <span class="okline">' + t.eveRead + "</span>"]];
+        [t.eveSteps[3], c === null ? '<span class="err">' + t.eveNoM + "</span>" : "P = " + sup(c, d) + " mod " + K.n + " = <b>" + modPow(c, d, K.n) + '</b> <span class="okline">' + t.eveRead + "</span>"]];
       h += '<p class="okline" style="margin:0 0 6px">' + t.facFound(F.st.count, K.n, p, q) + '</p><table class="ktab">' +
         rows.map(r => '<tr><td style="white-space:nowrap">' + r[0] + '</td><td class="val">' + r[1] + "</td></tr>").join("") + "</table>";
     }
@@ -1479,7 +1495,7 @@ function updateL4() {
     if (G && G.c === c && G.n === K.n && G.e === K.e) {
       h += '<div class="found">' + (G.found !== null ? '<span class="okline">' + t.found(G.found, G.tries, G.ms) + "</span>" : '<span class="badline">' + t.notFound(G.tries) + "</span>") + "</div>";
       h += '<p class="note" style="margin:6px 0 2px">' + t.lastTries + '</p><table class="ftab">' + G.last.map(r =>
-        "<tr" + (r.hit ? ' style="color:var(--ok);font-weight:700"' : "") + "><td>" + sup(r.g, K.e) + " mod " + K.n + " = " + r.c + "</td><td>" + (r.hit ? "= c ✓" : "≠ c") + "</td></tr>").join("") + "</table>";
+        "<tr" + (r.hit ? ' style="color:var(--ok);font-weight:700"' : "") + "><td>" + sup(r.g, K.e) + " mod " + K.n + " = " + r.c + "</td><td>" + (r.hit ? "= C ✓" : "≠ C") + "</td></tr>").join("") + "</table>";
     }
     g.innerHTML = h;
   }
@@ -1548,9 +1564,9 @@ function updateHyb() {
   if (!el) return;
   const t = L();
   if (!app.hybKey) { const b = new Uint8Array(32); crypto.getRandomValues(b); app.hybKey = Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); }
-  const mb = new TextEncoder().encode(app.msg).length, parts = t.hybParts(mb), sizes = [256, 12, mb, 16], roles = ["role-ct", "role-pub", "role-ct", "role-pub"];
+  const mb = new TextEncoder().encode(app.msg).length, parts = t.hybParts(mb), sizes = [256, 12, mb, 16], roles = ["role-ct", "role-neu", "role-ct", "role-neu"];
   el.innerHTML = '<div class="hyb">' +
-    '<div class="hrow"><div class="hn role-sec"><b>' + t.hybKey + '</b><span class="mono hk">' + app.hybKey + '</span></div><span class="harr">→</span><div class="hbox">RSA-2048<small>' + t.hybRsa + '</small></div><span class="harr">→</span><div class="hn role-ct"><b>' + parts[0] + "</b></div></div>" +
+    '<div class="hrow"><div class="hn role-sym"><b>' + t.hybKey + '</b><span class="mono hk">' + app.hybKey + '</span></div><span class="harr">→</span><div class="hbox">RSA-2048<small>' + t.hybRsa + '</small></div><span class="harr">→</span><div class="hn role-ct"><b>' + parts[0] + "</b></div></div>" +
     '<div class="hrow"><div class="hn role-msg"><b>' + t.hybMsg(mb) + '</b><span class="mono">' + esc(app.msg) + '</span></div><span class="harr">→</span><div class="hbox">AES-256-GCM / ChaCha20<small>' + t.hybSym + '</small></div><span class="harr">→</span><div class="hn role-ct"><b>' + parts[2] + "</b></div></div>" +
     '<p style="margin:10px 0 4px"><b>' + t.hybOut + '</b></p><div class="hbar">' +
       parts.map((x, i) => '<span class="' + roles[i] + '" style="flex:' + sizes[i] + ' 0 auto">' + x + "</span>").join("") + "</div>" +
@@ -1739,9 +1755,14 @@ document.addEventListener("keydown", e => {
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
 // #3 opens step 3; #1.5 opens step 1 at story step 5
-const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
-if (hm && +hm[1] >= 1 && +hm[1] <= 5) app.level = +hm[1] - 1;
-if (hm && hm[2] && app.level === 0) app.story = Math.max(1, Math.min(STORY_N, +hm[2]));
+function readHash() {
+  const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
+  if (hm && +hm[1] >= 1 && +hm[1] <= 5) app.level = +hm[1] - 1;
+  if (hm && app.level === 0) app.story = hm[2] ? Math.max(1, Math.min(STORY_N, +hm[2])) : 1;
+}
+// a link from a slide opens the right step even in a tab that is already open
+window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { readHash(); render(); view.scrollTop = 0; } });
+readHash();
 render();
 </script>
 </body>

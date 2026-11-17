@@ -443,7 +443,7 @@ function selfTest() {
     if (!samePoint(R, want)) { fails.push(k + "G"); break; }
     if (!samePoint(mul(C, BigInt(k), C.G), want)) { fails.push("double and add " + k + "G"); break; }
   }
-  // doubling G on the slides: s = 13, 2G = (6, 3); Task 1: G + 2G = (10, 6) with s = 2
+  // doubling G on the slides: s = 13, 2G = (6, 3); the paper exercise: G + 2G = (10, 6) with s = 2
   const d = addInfo(C, C.G, C.G);
   if (d.numM !== 9n || d.denInv !== 9n || d.s !== 13n || d.x3Raw !== 159n || d.y3Raw !== -14n || !samePoint(d.R, pt(6, 3))) fails.push("2G step by step");
   const t = addInfo(C, C.G, pt(6, 3));
@@ -502,18 +502,19 @@ const T = {
       ecdh: ["Diffie-Hellman with points", "Alice and Bob each pick a secret number and publish a point: A = aG and B = bG. Each multiplies the other's point by their own secret, and both get the same point abG. Eve sees the curve, G, A and B. Change the secrets. Click an a × G box to see what multiplying a point means."],
       elg: ["ElGamal with points", "Bob publishes Q = dG. Alice's message is a point M. She picks a random k and sends C₁ = kG and C₂ = M + kQ. Bob subtracts dC₁ = kQ and gets M back. Eve sees Q, C₁ and C₂. Click a box to see how points are added."],
       add: ["P + Q: draw a line, find the third point, reflect it", "Over the real numbers the curve y² = x³ + 2x + 2 is one smooth line. The line through P and Q meets the curve in exactly one more point. Its mirror image in the x-axis is P + Q. For P + P the line is the tangent. Drag P and Q."],
-      mod: ["The same curve modulo 17", "Computers need exact numbers, so x and y are whole numbers from 0 to 16 and every result is taken mod 17. The line becomes 18 dots, plus the point at infinity O. Adding G again and again visits all of them. Double and add gets to kG fast. Click a step to see its numbers."],
+      mod: ["The same curve modulo 17", "Computers need exact numbers, so x and y are whole numbers from 0 to 16 and every result is taken mod 17. The line becomes 18 dots, plus the point at infinity O. Click any square to check whether it is a point of the curve. Then add G again and again (G, 2G, 3G, …), or get to kG fast with double and add."],
       one: ["One addition, number by number", "The picture of step 2 becomes three formulas: the slope s, then x₃ and y₃, all mod 17. Dividing means multiplying by the modular inverse. Pick two points, or come here from step 3."],
     },
     selfOk: "✓ checked against the slides, Paar and Pelzl (ch. 9) and RFC 5903 (P-256)", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
     tabEcdh: "ECDH: agree on a point", tabElg: "ElGamal: encrypt a point",
-    pubT: "public", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1), order 19",
+    pubT: "public", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1)",
     alice: "Alice", bob: "Bob", eve: "Eve", rand: "random number",
     secA: "secret a (1 to 18)", secB: "secret b (1 to 18)", box_s: "click to look inside",
     ptA: "public A = aG", ptB: "public B = bG", toBob: "A to Bob", toAlice: "B to Alice",
     sharedA: "shared point aB", sharedB: "shared point bA", eveListens: "Eve listens", eveSees: "sees",
     cardCurve1: "On the curve", cardEve: "Eve's attack on this small curve",
+    eveShow: "show Eve's attack", eveHidden: "Eve tries G, 2G, 3G, … until she reaches A. The list shows the multiples of G: work them out yourself first, then click to compare.",
     eveTry: (n, a) => "Eve adds G again and again until she reaches A. After " + n + " " + (n === 1 ? "try" : "tries") + " she knows a = " + a + ", and a × B gives her the shared point.",
     eveReal: "Here there are only 19 multiples. On P-256 there are about 2²⁵⁶, and the best known attack needs about 2¹²⁸ steps. Small numbers are only for learning.",
     cardBig: "The same on a real curve: P-256",
@@ -541,7 +542,8 @@ const T = {
     cardGrid: "y² = x³ + 2x + 2 mod 17: 18 dots and O", gridNote: "Click any square: is it a point of the curve?",
     mirror: "dashed line y = 8.5: (x, y) and (x, 17 − y) are mirror images",
     isOn: (x, y, l, lr, r, rr, on) => "(" + x + ", " + y + "): left side y² = " + l + " → " + lr + " mod 17; right side x³ + 2x + 2 = " + r + " → " + rr + " mod 17. " + (on ? "Both are " + lr + ": on the curve ✓" : "Different: not on the curve ✗"),
-    tabMult: "Multiples of G", tabDbl: "kG: double and add",
+    tabMult: "Multiples of G", tabDbl: "kG: double and add", tabPts: "The points",
+    multHidden: "Adding G again and again gives G, 2G, 3G, … Where does it go, and when does it reach O? Work it out yourself first, then click to compare.", multShow: "show the multiples of G",
     multNote: "Each next point is the previous one plus G. Click a point to jump there.",
     multO: "19G = O: back to the start. The order of G is 19: G visited all 18 dots, then O.",
     multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
@@ -557,7 +559,7 @@ const T = {
     reduce: (k, q, r) => "19G = O, so only k mod 19 matters: " + k + " = " + q + " × 19 + " + r + ", so " + k + "G = " + r + "G.",
     resultIs: (k, pt) => k + "G = " + pt,
     // step 4
-    cardPick: "Pick two points", presets: "examples:", prDbl: "G + G (slides)", prTask: "G + 2G (Task 1)", prNeg: "G + (−G)",
+    cardPick: "Pick two points", presets: "examples:", prDbl: "G + G (slides)", prNeg: "G + (−G)",
     cardForm: "The formulas (mod 17)", fChord: "for P + Q:", fDbl: "for P + P:", fRes: "result:",
     divNote: "“/ v mod 17” means: multiply by v⁻¹, the number with v × v⁻¹ = 1 mod 17.",
     cardCalc: (P, Q, R) => P + " + " + Q + " = " + R + ", step by step",
@@ -579,18 +581,19 @@ const T = {
       ecdh: ["Diffie-Hellman na punktach", "Alice i Bob wybierają po tajnej liczbie i publikują punkt: A = aG oraz B = bG. Każde mnoży punkt drugiej strony przez swój sekret i oboje dostają ten sam punkt abG. Eve widzi krzywą, G, A i B. Zmień sekrety. Kliknij pole a × G, żeby zobaczyć, co znaczy mnożenie punktu."],
       elg: ["ElGamal na punktach", "Bob publikuje Q = dG. Wiadomość Alice to punkt M. Alice losuje k i wysyła C₁ = kG oraz C₂ = M + kQ. Bob odejmuje dC₁ = kQ i odzyskuje M. Eve widzi Q, C₁ i C₂. Kliknij pole, żeby zobaczyć, jak dodaje się punkty."],
       add: ["P + Q: prosta, trzeci punkt, odbicie", "Nad liczbami rzeczywistymi krzywa y² = x³ + 2x + 2 to jedna gładka linia. Prosta przez P i Q przecina krzywą w dokładnie jednym kolejnym punkcie. Jego odbicie względem osi x to P + Q. Dla P + P prosta jest styczną. Przeciągnij P i Q."],
-      mod: ["Ta sama krzywa modulo 17", "Komputer potrzebuje dokładnych liczb, więc x i y to liczby całkowite od 0 do 16, a każdy wynik bierzemy mod 17. Linia zmienia się w 18 kropek i punkt w nieskończoności O. Dodawanie G raz za razem odwiedza je wszystkie. Podwajanie i dodawanie szybko prowadzi do kG. Kliknij krok, żeby zobaczyć jego liczby."],
+      mod: ["Ta sama krzywa modulo 17", "Komputer potrzebuje dokładnych liczb, więc x i y to liczby całkowite od 0 do 16, a każdy wynik bierzemy mod 17. Linia zmienia się w 18 kropek i punkt w nieskończoności O. Kliknij dowolne pole, żeby sprawdzić, czy to punkt krzywej. Potem dodawaj G raz za razem (G, 2G, 3G, …) albo szybko dojdź do kG podwajaniem i dodawaniem."],
       one: ["Jedno dodawanie, liczba po liczbie", "Rysunek z kroku 2 zamienia się w trzy wzory: nachylenie s, potem x₃ i y₃, wszystko mod 17. Dzielenie to mnożenie przez odwrotność modularną. Wybierz dwa punkty albo przyjdź tu z kroku 3."],
     },
     selfOk: "✓ sprawdzone ze slajdami, z Paarem i Pelzlem (rozdz. 9) i z RFC 5903 (P-256)", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
     tabEcdh: "ECDH: wspólny punkt", tabElg: "ElGamal: szyfrowanie punktu",
-    pubT: "jawne", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1), rząd 19",
+    pubT: "jawne", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1)",
     alice: "Alice", bob: "Bob", eve: "Eve", rand: "losowa liczba",
     secA: "sekret a (od 1 do 18)", secB: "sekret b (od 1 do 18)", box_s: "kliknij, by zajrzeć",
     ptA: "jawny punkt A = aG", ptB: "jawny punkt B = bG", toBob: "A do Boba", toAlice: "B do Alice",
     sharedA: "wspólny punkt aB", sharedB: "wspólny punkt bA", eveListens: "Eve podsłuchuje", eveSees: "widzi",
     cardCurve1: "Na krzywej", cardEve: "Atak Eve na tę małą krzywą",
+    eveShow: "pokaż atak Eve", eveHidden: "Eve próbuje G, 2G, 3G, …, aż dojdzie do A. Lista pokazuje wielokrotności G: najpierw policz je sam, potem kliknij i porównaj.",
     eveTry: (n, a) => "Eve dodaje G raz za razem, aż dojdzie do A. Po " + n + " " + plN(n, "próbie", "próbach", "próbach") + " zna a = " + a + ", a a × B daje jej wspólny punkt.",
     eveReal: "Tutaj jest tylko 19 wielokrotności. Na P-256 jest ich około 2²⁵⁶, a najlepszy znany atak potrzebuje około 2¹²⁸ kroków. Małe liczby służą tylko do nauki.",
     cardBig: "To samo na prawdziwej krzywej: P-256",
@@ -616,7 +619,8 @@ const T = {
     cardGrid: "y² = x³ + 2x + 2 mod 17: 18 kropek i O", gridNote: "Kliknij dowolne pole: czy to punkt krzywej?",
     mirror: "przerywana linia y = 8,5: (x, y) i (x, 17 − y) to odbicia",
     isOn: (x, y, l, lr, r, rr, on) => "(" + x + ", " + y + "): lewa strona y² = " + l + " → " + lr + " mod 17; prawa strona x³ + 2x + 2 = " + r + " → " + rr + " mod 17. " + (on ? "Obie to " + lr + ": punkt leży na krzywej ✓" : "Różne: punkt nie leży na krzywej ✗"),
-    tabMult: "Wielokrotności G", tabDbl: "kG: podwajanie i dodawanie",
+    tabMult: "Wielokrotności G", tabDbl: "kG: podwajanie i dodawanie", tabPts: "Punkty",
+    multHidden: "Dodawanie G raz za razem daje G, 2G, 3G, … Dokąd prowadzi i kiedy dochodzi do O? Najpierw policz sam, potem kliknij i porównaj.", multShow: "pokaż wielokrotności G",
     multNote: "Każdy kolejny punkt to poprzedni plus G. Kliknij punkt, żeby do niego przejść.",
     multO: "19G = O: powrót do początku. Rząd G to 19: G odwiedził wszystkie 18 kropek, a potem O.",
     multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
@@ -631,7 +635,7 @@ const T = {
     opsCount: (d, a, k) => d + " " + plN(d, "podwojenie", "podwojenia", "podwojeń") + " i " + a + " " + plN(a, "dodawanie", "dodawania", "dodawań") + " zamiast " + (k - 1) + " " + plN(k - 1, "dodawania", "dodawań", "dodawań") + ". Dla 256-bitowego k: około 256 podwojeń, a nie 2²⁵⁶ dodawań.",
     reduce: (k, q, r) => "19G = O, więc liczy się tylko k mod 19: " + k + " = " + q + " × 19 + " + r + ", czyli " + k + "G = " + r + "G.",
     resultIs: (k, pt) => k + "G = " + pt,
-    cardPick: "Wybierz dwa punkty", presets: "przykłady:", prDbl: "G + G (slajdy)", prTask: "G + 2G (zadanie 1)", prNeg: "G + (−G)",
+    cardPick: "Wybierz dwa punkty", presets: "przykłady:", prDbl: "G + G (slajdy)", prNeg: "G + (−G)",
     cardForm: "Wzory (mod 17)", fChord: "dla P + Q:", fDbl: "dla P + P:", fRes: "wynik:",
     divNote: "„/ v mod 17” oznacza mnożenie przez v⁻¹, czyli liczbę, dla której v × v⁻¹ = 1 mod 17.",
     cardCalc: (P, Q, R) => P + " + " + Q + " = " + R + ", krok po kroku",
@@ -655,13 +659,15 @@ const L = () => T[lang];
 const MULT = [null];
 for (let k = 1; k <= 19; k++) MULT.push(mulSlow(TOY, k, TOY.G));
 const multOf = P => { for (let k = 1; k <= 19; k++) if (samePoint(MULT[k], P)) return k; return -1; };
+// the indices k of the 18 points, sorted by x and then y: the menus list the points in this order, not as G, 2G, 3G, ...
+const BY_XY = curvePoints(TOY).map(P => multOf(P));
 
 const app = {
-  level: 0, tab1: "ecdh",
+  level: 0, tab1: "ecdh", eveOpen: false, scrollTo: null,
   a: 3, b: 10, d: 7, m: 11, k: 4,
   bigA: RFC5903.i.toString(16), bigB: RFC5903.r.toString(16),
   rmode: "add", rP: { x: -0.7, up: true }, rQ: { x: 0.2, up: true },
-  mode3: "mult", mk: 3, dk: 100, dstep: 0, cell: { x: 5, y: 1 },
+  mode3: "pts", mk: 1, dk: 100, dstep: 0, cell: { x: 5, y: 1 },
   p4: 1, q4: 1, s4: 1, origin4: null,
 };
 
@@ -763,15 +769,15 @@ function render0() {
         '<div class="eqc" id="eqc" style="left:427px;top:484px"></div>' +
       "</div></div>" + legend + "</div>" +
       '<div class="row"><div class="card" style="flex:0 0 auto"><h3>' + t.cardCurve1 + '</h3><div id="g1"></div></div>' +
-        '<div class="card" style="flex:1 1 340px"><h3>' + t.cardEve + '</h3><div id="eveAtk"></div></div></div>' +
-      '<div class="card"><h3>' + t.cardBig + '</h3><p class="note" style="margin:0 0 8px">' + t.bigNote + '</p><div class="big">' +
+        '<div class="card" style="flex:1 1 340px" id="eveCard"><h3>' + t.cardEve + '</h3><div id="eveAtk"></div></div></div>' +
+      '<div class="card" id="bigCard"><h3>' + t.cardBig + '</h3><p class="note" style="margin:0 0 8px">' + t.bigNote + '</p><div class="big">' +
         '<div class="bigc role-priv"><span style="display:flex;justify-content:space-between;align-items:center">' + t.bigSecA + '<button class="icon-btn" data-action="bigrand" data-f="bigA" title="' + esc(t.rand) + '" aria-label="' + esc(t.rand) + '">' + DICE + '</button></span><input data-field="bigA" spellcheck="false" value="' + esc(app.bigA) + '"></div>' +
         '<div class="bigc role-priv"><span style="display:flex;justify-content:space-between;align-items:center">' + t.bigSecB + '<button class="icon-btn" data-action="bigrand" data-f="bigB" title="' + esc(t.rand) + '" aria-label="' + esc(t.rand) + '">' + DICE + '</button></span><input data-field="bigB" spellcheck="false" value="' + esc(app.bigB) + '"></div>' +
         '<div class="bigc role-pub" id="bigAo"></div><div class="bigc role-pub" id="bigBo"></div>' +
         '<div class="bigc role-priv bigout" id="bigS"></div></div></div>';
   }
   // ElGamal
-  const opts = Array.from({ length: 18 }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === app.m ? " selected" : "") + ">" + ps(MULT[i + 1]) + "</option>").join("");
+  const opts = BY_XY.map(k => '<option value="' + k + '"' + (k === app.m ? " selected" : "") + ">" + ps(MULT[k]) + "</option>").join("");
   const svg = '<svg class="arrows" width="900" height="500" aria-hidden="true"><defs>' + MARKERS + "</defs>" +
     ln("135,102 135,146", "var(--const-b)", "m_msg") + ln("270,186 234,186", "var(--key-b)", "m_priv") +
     ln("765,102 765,126", "var(--key-b)", "m_priv") + ln("570,92 570,158 676,158", "var(--ct-b)", "m_pub") +
@@ -816,7 +822,8 @@ function updateL0() {
     let tries = "", R = null, n = 0;
     do { R = add(C, R, C.G); n++; tries += '<span class="try' + (samePoint(R, e.A) ? " hit" : "") + '">' + n + "G = " + ps(R) + (samePoint(R, e.A) ? " = A" : "") + "</span>"; }
     while (!samePoint(R, e.A) && n < 19);
-    set("eveAtk", '<div class="tries">' + tries + "</div><p style=\"margin:4px 0\">" + t.eveTry(n, n) + '</p><p class="note" style="margin:0">' + t.eveReal + "</p>");
+    set("eveAtk", app.eveOpen ? '<div class="tries">' + tries + "</div><p style=\"margin:4px 0\">" + t.eveTry(n, n) + '</p><p class="note" style="margin:0">' + t.eveReal + "</p>"
+      : '<p style="margin:4px 0 8px">' + t.eveHidden + '</p><button data-action="eve-show">' + t.eveShow + "</button>");
     updateBig();
   } else {
     const M = MULT[app.m], Q = mul(C, BigInt(app.d), C.G);
@@ -970,10 +977,11 @@ function hookReal() {
 /* ---------- step 3: modulo 17 ---------- */
 function render2() {
   const t = L();
-  const pr = m => ' aria-pressed="' + (app.mode3 === m) + '"';
-  let right = '<span class="tabs"><button data-action="mode3" data-m="mult"' + pr("mult") + ">" + t.tabMult + "</button>" +
-    '<button data-action="mode3" data-m="dbl"' + pr("dbl") + ">" + t.tabDbl + "</button></span>";
-  if (app.mode3 === "mult") right += '<div class="btns"><button data-action="mk-reset">' + t.bReset + '</button><button data-action="mk-prev">' + t.bPrev + "</button>" +
+  const pr = on => ' aria-pressed="' + on + '"';
+  let right = '<span class="tabs"><button data-action="mode3" data-m="pts"' + pr(app.mode3 !== "dbl") + ">" + t.tabPts + "</button>" +
+    '<button data-action="mode3" data-m="dbl"' + pr(app.mode3 === "dbl") + ">" + t.tabDbl + "</button></span>";
+  if (app.mode3 === "pts") right += '<h3 style="margin:14px 0 6px">' + t.tabMult + '</h3><p style="margin:0 0 10px">' + t.multHidden + '</p><div class="btns"><button class="dark" data-action="mode3" data-m="mult">' + t.multShow + "</button></div>";
+  else if (app.mode3 === "mult") right += '<div class="btns"><button data-action="mk-reset">' + t.bReset + '</button><button data-action="mk-prev">' + t.bPrev + "</button>" +
     '<button class="dark" data-action="mk-next">' + t.bNext + '</button></div><div id="multBody"></div>';
   else right += '<div class="btns"><label style="font-weight:600;font-size:14px">' + t.kLbl + ' <input class="sm-in" type="number" min="1" max="1048575" data-field="dk" value="' + app.dk + '"></label></div>' +
     '<div class="btns"><button data-action="ds-reset">' + t.bReset + '</button><button data-action="ds-prev">' + t.bPrev + "</button>" +
@@ -991,6 +999,10 @@ function renderL2Body() {
   const t = L(), G = { P: TOY.G, col: "var(--ct-b)", label: "G", up: false };
   document.getElementById("chk").textContent = cellCheck();
   const g3 = document.getElementById("g3");
+  if (app.mode3 === "pts") {
+    g3.innerHTML = gridSVG({ c: 22, marks: [G], mirror: true, click: true, sel: app.cell });
+    return;
+  }
   if (app.mode3 === "mult") {
     const k = app.mk, path = [];
     for (let i = 1; i <= Math.min(k, 18); i++) path.push(MULT[i]);
@@ -999,9 +1011,9 @@ function renderL2Body() {
     g3.innerHTML = gridSVG({ c: 22, marks: marks, path: path, mirror: true, click: true, sel: app.cell });
     let chips = "";
     for (let i = 1; i <= 19; i++)
-      chips += '<button class="mchip' + (i === k ? " cur" : i > k ? " fut" : "") + '" data-action="mk-set" data-k="' + i + '"><b>' + i + "G</b>" + psH(MULT[i]) + "</button>";
+      chips += '<button class="mchip' + (i === k ? " cur" : i > k ? " fut" : "") + '" data-action="mk-set" data-k="' + i + '"><b>' + i + "G</b>" + (i > k ? "?" : psH(MULT[i])) + "</button>";
     document.getElementById("multBody").innerHTML =
-      '<div class="bigline">' + k + "G = " + psH(MULT[k]) + '</div><p class="note" style="margin:0">' + t.multLine(k) + "</p>" +
+        '<h3 style="margin:14px 0 0">' + t.tabMult + '</h3><div class="bigline">' + k + "G = " + psH(MULT[k]) + '</div><p class="note" style="margin:0">' + t.multLine(k) + "</p>" +
       '<div class="mchips">' + chips + "</div>" +
       (k === 19 ? '<div class="why">' + t.multO + "</div>" : '<p class="note" style="margin:0">' + t.multNote + "</p>") +
       (k >= 2 ? '<div class="btns"><button data-action="zoom">' + t.seeAdd + "</button></div>" : "");
@@ -1078,10 +1090,11 @@ function setDk(v) {
 /* ---------- step 4: one addition ---------- */
 function render3() {
   const t = L();
-  const opts = sel => Array.from({ length: 19 }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === sel ? " selected" : "") + ">" + (i + 1 === 19 ? "O" : ps(MULT[i + 1])) + " = " + (i + 1 === 1 ? "G" : (i + 1) + "G") + "</option>").join("");
+  // the points sorted by x and y, then O; only G is named, so the menu is not the list of multiples
+  const opts = sel => BY_XY.concat([19]).map(k => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + (k === 19 ? "O" : ps(MULT[k]) + (k === 1 ? " = G" : "")) + "</option>").join("");
   return '<div class="card"><h3>' + t.cardPick + "</h3>" + (app.origin4 ? '<p class="note" style="margin:0 0 8px">' + esc(t.origin(app.origin4)) + "</p>" : "") +
       '<div class="pick"><label>P <select data-field="p4">' + opts(app.p4) + "</select></label><label>Q <select data-field=\"q4\">" + opts(app.q4) + "</select></label>" +
-      '<span class="note">' + t.presets + '</span><button data-action="pre" data-p="1" data-q="1">' + t.prDbl + '</button><button data-action="pre" data-p="1" data-q="2">' + t.prTask + "</button>" +
+      '<span class="note">' + t.presets + '</span><button data-action="pre" data-p="1" data-q="1">' + t.prDbl + "</button>" +
       '<button data-action="pre" data-p="1" data-q="18">' + t.prNeg + "</button></div></div>" +
     '<div class="card"><h3>' + t.cardForm + '</h3><div id="formbox"></div><p class="note" style="margin:8px 0 0">' + t.divNote + "</p></div>" +
     '<div class="card"><h3 id="calcHead"></h3><div class="btns" style="margin:0 0 6px" id="s4btns"><button data-action="s4-reset">' + t.bReset + '</button><button data-action="s4-prev">' + t.bPrev + "</button>" +
@@ -1185,7 +1198,34 @@ function render() {
   if (app.level === 3) renderL3Body();
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
-  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+  try { if (location.hash !== hashStr()) history.replaceState(null, "", hashStr()); } catch (e) {}
+  if (app.scrollTo) { const el = document.getElementById(app.scrollTo); app.scrollTo = null; if (el) el.scrollIntoView({ block: "start" }); }
+}
+/* the address: #N is a step, #N.M a tab or a card of the step
+   #1 (#1.1) ECDH, #1.2 ElGamal, #1.3 ECDH with Eve's attack open, #1.4 ECDH, scrolled to P-256
+   #3 (#3.1) the points, #3.2 kG: double and add, #3.3 the multiples of G */
+function hashStr() {
+  let h = "#" + (app.level + 1);
+  if (app.level === 0 && app.tab1 === "elg") h += ".2";
+  if (app.level === 2 && app.mode3 === "dbl") h += ".2";
+  if (app.level === 2 && app.mode3 === "mult") h += ".3";
+  return h;
+}
+function readHash() {
+  const m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash);
+  if (!m) return;
+  const n = +m[1], sub = m[2] ? +m[2] : 1;
+  if (n < 1 || n > 4) return;
+  app.level = n - 1;
+  if (n === 1) {
+    app.tab1 = sub === 2 ? "elg" : "ecdh";
+    if (sub === 3) { app.eveOpen = true; app.scrollTo = "eveCard"; }
+    if (sub === 4) app.scrollTo = "bigCard";
+  }
+  if (n === 3) {
+    app.mode3 = sub === 2 ? "dbl" : sub === 3 ? "mult" : "pts";
+    if (sub === 3 && app.mk < 1) app.mk = 1;
+  }
 }
 function goTo(level) {
   app.level = level;
@@ -1195,6 +1235,7 @@ function goTo(level) {
 // from step 3 to step 4: take the addition that is on the screen
 function originFromStep3() {
   const lab = i => (2n ** BigInt(i)).toString() + "G";
+  if (app.mode3 === "pts") return;
   if (app.mode3 === "mult") {
     if (app.mk < 2) return;
     app.p4 = app.mk - 1; app.q4 = 1;
@@ -1249,6 +1290,7 @@ view.addEventListener("click", e => {
   const a = el.dataset.action;
   if (a === "zoom") zoomIn();
   else if (a === "tab1") { app.tab1 = el.dataset.t; render(); }
+  else if (a === "eve-show") { app.eveOpen = true; updateL0(); }
   else if (a === "dec" || a === "inc") setSmall(el.dataset.f, app[el.dataset.f] + (a === "inc" ? 1 : -1));
   else if (a === "rand") { const r = new Uint32Array(1); crypto.getRandomValues(r); setSmall(el.dataset.f, 1 + r[0] % 18); }
   else if (a === "bigrand") {
@@ -1313,13 +1355,13 @@ document.addEventListener("keydown", e => {
   if (e.key === "Enter" && tag === "BUTTON") return;
   if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
   else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
-  else if (app.level === 2 && (e.key === "n" || e.key === " ")) {
+  else if (app.level === 2 && app.mode3 !== "pts" && (e.key === "n" || e.key === " ")) {
     e.preventDefault();
     if (app.mode3 === "mult") app.mk = Math.min(19, app.mk + 1);
     else app.dstep = Math.min(mulTrace(TOY, BigInt(app.dk), TOY.G).ops.length, app.dstep + 1);
     renderL2Body();
   }
-  else if (app.level === 2 && e.key === "p") {
+  else if (app.level === 2 && app.mode3 !== "pts" && e.key === "p") {
     if (app.mode3 === "mult") app.mk = Math.max(1, app.mk - 1); else app.dstep = Math.max(0, app.dstep - 1);
     renderL2Body();
   }
@@ -1329,9 +1371,11 @@ document.addEventListener("keydown", e => {
 
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-const startStep = parseInt(location.hash.slice(1), 10);
-if (startStep >= 1 && startStep <= 4) app.level = startStep - 1;
+// the menus of steps 1 and 4: each of the 18 points once, sorted by x and y
+if (BY_XY.length !== 18 || new Set(BY_XY).size !== 18 || BY_XY.indexOf(-1) >= 0) SELF_FAILS.push("the point menus");
+readHash();
 render();
+window.addEventListener("hashchange", () => { if (location.hash !== hashStr() || app.scrollTo) { readHash(); render(); } });
 </script>
 </body>
 </html>

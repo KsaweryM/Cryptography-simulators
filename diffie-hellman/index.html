@@ -8,11 +8,15 @@
 :root{
   --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
   --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
-  --pub-b:#2F6FDB; --pub-bg:#E5EDFB;
-  --sec-b:#E2A60E; --sec-bg:#FDF3DC;
-  --sh-b:#2FA84F;  --sh-bg:#E3F4E8;
-  --msg-b:#8A5CD8; --msg-bg:#F1EAFD;
-  --mal-b:#D6336C; --mal-bg:#FBE3EC;
+  /* role colours = the slides of the Diffie-Hellman lecture (Beamer colours in brackets) */
+  --pub-b:#90A4AE; --pub-bg:#ECEFF1; --pub-t:#37474F;   /* public values: neutral (nLine, nFill, nInk) */
+  --sec-b:#FFB300; --sec-bg:#FFECBF; --sec-t:#A06A00;   /* secrets a, b, x, k, m (sAmber, sAmber!25, sAmberText) */
+  --sh-b:#FFB300;  --sh-bg:#FFDB80;                     /* the shared secret: the same amber, stronger fill */
+  --msg-b:#7E57C2; --msg-bg:#ECE6F6;                    /* the message (sViolet) */
+  --mal-b:#EC407A; --mal-bg:#FCE2EB; --mal-t:#C2185B;   /* the attackers, Eve and Mallory (sPink, sPinkText) */
+  --ctx-b:#8D6E63; --ctx-bg:#EEE9E7;                    /* ciphertext C1, C2 (sBrown) */
+  --al:#5C6BC0; --al-t:#5C6BC0; --bo:#26A69A; --bo-t:#00796B;   /* Alice (sIndigo), Bob (sTeal, sTealText) */
+  --good-b:#2FA84F; --good-bg:#E3F4E8;                  /* "it worked" banners, not a role */
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
 }
@@ -20,17 +24,19 @@
   :root:not([data-theme="light"]){
     --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
     --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
-    --pub-b:#7FA8F0; --pub-bg:#1A2740; --sec-b:#F5C044; --sec-bg:#3A2E10;
-    --sh-b:#4CC877; --sh-bg:#15301E; --msg-b:#B596F5; --msg-bg:#2A2142;
-    --mal-b:#F27BA5; --mal-bg:#3B1828;
+    --pub-b:#B0BEC5; --pub-bg:#263238; --pub-t:#CFD8DC; --sec-b:#FFCA28; --sec-bg:#3A2E10; --sec-t:#FFCA28;
+    --sh-b:#FFCA28; --sh-bg:#5A4410; --msg-b:#B39DDB; --msg-bg:#2A2142;
+    --mal-b:#F48FB1; --mal-bg:#3B1828; --mal-t:#F48FB1; --ctx-b:#BCAAA4; --ctx-bg:#2E2522;
+    --al:#7986CB; --al-t:#9FA8DA; --bo:#26A69A; --bo-t:#80CBC4; --good-b:#4CC877; --good-bg:#15301E;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
   --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E;
-  --pub-b:#7FA8F0; --pub-bg:#1A2740; --sec-b:#F5C044; --sec-bg:#3A2E10;
-  --sh-b:#4CC877; --sh-bg:#15301E; --msg-b:#B596F5; --msg-bg:#2A2142;
-  --mal-b:#F27BA5; --mal-bg:#3B1828;
+  --pub-b:#B0BEC5; --pub-bg:#263238; --pub-t:#CFD8DC; --sec-b:#FFCA28; --sec-bg:#3A2E10; --sec-t:#FFCA28;
+  --sh-b:#FFCA28; --sh-bg:#5A4410; --msg-b:#B39DDB; --msg-bg:#2A2142;
+  --mal-b:#F48FB1; --mal-bg:#3B1828; --mal-t:#F48FB1; --ctx-b:#BCAAA4; --ctx-bg:#2E2522;
+  --al:#7986CB; --al-t:#9FA8DA; --bo:#26A69A; --bo-t:#80CBC4; --good-b:#4CC877; --good-bg:#15301E;
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%}
@@ -114,6 +120,8 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .role-sh{border-color:var(--sh-b);background:var(--sh-bg)}
 .role-msg{border-color:var(--msg-b);background:var(--msg-bg)}
 .role-mal{border-color:var(--mal-b);background:var(--mal-bg)}
+.role-ctx{border-color:var(--ctx-b);background:var(--ctx-bg)}
+.half.good{border-color:var(--good-b)}
 
 /* the schematics */
 .sch{position:relative;color:var(--ink)}
@@ -130,16 +138,22 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .chip.tiny .v{font-size:14px}
 .person{position:absolute;display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
 .ava{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;flex:none}
-.ava.mal{background:var(--mal-b);color:var(--surface)}
+.ava.mal{background:var(--mal-b);color:#fff}
+.ava.al{background:var(--al);color:#fff}
+.ava.bo{background:var(--bo);color:#fff}
+.person.al{color:var(--al-t)}
+.person.bo{color:var(--bo-t)}
+.person.mal{color:var(--mal-t)}
 .person small{font-weight:400;font-size:12.5px;color:var(--muted)}
 .sbox{position:absolute}
 .wlbl{position:absolute;font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap;background:var(--surface);padding:0 4px;border-radius:4px}
 .evecard{position:absolute;border:1.5px solid var(--mal-b);background:var(--surface);border-radius:8px;overflow:hidden;font-size:13px}
-.evecard .eh{background:var(--mal-b);color:var(--surface);font-weight:600;padding:3px 10px;display:flex;align-items:center;gap:6px}
+.evecard .eh{background:var(--mal-b);color:#fff;font-weight:600;padding:3px 10px;display:flex;align-items:center;gap:6px}
+/* dark theme: the light pink header and avatar need dark text */ @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .evecard .eh,:root:not([data-theme="light"]) .ava.mal{color:#2B0A18}} :root[data-theme="dark"] .evecard .eh,:root[data-theme="dark"] .ava.mal{color:#2B0A18}
 .evecard .eb{padding:0 12px 4px;font-family:var(--mono);font-size:13.5px;line-height:22px;background:repeating-linear-gradient(var(--surface) 0 21px,var(--rule) 21px 22px)}
 .evecard .eb .no{color:var(--muted)}
 .banner{margin-top:8px;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14.5px;border:1.5px solid}
-.banner.good{border-color:var(--sh-b);background:var(--sh-bg)}
+.banner.good{border-color:var(--good-b);background:var(--good-bg)}
 .banner.bad{border-color:var(--mal-b);background:var(--mal-bg)}
 .banner.neutral{border-color:var(--rule);background:var(--sunken)}
 .todo{opacity:.22;transition:opacity .25s}
@@ -148,7 +162,7 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .pgfield label{font-size:12.5px;font-weight:600}
 .pgfield input{display:block;margin-top:2px}
 .stamp{display:inline-block;font-size:11px;font-weight:700;color:var(--mal-b);border:1.5px solid var(--mal-b);border-radius:4px;padding:0 5px;margin-left:4px;vertical-align:1px}
-.stamp.ok{color:var(--sh-b);border-color:var(--sh-b)}
+.stamp.ok{color:var(--ok);border-color:var(--ok)}
 
 /* step 2: the clock and the table of powers */
 .clockrow{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
@@ -164,7 +178,7 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .clock .ch.last{stroke:var(--chg);stroke-width:2.6;opacity:1}
 .clock .ctr{font-family:var(--mono);font-size:22px;font-weight:700;fill:var(--ink);text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:6px;stroke-linejoin:round}
 .clock .ctrs{font-family:var(--sans);font-size:12.5px;fill:var(--muted);text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:5px}
-.clock .aring{fill:none;stroke:var(--pub-b);stroke-width:2.5;stroke-dasharray:4 3}
+.clock .aring{fill:none;stroke:var(--pub-t);stroke-width:2.5;stroke-dasharray:4 3}
 .clockside{flex:1 1 380px;min-width:340px}
 .bigeq{font-family:var(--mono);font-size:22px;margin:6px 0}
 .bigeq b{color:var(--chg)}
@@ -175,7 +189,7 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .ptable td.on{background:var(--pub-bg)}
 .ptable td.cur{background:var(--chg);color:#fff;font-weight:700}
 .ptable td.rep{background:var(--chg-bg)}
-.ptable td.isA{box-shadow:inset 0 0 0 2px var(--pub-b)}
+.ptable td.isA{box-shadow:inset 0 0 0 2px var(--pub-t)}
 .ptable td.click{cursor:pointer}
 .ctl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
 .ctl input[type=range]{width:220px}
@@ -184,7 +198,7 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .half h4{margin:0 0 6px;font-size:14.5px}
 .tries{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;font-family:var(--mono);font-size:12.5px}
 .try{padding:1px 6px;border-radius:4px;background:var(--sunken)}
-.try.hit{background:var(--sh-bg);outline:1.5px solid var(--sh-b);font-weight:700}
+.try.hit{background:var(--good-bg);outline:1.5px solid var(--good-b);font-weight:700}
 .rtable{border-collapse:collapse;font-size:13.5px;margin-top:6px}
 .rtable th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;padding:3px 12px 3px 0;border-bottom:1px solid var(--rule)}
 .rtable td{padding:4px 12px 4px 0;font-family:var(--mono);border-bottom:1px solid var(--rule)}
@@ -194,14 +208,14 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 
 /* step 4: ElGamal */
 .eg{display:grid;grid-template-columns:300px minmax(44px,1fr) 270px minmax(44px,1fr) 300px;align-items:start;min-width:958px;max-width:1150px}
-.harr{height:2.4px;background:var(--pub-b);position:relative;margin:342px 10px 0 4px}
-.harr::after{content:"";position:absolute;right:-2px;top:-5.5px;border:6.5px solid transparent;border-left:10px solid var(--pub-b);border-right:0}
+.harr{height:2.4px;background:var(--ctx-b);position:relative;margin:342px 10px 0 4px}
+.harr::after{content:"";position:absolute;right:-2px;top:-5.5px;border:6.5px solid transparent;border-left:10px solid var(--ctx-b);border-right:0}
 .egcol{display:flex;flex-direction:column;gap:0}
 .egcol .chip,.egcol .person,.egcol .evecard{position:relative}
 .egcol .box{width:100%}
 .down{text-align:center;color:var(--muted);font-size:17px;line-height:22px;height:22px}
 .pair{font-family:var(--mono);font-size:22px;font-weight:600}
-.ctx{border:1.5px solid var(--pub-b);background:var(--pub-bg);border-radius:8px;padding:8px 12px;margin-top:290px}
+.ctx{border:1.5px solid var(--ctx-b);background:var(--ctx-bg);border-radius:8px;padding:8px 12px;margin-top:290px}
 .calc{font-family:var(--mono);font-size:14px;line-height:1.9}
 .calc .cr{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .calc .cn{font-family:var(--sans);font-weight:600;color:var(--muted);font-size:12.5px;width:1.5em}
@@ -243,6 +257,7 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .role-sh.role-sh{border-color:var(--sh-b)}
 .role-msg.role-msg{border-color:var(--msg-b)}
 .role-mal.role-mal{border-color:var(--mal-b)}
+.role-ctx.role-ctx{border-color:var(--ctx-b)}
 .ptable td.on{border:1.5px solid var(--pub-b)}
 </style>
 </head>
@@ -431,9 +446,11 @@ function selfTest() {
   //    The same numbers are the classic textbook example (also checked with Python 3: pow(5, 6, 23) etc.).
   let d = dhExchange(23n, 5n, 6n, 15n);
   eq("DH slides", [d.A, d.B, d.sAlice, d.sBob].join(), "8,19,2,2");
-  // 2. Slide "Task 1: an exchange on paper" (and the Wikipedia example): a = 4, b = 3 -> A = 4, B = 10, secret 18.
-  d = dhExchange(23n, 5n, 4n, 3n);
-  eq("DH task 1", [d.A, d.B, d.sAlice, d.sBob].join(), "4,10,18,18");
+  // 2. The paper exercise on the slides: a = 3, b = 5 -> A = 10, B = 20, secret 19 (Python 3: pow(20, 3, 23) etc.);
+  //    "Recall: powers modulo p": 5^2 mod 23 = 2; "Why are they equal?": 6 * 15 = 90, 5^90 mod 23 = 2.
+  d = dhExchange(23n, 5n, 3n, 5n);
+  eq("DH paper exercise", [d.A, d.B, d.sAlice, d.sBob].join(), "10,20,19,19");
+  eq("5^2 and 5^90", [modPow(5n, 2n, 23n), modPow(5n, 90n, 23n)].join(), "2,2");
   // 3. W. Stallings, "Cryptography and Network Security", the Diffie-Hellman example:
   //    q = 353, alpha = 3, XA = 97, XB = 233 -> YA = 40, YB = 248, K = 160 (checked again with Python 3).
   d = dhExchange(353n, 3n, 97n, 233n);
@@ -443,24 +460,25 @@ function selfTest() {
   eq("order of 2", orderOf(23n, 2n, 100), 11);
   eq("order of 5", orderOf(23n, 5n, 100), 22);
   eq("order of 22", orderOf(23n, 22n, 100), 2);
-  // 5. ElGamal on the slides "The keys", "Encrypt", "Decrypt", "The same message twice":
-  //    x = 6 -> y = 8; M = 10, k = 3 -> (10, 14); s = 6, s^-1 = 4, M = 10; k = 7 -> (17, 5).
-  const y = modPow(5n, 6n, 23n);
-  let c = egEncrypt(23n, 5n, y, 10n, 3n), m = egDecrypt(23n, 6n, c.C1, c.C2);
-  eq("ElGamal slides", [y, c.C1, c.C2, m.s, m.sInv, m.M].join(), "8,10,14,6,4,10");
-  c = egEncrypt(23n, 5n, y, 10n, 7n);
-  eq("ElGamal k = 7", [c.C1, c.C2].join(), "17,5");
-  eq("inverse of 6", modInv(6n, 23n), 4n);
+  // 5. ElGamal on the slides "The keys", "Encrypt", "Recall: the modular inverse", "Decrypt", "The same message twice":
+  //    x = 15 (Bob's b of the exchange) -> y = 19 (his B); M = 7, k = 3 -> (10, 12); s = 5, s^-1 = 14, M = 7;
+  //    k = 7 -> (17, 13). Python 3: pow(5, 15, 23) = 19, pow(19, 3, 23) = 5, pow(10, 15, 23) = 5, pow(5, -1, 23) = 14.
+  const y = modPow(5n, 15n, 23n);
+  let c = egEncrypt(23n, 5n, y, 7n, 3n), m = egDecrypt(23n, 15n, c.C1, c.C2);
+  eq("ElGamal slides", [y, c.C1, c.C2, m.s, m.sInv, m.M].join(), "19,10,12,5,14,7");
+  c = egEncrypt(23n, 5n, y, 7n, 7n);
+  eq("ElGamal k = 7", [c.C1, c.C2].join(), "17,13");
+  eq("inverse of 5", modInv(5n, 23n), 14n);
   // 6. W. Stallings, the ElGamal example: q = 19, alpha = 10, XA = 5 -> YA = 3; M = 17, k = 6 -> C1 = 11, C2 = 5;
   //    decrypt: K = 7, K^-1 = 11, M = 17 (checked again with Python 3).
   const yS = modPow(10n, 5n, 19n);
   c = egEncrypt(19n, 10n, yS, 17n, 6n); m = egDecrypt(19n, 5n, c.C1, c.C2);
   eq("ElGamal Stallings", [yS, c.C1, c.C2, m.s, m.sInv, m.M].join(), "3,11,5,7,11,17");
-  // 7. Invariant: decrypt(encrypt(M)) = M for every M and k with p = 23, g = 5, x = 6.
+  // 7. Invariant: decrypt(encrypt(M)) = M for every M and k with p = 23, g = 5, x = 15.
   let okAll = true;
   for (let M = 1n; M < 23n; M++) for (let k = 1n; k < 22n; k++) {
     const cc = egEncrypt(23n, 5n, y, M, k);
-    if (egDecrypt(23n, 6n, cc.C1, cc.C2).M !== M) okAll = false;
+    if (egDecrypt(23n, 15n, cc.C1, cc.C2).M !== M) okAll = false;
   }
   if (!okAll) fails.push("ElGamal round trip");
   // 8. Mallory with m = 9 on the slide numbers: M = 11; Alice gets 9 = A^m, Bob gets 10 = B^m (Python 3).
@@ -473,13 +491,16 @@ function selfTest() {
   d = dhExchange(RFC3526_P, RFC3526_G, bigA, bigB);
   eq("RFC 3526 exchange", [d.A.toString().slice(0, 20), d.B.toString().slice(0, 20), d.sAlice.toString().slice(0, 20), d.sAlice === d.sBob].join(),
      "80235203082549063091,23079903781931393279,23881371980742647979,true");
-  // 10. Task 6 at real size: the known first message gives away the second one.
+  // 10. k used twice on small numbers (step 6 defaults): M = 7 known, M2 = 4, the same k = 3 -> Eve gets 4.
+  const c6a = egEncrypt(23n, 5n, y, 7n, 3n), c6b = egEncrypt(23n, 5n, y, 4n, 3n);
+  eq("k used twice, small", reuseAttack(23n, 7n, c6a.C2, c6b.C2).M2, 4n);
+  // 10b. Task 6 at real size: the known first message gives away the second one.
   const r6 = reuseAttack(RFC3526_P, textToNumber(T6_FIRST), T6_C2_FIRST, T6_C2_SECOND);
-  eq("Task 6", numberToText(r6.M2), "New door code for the server room: 4096.");
+  eq("k used twice, real size", numberToText(r6.M2), "New door code for the server room: 4096.");
   // 11. Task 3: the search finds the answers of Task3/solution/dlog.py (16 and 20 bits here, to stay fast).
   for (const t of TASK3.slice(0, 2)) {
     const s = searchChunk(t.p, t.g, t.A, 1, t.g, 2000000);
-    if (!s.found || s.e !== t.a) fails.push("Task 3, " + t.bits + " bits");
+    if (!s.found || s.e !== t.a) fails.push("search, " + t.bits + " bits");
   }
   // 12. Square-and-multiply against plain repeated multiplication, and its trace.
   for (const [b, e, mm] of [[5n, 6n, 23n], [19n, 6n, 23n], [8n, 15n, 23n], [3n, 97n, 353n], [7n, 1n, 11n]]) {
@@ -501,23 +522,24 @@ const T = {
   en: {
     title: "Diffie-Hellman explorer", home: "All simulators",
     intro: "Diffie-Hellman and ElGamal, from the outside in. Pick a step on the left, or click a dark box to zoom in.",
-    stepOf: n => "Step " + n + " of 5 · Diffie-Hellman",
+    stepOf: n => "Step " + n + " of 6 · Diffie-Hellman",
     steps: [["Black box", "two secrets, one shared number"], ["The powers of g", "easy forward, hard back"],
             ["Mallory in the middle", "when nobody checks who is who"], ["ElGamal", "Diffie-Hellman with a message"],
-            ["One power", "square-and-multiply"]],
+            ["One power", "square-and-multiply"], ["k used twice", "one known message gives away another"]],
     explain: [
       ["A secret in public", "Alice and Bob agree on a number without sending it. Eve hears everything on the channel: p, g, A and B. Both sides end with the same secret s, Eve does not. Change any number, everything is computed again. Click a dark box to look inside."],
       ["Why Eve cannot go back", "The powers of g modulo p jump around the clock with no order. Going forward (a to A) is fast. Going back (A to a) is the discrete logarithm: Eve has to try exponents one by one. Real p has 2048 bits."],
-      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own value M. Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons."],
+      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own public value M = g^m (m is her secret). Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons."],
       ["Diffie-Hellman with a message", "Bob publishes y = g^x once. To send a number M, Alice picks a new secret k, sends C1 = g^k (her half of an exchange) and C2 = M × y^k (the message hidden by the shared value). Bob divides by the same value and gets M back."],
-      ["One modular power", "How does Alice compute g^a mod p when a has 256 bits? Not by multiplying a times. Square-and-multiply goes through the bits of the exponent: square for every bit, multiply once more for every 1."]],
+      ["One modular power", "How does Alice compute g^a mod p when a has 256 bits? Not by multiplying a times. Square-and-multiply goes through the bits of the exponent: square for every bit, multiply once more for every 1."],
+      ["The same k for two messages", "ElGamal hides every message with the mask y^k. If the sender uses the same k twice, both messages get the same mask. Eve knows one of the messages: can she read the other one without Bob's private key x?"]],
     selfOk: "✓ checked against the slides, Stallings and RFC 3526", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back",
     digits: n => n + " digits", clickIn: "click to look inside", clickPow: "click: this power, step by step",
     // inputs
     pLbl: "p: a public prime", gLbl: "g: public", pubTitle: "Public, known to everybody (Eve too)",
     aLbl: "a: Alice's secret", bLbl: "b: Bob's secret", rand: "random secret",
-    presets: "Examples:", prSlides: "slides: a = 6, b = 15", prTask1: "Task 1: a = 4, b = 3", prBook: "textbook: p = 353", prReal: "real size: 2048 bits",
+    presets: "Examples:", prSlides: "slides: a = 6, b = 15", prBook: "textbook: p = 353", prReal: "real size: 2048 bits",
     errNum: "Type a whole number.", errPsmall: "p must be a prime of at least 5.", errPbig: "Up to 10^12 here (or the 2048-bit prime of the last example).",
     errPrime: p => p + " is not a prime.", errRange: (n, hi) => n + " must be between 1 and " + hi + ".", errG: hi => "g must be between 2 and " + hi + ".",
     fixFirst: "Fix the red numbers in step 1 first.", fixHere: "Fix the red numbers first.",
@@ -532,11 +554,11 @@ const T = {
     whyA: "Alice: B<sup>a</sup> = (g<sup>b</sup>)<sup>a</sup> = g<sup>b·a</sup>", whyB: "Bob: A<sup>b</sup> = (g<sup>a</sup>)<sup>b</sup> = g<sup>a·b</sup>",
     whyNum: (ab, r) => "a·b = " + ab + ", and g<sup>" + ab + "</sup> mod p = " + r + ": the same number, and nobody ever sent it.",
     whyBig: "a·b is huge here, but the rule is the same: both compute g<sup>ab</sup> mod p.",
-    legPub: "public: everybody sees it", legSec: "secret: only its owner", legSh: "shared secret", legMal: "the attackers: Eve and Mallory", legMsg: "the message",
+    legPub: "public: everybody sees it", legSec: "secret: only its owner", legSh: "shared secret", legMal: "the attackers: Eve and Mallory", legMsg: "the message", legCtx: "ciphertext",
     honest: "Small numbers are only for learning: with p = 23 Eve can try all 22 exponents in no time. Real Diffie-Hellman uses a p of 2048 bits and secrets of at least 256 bits (try the last example).",
     // step 2
     clockTitle: (g, p) => "The powers of " + g + " mod " + p + " around a clock",
-    clockNote: "The clock shows the numbers 1 to p - 1. Each step multiplies by g (mod p) and jumps to the next number. The blue ring is Alice's A.",
+    clockNote: "The clock shows the numbers 1 to p - 1. Each step multiplies by g (mod p) and jumps to the next number. The dashed ring is Alice's A.",
     expo: "exponent e", play: "▶ play", stop: "■ stop",
     distinctAll: (n, p) => "g reaches all " + n + " numbers from 1 to " + (p - 1) + ": a good g.",
     distinctFew: (n, p) => "g reaches only " + n + " different numbers, then they repeat: a bad g, fewer for Eve to try.",
@@ -554,17 +576,17 @@ const T = {
     tried: n => "Tried " + n.toLocaleString("en-US") + " " + (n === 1 ? "exponent" : "exponents") + ".",
     found: (e, n) => "Found a = " + e + " after " + n.toLocaleString("en-US") + " " + (n === 1 ? "try" : "tries") + ". Now Eve can compute s too.",
     foundOther: (e, a) => "Eve found e = " + e + ", not Alice's a = " + a + ", but g^" + e + " gives the same A, so it works just as well for her.",
-    bigSearch: "With this p the search would take far too long: about 2^2047 tries. That is why real p has 2048 bits.",
+    bigSearch: "With this p and a 256-bit secret a the search would take far too long: about 2^256 tries.",
     searching: (n) => "searching … " + n.toLocaleString("en-US") + " tries",
-    t3Title: "Task 3: 4 more bits each time. How much longer?",
+    t3Title: "Four searches, 4 bits more each time. How much longer?", t3Open: "show the four searches",
     t3Predict: "Predict first: p grows by 4 bits from row to row. How many times longer will the search take?",
     t3Run: "run the search", t3Bits: "bits", t3Tries: "tries until A", t3Time: "time in this browser", t3Ratio: "more tries than the row above",
-    t3Note: "The time depends on how big the random a was, so the growth is not even. On average 4 more bits mean 16 times more tries. Python (as in Task 3) is slower than this browser.",
+    t3Note: "The time depends on how big the random a was, so the growth is not even. On average 4 more bits mean 16 times more tries. Plain Python is slower than this browser.",
     // step 3
     malOn: "Mallory sits on the cable", malStepLbl: k => "attack, step " + k + " of 4",
-    malSteps: ["Alice sends A. Mallory keeps it and sends her own M to Bob.", "Bob sends B. Mallory keeps it and sends M to Alice.",
+    malSteps: ["Alice sends A. Mallory keeps it and sends her own public value M = g^m to Bob.", "Bob sends B. Mallory keeps it and sends M to Alice.",
                "Alice shares a secret with Mallory. Bob shares another one with Mallory.", "Alice sends a message. Mallory decrypts it, reads it, encrypts it again for Bob."],
-    mLbl: "m: Mallory's secret", malM: "M = g^m mod p, sent to both", malWithA: "key with Alice: A^m", malWithB: "key with Bob: B^m",
+    mLbl: "m: Mallory's secret", malM: "her public value g^m mod p (= M), sent to both", malWithA: "key with Alice: A^m", malWithB: "key with Bob: B^m",
     recvAsB: "\"from Bob\" (really M)", recvAsA: "\"from Alice\" (really M)",
     sealOn: "Alice and Bob check a seal (authentication)",
     noSealB: "no seal of Bob: rejected", noSealA: "no seal of Alice: rejected", stopped: "exchange stopped",
@@ -574,10 +596,10 @@ const T = {
     msgTitle: "What the attack gives", msgLbl: "Alice's message",
     lockedWith: (n, s) => "locked with key " + n + " (from " + s + ")", malReads: "Mallory opens it, reads, locks it again",
     bobReads: "Bob reads", aliceSends: "Alice sends",
-    msgNote: "As in Task 4: the key comes from the secret through SHA-256. Here we only show which key locks which envelope. Both sides see correct messages: nothing looks wrong.",
+    msgNote: "The key comes from the secret through SHA-256. Here we only show which key locks which envelope. Both sides see correct messages: nothing looks wrong.",
     msgStopped: "Nothing is sent: the exchange was stopped.",
     fixTitle: "The fix: authenticate the exchange",
-    fixText: "Bob adds to his B a seal that only his private key can make. Alice checks the seal with Bob's public key, which she knows from a <b>certificate</b>: Bob's public key, sealed by a party she already trusts. Mallory can replace B, but she cannot seal M as Bob. How such a seal works is a topic of its own, not covered here. Turn on the check above to see the effect.",
+    fixText: "Bob adds to his B a seal that only his long-term private key (not b) can make. Alice checks the seal with Bob's public key, which comes vouched for by someone she already trusts. Mallory can replace B, but she cannot seal M as Bob. How such a seal works is a topic of its own, not covered here. Turn on the check above to see the effect.",
     // step 4
     keysTitle: "Bob's keys",
     xLbl: "x: Bob's private key", yLbl: "y = g^x mod p: Bob's public key, on a notice board", pgNow: (p, g) => "p = " + p + ", g = " + g + " (change them in step 1)",
@@ -588,16 +610,16 @@ const T = {
     back: "the message is back", c1Is: "Alice's half of a Diffie-Hellman exchange", c2Is: "the message, hidden by y^k",
     sameS: "s is the same as y^k: (g^k)^x = (g^x)^k. Bob divides by it.",
     twiceTitle: "The same message twice",
-    twiceText: "A new k gives a new ciphertext every time. Textbook RSA gives the same one (the PIN attack of lecture 3). The price: two numbers, twice as long as p.",
-    withK: "with k =", reuseTitle: "k used twice (Task 6)",
+    twiceText: "A new k gives a new ciphertext every time. Textbook RSA gives the same one, so an attacker can test guesses such as a PIN. The price: two numbers, twice as long as p.",
+    withK: "with k =", reuseTitle: "k used twice", m1Lbl: "the first message M (known) =", k1Lbl: "k =", keysNow: (x, y) => "Bob's keys: x = " + x + ", y = " + y + " (change them in step 4)",
     reuseText: "The sender used the same k for a second message M2. Eve knows the first message M (it was printed on a public receipt). Can she read M2 without Bob's x?",
     m2Lbl: "the second message M2 =", sameK: "the same k", newK: "a new k' = ",
     second: "second ciphertext",
     rs1: "the mask y^k = C2 × M^-1 mod p", rs2: "M2 = C2' × (mask)^-1 mod p",
     rsOk: "Eve read the second message. She never needed x.", rsBad: "With a new k the trick gives a wrong number: Eve learns nothing.",
     sameC1: "C1 is the same twice: Eve sees that k was reused.",
-    rule: "<b>The rule:</b> k must be random, secret and new for every message. The same lesson as the keystream and the nonce in the stream cipher lectures.",
-    realTitle: "At real size: the numbers from Task 6",
+    rule: "<b>The rule:</b> k must be random, secret and new for every message. The same lesson as the keystream and the nonce of a stream cipher.",
+    realTitle: "At real size: two 2048-bit ciphertexts",
     realText: "Two 2048-bit ciphertexts with the same C1 (" + "268389893958…" + "). The first message is known: \"" + "Payment approved: 250 EUR, order 1187." + "\"",
     realBtn: "do Eve's two steps", realOut: "second message:",
     // step 5
@@ -620,22 +642,23 @@ const T = {
   pl: {
     title: "Eksplorator Diffiego-Hellmana", home: "Wszystkie symulatory",
     intro: "Diffie-Hellman i ElGamal, od ogółu do szczegółu. Wybierz krok po lewej albo kliknij ciemne pole, żeby wejść głębiej.",
-    stepOf: n => "Krok " + n + " z 5 · Diffie-Hellman",
+    stepOf: n => "Krok " + n + " z 6 · Diffie-Hellman",
     steps: [["Czarna skrzynka", "dwa sekrety, jedna wspólna liczba"], ["Potęgi g", "łatwo w przód, trudno wstecz"],
             ["Mallory pośrodku", "gdy nikt nie sprawdza, kto jest kim"], ["ElGamal", "Diffie-Hellman z wiadomością"],
-            ["Jedna potęga", "podnoszenie do kwadratu i mnożenie"]],
+            ["Jedna potęga", "podnoszenie do kwadratu i mnożenie"], ["k użyte dwa razy", "jedna znana wiadomość zdradza drugą"]],
     explain: [
       ["Sekret na oczach wszystkich", "Alice i Bob ustalają liczbę, nie wysyłając jej. Eve słyszy wszystko w kanale: p, g, A i B. Obie strony kończą z tym samym sekretem s, Eve go nie zna. Zmień dowolną liczbę, wszystko przeliczy się od nowa. Kliknij ciemne pole, żeby zajrzeć do środka."],
       ["Dlaczego Eve nie cofnie potęgi", "Potęgi g modulo p skaczą po tarczy zegara bez żadnego porządku. W przód (z a do A) jest szybko. Wstecz (z A do a) to logarytm dyskretny: Eve musi próbować wykładników po kolei. Prawdziwe p ma 2048 bitów."],
-      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość M. Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami."],
+      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość publiczną M = g^m (m to jej sekret). Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami."],
       ["Diffie-Hellman z wiadomością", "Bob raz publikuje y = g^x. Żeby wysłać liczbę M, Alice losuje nowe tajne k i wysyła C1 = g^k (swoją połowę wymiany) oraz C2 = M × y^k (wiadomość zakrytą wspólną wartością). Bob dzieli przez tę samą wartość i odzyskuje M."],
-      ["Jedna potęga modulo", "Jak Alice liczy g^a mod p, gdy a ma 256 bitów? Na pewno nie mnożąc a razy. Metoda „kwadrat i mnożenie” idzie po bitach wykładnika: dla każdego bitu podnosi do kwadratu, a dla każdej jedynki mnoży jeszcze raz."]],
+      ["Jedna potęga modulo", "Jak Alice liczy g^a mod p, gdy a ma 256 bitów? Na pewno nie mnożąc a razy. Metoda „kwadrat i mnożenie” idzie po bitach wykładnika: dla każdego bitu podnosi do kwadratu, a dla każdej jedynki mnoży jeszcze raz."],
+      ["To samo k dla dwóch wiadomości", "ElGamal zakrywa każdą wiadomość maską y^k. Jeśli nadawca użyje tego samego k dwa razy, obie wiadomości dostaną tę samą maskę. Eve zna jedną z wiadomości: czy przeczyta drugą bez klucza prywatnego x Boba?"]],
     selfOk: "✓ sprawdzone ze slajdami, Stallingsem i RFC 3526", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: następny krok · ← / Esc: wstecz",
     digits: n => n + " " + plN(n, "cyfra", "cyfry", "cyfr"), clickIn: "kliknij, by zajrzeć", clickPow: "kliknij: ta potęga krok po kroku",
     pLbl: "p: jawna liczba pierwsza", gLbl: "g: jawne", pubTitle: "Jawne, zna je każdy (także Eve)",
     aLbl: "a: sekret Alice", bLbl: "b: sekret Boba", rand: "losowy sekret",
-    presets: "Przykłady:", prSlides: "slajdy: a = 6, b = 15", prTask1: "zadanie 1: a = 4, b = 3", prBook: "podręcznik: p = 353", prReal: "prawdziwy rozmiar: 2048 bitów",
+    presets: "Przykłady:", prSlides: "slajdy: a = 6, b = 15", prBook: "podręcznik: p = 353", prReal: "prawdziwy rozmiar: 2048 bitów",
     errNum: "Wpisz liczbę całkowitą.", errPsmall: "p musi być liczbą pierwszą, co najmniej 5.", errPbig: "Tutaj najwyżej 10^12 (albo 2048-bitowa liczba pierwsza z ostatniego przykładu).",
     errPrime: p => p + " nie jest liczbą pierwszą.", errRange: (n, hi) => n + " musi być od 1 do " + hi + ".", errG: hi => "g musi być od 2 do " + hi + ".",
     fixFirst: "Najpierw popraw czerwone liczby w kroku 1.", fixHere: "Najpierw popraw czerwone liczby.",
@@ -649,10 +672,10 @@ const T = {
     whyA: "Alice: B<sup>a</sup> = (g<sup>b</sup>)<sup>a</sup> = g<sup>b·a</sup>", whyB: "Bob: A<sup>b</sup> = (g<sup>a</sup>)<sup>b</sup> = g<sup>a·b</sup>",
     whyNum: (ab, r) => "a·b = " + ab + ", a g<sup>" + ab + "</sup> mod p = " + r + ": ta sama liczba, której nikt nigdy nie wysłał.",
     whyBig: "Tutaj a·b jest ogromne, ale zasada ta sama: oboje liczą g<sup>ab</sup> mod p.",
-    legPub: "jawne: widzi każdy", legSec: "tajne: zna tylko właściciel", legSh: "wspólny sekret", legMal: "napastnicy: Eve i Mallory", legMsg: "wiadomość",
+    legPub: "jawne: widzi każdy", legSec: "tajne: zna tylko właściciel", legSh: "wspólny sekret", legMal: "napastnicy: Eve i Mallory", legMsg: "wiadomość", legCtx: "szyfrogram",
     honest: "Małe liczby są tylko do nauki: przy p = 23 Eve sprawdzi wszystkie 22 wykładniki w mgnieniu oka. Prawdziwy Diffie-Hellman używa p o 2048 bitach i sekretów o co najmniej 256 bitach (wypróbuj ostatni przykład).",
     clockTitle: (g, p) => "Potęgi " + g + " mod " + p + " na tarczy zegara",
-    clockNote: "Na tarczy są liczby od 1 do p - 1. Każdy krok mnoży przez g (mod p) i skacze do następnej liczby. Niebieski pierścień to A Alice.",
+    clockNote: "Na tarczy są liczby od 1 do p - 1. Każdy krok mnoży przez g (mod p) i skacze do następnej liczby. Przerywany pierścień to A Alice.",
     expo: "wykładnik e", play: "▶ odtwórz", stop: "■ stop",
     distinctAll: (n, p) => "g dochodzi do wszystkich " + n + " liczb od 1 do " + (p - 1) + ": dobre g.",
     distinctFew: (n, p) => "g daje tylko " + n + " " + plN(n, "różną liczbę", "różne liczby", "różnych liczb") + ", potem się powtarzają: złe g, Eve ma mniej do sprawdzenia.",
@@ -670,16 +693,16 @@ const T = {
     tried: n => "Sprawdzono " + n.toLocaleString("pl-PL") + " " + plN(n, "wykładnik", "wykładniki", "wykładników") + ".",
     found: (e, n) => "Znaleziono a = " + e + " po " + n.toLocaleString("pl-PL") + " " + plN(n, "próbie", "próbach", "próbach") + ". Teraz Eve też policzy s.",
     foundOther: (e, a) => "Eve znalazła e = " + e + ", a nie a = " + a + " Alice, ale g^" + e + " daje to samo A, więc dla niej działa tak samo dobrze.",
-    bigSearch: "Przy takim p szukanie trwałoby o wiele za długo: około 2^2047 prób. Dlatego prawdziwe p ma 2048 bitów.",
+    bigSearch: "Przy takim p i 256-bitowym sekrecie a szukanie trwałoby o wiele za długo: około 2^256 prób.",
     searching: (n) => "szukam … " + n.toLocaleString("pl-PL") + " prób",
-    t3Title: "Zadanie 3: za każdym razem 4 bity więcej. Ile dłużej?",
+    t3Title: "Cztery wyszukiwania, za każdym razem 4 bity więcej. Ile dłużej?", t3Open: "pokaż cztery wyszukiwania",
     t3Predict: "Najpierw przewiduj: z wiersza na wiersz p rośnie o 4 bity. Ile razy dłużej potrwa szukanie?",
     t3Run: "uruchom szukanie", t3Bits: "bity", t3Tries: "próby do A", t3Time: "czas w tej przeglądarce", t3Ratio: "ile razy więcej prób niż wyżej",
-    t3Note: "Czas zależy od tego, jak duże było losowe a, więc wzrost nie jest równy. Średnio 4 bity więcej to 16 razy więcej prób. Python (jak w zadaniu 3) jest wolniejszy niż ta przeglądarka.",
+    t3Note: "Czas zależy od tego, jak duże było losowe a, więc wzrost nie jest równy. Średnio 4 bity więcej to 16 razy więcej prób. Zwykły Python jest wolniejszy niż ta przeglądarka.",
     malOn: "Mallory siedzi na kablu", malStepLbl: k => "atak, krok " + k + " z 4",
-    malSteps: ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi swoje M.", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice M.",
+    malSteps: ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi swoją wartość publiczną M = g^m.", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice M.",
                "Alice ma wspólny sekret z Mallory. Bob ma inny wspólny sekret z Mallory.", "Alice wysyła wiadomość. Mallory ją odszyfrowuje, czyta i szyfruje na nowo dla Boba."],
-    mLbl: "m: sekret Mallory", malM: "M = g^m mod p, wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
+    mLbl: "m: sekret Mallory", malM: "jej wartość publiczna g^m mod p (= M), wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
     recvAsB: "„od Boba” (naprawdę M)", recvAsA: "„od Alice” (naprawdę M)",
     sealOn: "Alice i Bob sprawdzają pieczęć (uwierzytelnienie)",
     noSealB: "brak pieczęci Boba: odrzucone", noSealA: "brak pieczęci Alice: odrzucone", stopped: "wymiana przerwana",
@@ -689,10 +712,10 @@ const T = {
     msgTitle: "Co daje atak", msgLbl: "wiadomość Alice",
     lockedWith: (n, s) => "zamknięta kluczem " + n + " (z " + s + ")", malReads: "Mallory otwiera, czyta, zamyka na nowo",
     bobReads: "Bob czyta", aliceSends: "Alice wysyła",
-    msgNote: "Jak w zadaniu 4: klucz powstaje z sekretu przez SHA-256. Tutaj pokazujemy tylko, który klucz zamyka którą kopertę. Obie strony widzą poprawne wiadomości: nic nie wygląda podejrzanie.",
+    msgNote: "Klucz powstaje z sekretu przez SHA-256. Tutaj pokazujemy tylko, który klucz zamyka którą kopertę. Obie strony widzą poprawne wiadomości: nic nie wygląda podejrzanie.",
     msgStopped: "Nic nie zostaje wysłane: wymiana została przerwana.",
     fixTitle: "Ratunek: uwierzytelnić wymianę",
-    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego klucz prywatny. Alice sprawdza pieczęć kluczem publicznym Boba, który zna z <b>certyfikatu</b>: klucza publicznego Boba opieczętowanego przez kogoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje M jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie wyżej, żeby zobaczyć efekt.",
+    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego długoterminowy klucz prywatny (nie b). Alice sprawdza pieczęć kluczem publicznym Boba, za który poręczył ktoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje M jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie wyżej, żeby zobaczyć efekt.",
     keysTitle: "Klucze Boba",
     xLbl: "x: klucz prywatny Boba", yLbl: "y = g^x mod p: klucz publiczny Boba, na tablicy ogłoszeń", pgNow: (p, g) => "p = " + p + ", g = " + g + " (zmienisz je w kroku 1)",
     MLbl: "M: wiadomość, liczba od 1 do p - 1", kLbl: "k: nowy losowy sekret",
@@ -702,16 +725,16 @@ const T = {
     back: "wiadomość wróciła", c1Is: "połowa wymiany Diffiego-Hellmana od Alice", c2Is: "wiadomość zakryta przez y^k",
     sameS: "s to to samo co y^k: (g^k)^x = (g^x)^k. Bob przez nie dzieli.",
     twiceTitle: "Ta sama wiadomość dwa razy",
-    twiceText: "Nowe k daje za każdym razem nowy szyfrogram. Podręcznikowe RSA daje ten sam (atak na PIN z wykładu 3). Cena: dwie liczby, dwa razy dłużej niż p.",
-    withK: "dla k =", reuseTitle: "k użyte dwa razy (zadanie 6)",
+    twiceText: "Nowe k daje za każdym razem nowy szyfrogram. Podręcznikowe RSA daje ten sam, więc napastnik może sprawdzać zgadywane wartości, np. PIN. Cena: dwie liczby, dwa razy dłużej niż p.",
+    withK: "dla k =", reuseTitle: "k użyte dwa razy", m1Lbl: "pierwsza wiadomość M (znana) =", k1Lbl: "k =", keysNow: (x, y) => "Klucze Boba: x = " + x + ", y = " + y + " (zmienisz je w kroku 4)",
     reuseText: "Nadawca użył tego samego k dla drugiej wiadomości M2. Eve zna pierwszą wiadomość M (była wydrukowana na publicznym paragonie). Czy przeczyta M2 bez x Boba?",
     m2Lbl: "druga wiadomość M2 =", sameK: "to samo k", newK: "nowe k' = ",
     second: "drugi szyfrogram",
     rs1: "maska y^k = C2 × M^-1 mod p", rs2: "M2 = C2' × (maska)^-1 mod p",
     rsOk: "Eve przeczytała drugą wiadomość. Ani razu nie potrzebowała x.", rsBad: "Przy nowym k sztuczka daje złą liczbę: Eve niczego się nie dowiaduje.",
     sameC1: "C1 jest dwa razy takie samo: Eve widzi, że k się powtórzyło.",
-    rule: "<b>Zasada:</b> k musi być losowe, tajne i nowe dla każdej wiadomości. Ta sama lekcja co keystream i nonce w wykładach o szyfrach strumieniowych.",
-    realTitle: "W prawdziwym rozmiarze: liczby z zadania 6",
+    rule: "<b>Zasada:</b> k musi być losowe, tajne i nowe dla każdej wiadomości. Ta sama lekcja co keystream i nonce w szyfrze strumieniowym.",
+    realTitle: "W prawdziwym rozmiarze: dwa 2048-bitowe szyfrogramy",
     realText: "Dwa 2048-bitowe szyfrogramy z tym samym C1 (" + "268389893958…" + "). Pierwsza wiadomość jest znana: „" + "Payment approved: 250 EUR, order 1187." + "”",
     realBtn: "wykonaj dwa kroki Eve", realOut: "druga wiadomość:",
     pwTitle: "Policz podstawa^e mod p", pwBase: "podstawa", pwExp: "wykładnik e", pwMod: "moduł p",
@@ -740,11 +763,12 @@ const L = () => T[lang];
 
 const app = {
   level: 0,
-  f: { p: "23", g: "5", a: "6", b: "15", m: "9", x: "6", M: "10", k: "3", k2: "7", M2: "7" },
+  f: { p: "23", g: "5", a: "6", b: "15", m: "9", x: "15", M: "7", k: "3", k2: "7", M2: "4" },
   malStep: 1, seal: false, reuseSame: true,
   clockE: 6, playing: null,
   eve: null,        // Eve's search: { key, e, v, found, done, running }
-  t3: null,         // Task 3 results
+  t3: null,         // the four searches: results
+  t3open: false,    // step 2: the card with the four searches is open (#2.2)
   real6: false,
   pw: { b: "5", e: "6", m: "23", origin: "gA", step: 0 },
   mmsg: "My new card PIN is 7314. Please keep it secret.",
@@ -809,12 +833,13 @@ const ENV_SVG = (c) => '<svg viewBox="0 0 40 28" width="40" height="28" aria-hid
 const LOCK_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 const rndBtn = f => '<button class="rnd" data-action="rand" data-f="' + f + '" title="' + esc(L().rand) + '" aria-label="' + esc(L().rand) + '">' + DICE_SVG + "</button>";
 const inp = (f, cls) => '<input data-field="' + f + '" spellcheck="false" autocomplete="off" inputmode="numeric" class="' + (cls || "") + '" value="' + esc(app.f[f]) + '">';
-const person = (name, x, y, sub, mal) => '<div class="person" style="left:' + x + "px;top:" + y + 'px"><span class="ava' + (mal ? " mal" : "") + '">' + (mal ? SPY_SVG : USER_SVG) + "</span>" + name + (sub ? " <small>" + sub + "</small>" : "") + "</div>";
+/* a person with the avatar colour of the slides: role "al" (Alice), "bo" (Bob), "mal" (Eve, Mallory) */
+const person = (name, x, y, sub, role) => '<div class="person ' + role + '" style="left:' + x + "px;top:" + y + 'px"><span class="ava ' + role + '">' + (role === "mal" ? SPY_SVG : USER_SVG) + "</span>" + name + (sub ? " <small>" + sub + "</small>" : "") + "</div>";
 const mk = (id, c) => '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="' + c + '"/></marker>';
 const MARKERS = "<defs>" + mk("mInk", "var(--muted)") + mk("mPub", "var(--pub-b)") + mk("mSec", "var(--sec-b)") + mk("mMal", "var(--mal-b)") + "</defs>";
 const ln = (pts, kind, extra) => '<polyline fill="none" stroke="' + ({ ink: "var(--muted)", pub: "var(--pub-b)", sec: "var(--sec-b)", mal: "var(--mal-b)" })[kind] +
   '" stroke-width="2.3" marker-end="url(#m' + ({ ink: "Ink", pub: "Pub", sec: "Sec", mal: "Mal" })[kind] + ')" points="' + pts + '"' + (extra || "") + "/>";
-const legend = keys => '<div class="legend">' + keys.map(k => '<span class="role-' + k + '">' + L()[{ pub: "legPub", sec: "legSec", sh: "legSh", mal: "legMal", msg: "legMsg" }[k]] + "</span>").join("") + "</div>";
+const legend = keys => '<div class="legend">' + keys.map(k => '<span class="role-' + k + '">' + L()[{ pub: "legPub", sec: "legSec", sh: "legSh", mal: "legMal", msg: "legMsg", ctx: "legCtx" }[k]] + "</span>").join("") + "</div>";
 function setHTML(id, h) { const e = document.getElementById(id); if (e) e.innerHTML = h; }
 function markInputs(er) {
   view.querySelectorAll("input[data-field]").forEach(i => {
@@ -829,7 +854,7 @@ function render0() {
   const t = L();
   const W = 1045, H = 522;
   let h = '<div class="card"><div class="btns" style="margin-bottom:12px"><span class="lbl">' + t.presets + "</span>" +
-    '<button data-action="preset" data-p="slides">' + t.prSlides + '</button><button data-action="preset" data-p="task1">' + t.prTask1 + "</button>" +
+    '<button data-action="preset" data-p="slides">' + t.prSlides + "</button>" +
     '<button data-action="preset" data-p="book">' + t.prBook + '</button><button data-action="preset" data-p="real">' + t.prReal + "</button></div>" +
     '<div class="schwrap"><div class="sch" style="width:' + W + "px;height:" + H + 'px">' +
     '<svg class="arrows" width="' + W + '" height="' + H + '" aria-hidden="true">' + MARKERS +
@@ -845,7 +870,7 @@ function render0() {
       '<label style="margin-top:6px">' + t.pLbl + inp("p") + "</label>" +
       '<label style="margin-top:6px">' + t.gLbl + inp("g") + "</label></div>" +
     // Alice
-    person(t.alice, 20, 2) +
+    person(t.alice, 20, 2, "", "al") +
     '<div class="chip role-sec" style="left:20px;top:44px;width:280px;height:72px">' + rndBtn("a") + "<label>" + t.aLbl + inp("a") + "</label></div>" +
     '<button class="box sbox" style="left:60px;top:134px;width:200px;height:56px" data-action="zoom" data-to="1"><span>g<sup>a</sup> mod p</span><small>' + t.clickIn + "</small></button>" +
     '<div class="chip role-pub" style="left:20px;top:208px;width:280px;height:60px">A<small> (' + t.sendsA + ')</small><span class="v" id="o_A"></span></div>' +
@@ -853,7 +878,7 @@ function render0() {
     '<button class="box sbox" style="left:60px;top:376px;width:200px;height:56px" data-action="pow" data-k="Ba"><span>B<sup>a</sup> mod p</span><small>' + t.clickPow + "</small></button>" +
     '<div class="chip role-sh" style="left:20px;top:452px;width:280px;height:64px">' + t.sharedA + '<span class="v" id="o_sA"></span></div>' +
     // Bob
-    person(t.bob, 745, 2) +
+    person(t.bob, 745, 2, "", "bo") +
     '<div class="chip role-sec" style="left:745px;top:44px;width:280px;height:72px">' + rndBtn("b") + "<label>" + t.bLbl + inp("b") + "</label></div>" +
     '<button class="box sbox" style="left:785px;top:134px;width:200px;height:56px" data-action="zoom" data-to="1"><span>g<sup>b</sup> mod p</span><small>' + t.clickIn + "</small></button>" +
     '<div class="chip role-pub" style="left:745px;top:208px;width:280px;height:60px">B<small> (' + t.sendsB + ')</small><span class="v" id="o_B"></span></div>' +
@@ -861,8 +886,8 @@ function render0() {
     '<button class="box sbox" style="left:785px;top:376px;width:200px;height:56px" data-action="pow" data-k="Ab"><span>A<sup>b</sup> mod p</span><small>' + t.clickPow + "</small></button>" +
     '<div class="chip role-sh" style="left:745px;top:452px;width:280px;height:64px">' + t.sharedB + '<span class="v" id="o_sB"></span></div>' +
     // the channel and Eve
-    '<div class="wlbl" style="left:318px;top:206px;color:var(--pub-b)" id="w_A"></div>' +
-    '<div class="wlbl" style="left:590px;top:206px;width:140px;text-align:right;color:var(--pub-b)" id="w_B"></div>' +
+    '<div class="wlbl" style="left:318px;top:206px;color:var(--pub-t)" id="w_A"></div>' +
+    '<div class="wlbl" style="left:590px;top:206px;width:140px;text-align:right;color:var(--pub-t)" id="w_B"></div>' +
     '<div class="evecard" style="left:392px;top:372px;width:262px"><div class="eh">' + EAR_SVG + " " + t.eveListens + '</div><div class="eb" id="o_eve"></div></div>' +
     "</div></div>" +
     '<div id="o_res"></div>' + legend(["pub", "sec", "sh", "mal"]) + "</div>" +
@@ -911,14 +936,17 @@ function render1() {
       '<div class="bigeq" id="c_eq"></div><p id="c_count" style="margin:4px 0"></p><p class="note" id="c_note"></p></div></div>' +
     '<div class="schwrap"><table class="ptable" id="c_table"></table></div></div>';
   h += '<div class="card"><div class="two">' +
-    '<div class="half role-sh"><h4>' + t.fwdTitle + '</h4><div class="bigeq" style="font-size:17px" id="f_eq"></div><p style="margin:4px 0 8px" id="f_txt"></p>' +
+    '<div class="half good"><h4>' + t.fwdTitle + '</h4><div class="bigeq" style="font-size:17px" id="f_eq"></div><p style="margin:4px 0 8px" id="f_txt"></p>' +
       '<button class="dark" data-action="pow" data-k="gA">' + t.fwdBtn + " →</button></div>" +
     '<div class="half role-mal"><h4>' + t.backTitle + '</h4><p style="margin:0 0 8px" id="b_txt"></p>' +
       '<div class="btns"><button data-action="eve1">' + t.tryOne + '</button><button class="dark" data-action="eveall">' + t.tryAll + "</button>" +
       '<button data-action="evereset">' + t.reset + '</button></div><div id="b_out"></div></div></div></div>';
-  h += '<div class="card"><h3>' + t.t3Title + '</h3><p style="margin:0 0 8px">' + t.t3Predict + "</p>" +
-    '<button class="dark" data-action="t3run" id="t3btn">' + t.t3Run + '</button><div class="schwrap"><table class="rtable" id="t3tab"></table></div>' +
-    '<p class="note">' + t.t3Note + "</p></div>";
+  // the four searches (#2.2): open only on request, so that a link to #2 does not show them before the exercise
+  if (app.t3open)
+    h += '<div class="card" id="t3card"><h3>' + t.t3Title + '</h3><p style="margin:0 0 8px">' + t.t3Predict + "</p>" +
+      '<button class="dark" data-action="t3run" id="t3btn">' + t.t3Run + '</button><div class="schwrap"><table class="rtable" id="t3tab"></table></div>' +
+      '<p class="note">' + t.t3Note + "</p></div>";
+  else h += '<div class="card"><button data-action="t3open">▸ ' + t.t3Open + "</button></div>";
   return h;
 }
 function clockSVG(p, g, e, A) {
@@ -1123,7 +1151,7 @@ function render2() {
   const k = app.malStep, st = n => (k < n ? " todo" : " mfaded");
   let h = '<div class="card"><div class="btns" style="margin-bottom:10px">' +
     '<button data-action="mal" data-d="-1">' + t.bPrev + '</button><button class="dark" data-action="mal" data-d="1">' + t.bNext + "</button>" +
-    " <b>" + t.malStepLbl(k) + '</b> <span class="opnow" style="font-family:var(--sans)">' + esc(t.malSteps[k - 1]) + "</span></div>" +
+    " <b>" + t.malStepLbl(k) + '</b> <span class="opnow" style="font-family:var(--sans)">' + supTxt(t.malSteps[k - 1]) + "</span></div>" +
     '<div class="schwrap"><div class="sch" style="width:' + W + "px;height:" + H + 'px">' +
     '<svg class="arrows" width="' + W + '" height="' + H + '" aria-hidden="true">' + MARKERS +
       ln("160,110 160,124", "ink") + '<g class="' + st(2) + '">' + ln("160,274 160,300", "ink") + "</g>" +
@@ -1132,28 +1160,28 @@ function render2() {
       '<g class="' + st(1) + '">' + ln("302,156 358,156", "pub") + ln("687,244 741,244", "mal") + "</g>" +
       '<g class="' + st(2) + '">' + ln("743,156 689,156", "pub") + ln("358,244 304,244", "mal") + "</g>" +
     "</svg>" +
-    person(t.alice, 20, 2) +
+    person(t.alice, 20, 2, "", "al") +
     '<div class="chip role-sec" style="left:20px;top:42px;width:280px;height:68px">' + rndBtn("a") + "<label>" + t.aLbl + inp("a") + "</label></div>" +
     '<div class="chip role-pub" style="left:20px;top:126px;width:280px;height:58px">A<small> (' + t.sendsA + ')</small><span class="v" id="m_A"></span></div>' +
     '<div class="chip role-pub' + st(2) + '" style="left:20px;top:214px;width:280px;height:60px">B?<small> ' + esc(t.recvAsB) + '</small><span class="v" id="m_rA"></span></div>' +
     '<div class="chip role-sh' + st(3) + '" style="left:20px;top:302px;width:280px;height:64px">' + t.sharedA + '<span class="v" id="m_sA"></span></div>' +
-    person(t.bob, 745, 2) +
+    person(t.bob, 745, 2, "", "bo") +
     '<div class="chip role-sec" style="left:745px;top:42px;width:280px;height:68px">' + rndBtn("b") + "<label>" + t.bLbl + inp("b") + "</label></div>" +
     '<div class="chip role-pub' + st(2) + '" style="left:745px;top:126px;width:280px;height:58px">B<small> (' + t.sendsB + ')</small><span class="v" id="m_B"></span></div>' +
     '<div class="chip role-pub' + st(1) + '" style="left:745px;top:214px;width:280px;height:60px">A?<small> ' + esc(t.recvAsA) + '</small><span class="v" id="m_rB"></span></div>' +
     '<div class="chip role-sh' + st(3) + '" style="left:745px;top:302px;width:280px;height:64px">' + t.sharedB + '<span class="v" id="m_sB"></span></div>' +
     // Mallory
     '<div class="chip role-mal" style="left:360px;top:2px;width:327px;height:366px">' +
-      '<div style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700"><span class="ava mal">' + SPY_SVG + "</span>" + t.mallory + "</div>" +
+      '<div style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;color:var(--mal-t)"><span class="ava mal">' + SPY_SVG + "</span>" + t.mallory + "</div>" +
       '<div class="chip role-sec" style="position:relative;margin-top:8px;height:64px">' + rndBtn("m") + "<label>" + t.mLbl + inp("m") + "</label></div>" +
       '<div class="chip role-pub" style="position:relative;margin-top:8px;height:58px">' + supTxt(t.malM) + '<span class="v" id="m_M"></span></div>' +
       '<div class="chip role-sh' + st(3) + '" style="position:relative;margin-top:8px;height:58px">' + supTxt(t.malWithA) + '<span class="v" id="m_kA"></span></div>' +
       '<div class="chip role-sh' + st(3) + '" style="position:relative;margin-top:8px;height:58px">' + supTxt(t.malWithB) + '<span class="v" id="m_kB"></span></div>' +
     "</div>" +
-    '<div class="wlbl' + st(1) + '" style="left:302px;top:128px;color:var(--pub-b);font-size:12px" id="mw_A"></div>' +
-    '<div class="wlbl' + st(1) + '" style="left:689px;top:216px;color:var(--mal-b);font-size:12px" id="mw_M1"></div>' +
-    '<div class="wlbl' + st(2) + '" style="left:689px;top:128px;color:var(--pub-b);font-size:12px" id="mw_B"></div>' +
-    '<div class="wlbl' + st(2) + '" style="left:302px;top:216px;color:var(--mal-b);font-size:12px" id="mw_M2"></div>' +
+    '<div class="wlbl' + st(1) + '" style="left:302px;top:128px;color:var(--pub-t);font-size:12px" id="mw_A"></div>' +
+    '<div class="wlbl' + st(1) + '" style="left:689px;top:216px;color:var(--mal-t);font-size:12px" id="mw_M1"></div>' +
+    '<div class="wlbl' + st(2) + '" style="left:689px;top:128px;color:var(--pub-t);font-size:12px" id="mw_B"></div>' +
+    '<div class="wlbl' + st(2) + '" style="left:302px;top:216px;color:var(--mal-t);font-size:12px" id="mw_M2"></div>' +
     "</div></div>" +
     '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:600"><input type="checkbox" data-field="seal"' + (app.seal ? " checked" : "") + "> " + t.sealOn + "</label>" +
     '<div id="m_res" class="' + st(3) + '"></div>' + legend(["pub", "sec", "sh", "mal"]) + "</div>" +
@@ -1198,9 +1226,9 @@ function update2() {
   const arr = '<span style="font-size:22px;color:var(--muted)">→</span>';
   setHTML("m_msg", '<div style="display:flex;align-items:center;gap:6px">' +
     '<div class="chip role-msg" style="position:relative;flex:1 1 0;min-width:0"><small>' + t.aliceSends + "</small><br>" + msg + "</div>" + arr +
-    env(esc(t.lockedWith(1, sh(r.sAlice))), "var(--sh-b)") + arr +
+    env(esc(t.lockedWith(1, sh(r.sAlice))), "var(--ctx-b)") + arr +
     '<div class="chip role-mal" style="position:relative;flex:1.15 1 0;min-width:0"><small>' + t.malReads + "</small><br>" + msg + "</div>" + arr +
-    env(esc(t.lockedWith(2, sh(r.sBob))), "var(--sh-b)") + arr +
+    env(esc(t.lockedWith(2, sh(r.sBob))), "var(--ctx-b)") + arr +
     '<div class="chip role-msg" style="position:relative;flex:1 1 0;min-width:0"><small>' + t.bobReads + ' <span class="stamp ok">✓</span></small><br>' + msg + "</div></div>");
 }
 
@@ -1216,19 +1244,19 @@ function render3() {
     ch("role-pub", supTxt(t.yLbl) + '<span class="v" id="e_y"></span>', "position:relative;width:420px") +
     '</div><p class="note" style="margin:8px 0 0" id="e_pg"></p></div>';
   h += '<div class="card"><div class="schwrap"><div class="eg">' +
-    '<div class="egcol">' + '<div class="person" style="position:relative;margin-bottom:6px"><span class="ava">' + USER_SVG + "</span>" + t.alice + "</div>" +
+    '<div class="egcol">' + '<div class="person al" style="position:relative;margin-bottom:6px"><span class="ava al">' + USER_SVG + "</span>" + t.alice + "</div>" +
       ch("role-msg", "<label>" + t.MLbl + inp("M") + "</label>", "position:relative") +
       '<div style="height:8px"></div>' + ch("role-sec", rndBtn("k") + "<label>" + t.kLbl + inp("k") + "</label>", "position:relative") + dn +
       '<button class="box" data-action="pow" data-k="gk"><span>' + supTxt(t.c1Box) + "</span><small>" + t.clickPow + "</small></button>" + dn +
-      ch("role-pub", "C1 <small>" + t.c1Is + '</small><span class="v" id="e_c1"></span>', "position:relative") + dn +
+      ch("role-ctx", "C<sub>1</sub> <small>" + t.c1Is + '</small><span class="v" id="e_c1"></span>', "position:relative") + dn +
       '<button class="box" data-action="pow" data-k="yk"><span>' + supTxt(t.c2Box) + "</span><small>" + t.clickPow + "</small></button>" + dn +
-      ch("role-pub", "C2 <small>" + supTxt(t.c2Is) + '</small><span class="v" id="e_c2"></span>', "position:relative") +
+      ch("role-ctx", "C<sub>2</sub> <small>" + supTxt(t.c2Is) + '</small><span class="v" id="e_c2"></span>', "position:relative") +
     "</div>" +
     '<div class="harr"></div>' +
     '<div class="egcol"><div class="ctx"><div style="font-size:12.5px;font-weight:600">' + t.sent + '</div><div class="pair" id="e_pair"></div></div>' +
       '<div class="evecard" style="margin-top:16px"><div class="eh">' + EAR_SVG + " " + t.eve + '</div><div class="eb" style="font-family:var(--sans);font-size:13px">' + t.eveSees + "</div></div></div>" +
     '<div class="harr"></div>' +
-    '<div class="egcol">' + '<div class="person" style="position:relative;margin-bottom:6px"><span class="ava">' + USER_SVG + "</span>" + t.bob + "</div>" +
+    '<div class="egcol">' + '<div class="person bo" style="position:relative;margin-bottom:6px"><span class="ava bo">' + USER_SVG + "</span>" + t.bob + "</div>" +
       ch("role-sec", t.xLbl + '<span class="v" id="e_x"></span>', "position:relative") + dn +
       '<button class="box" data-action="pow" data-k="C1x"><span>' + supTxt(t.sBox) + "</span><small>" + t.clickPow + "</small></button>" + dn +
       ch("role-sh", "s" + '<span class="v" id="e_s"></span>', "position:relative") + dn +
@@ -1237,28 +1265,20 @@ function render3() {
       '<div class="box" style="cursor:default"><span>' + supTxt(t.mBox) + "</span></div>" + dn +
       ch("role-msg", t.back + '<span class="v" id="e_m"></span>', "position:relative") +
     "</div></div></div>" +
-    '<div class="why" id="e_why">' + supTxt(t.sameS) + '</div><div id="e_err"></div>' + legend(["pub", "sec", "sh", "msg", "mal"]) + "</div>";
+    '<div class="why" id="e_why">' + supTxt(t.sameS) + '</div><div id="e_err"></div>' + legend(["pub", "sec", "sh", "msg", "ctx", "mal"]) + "</div>";
   h += '<div class="card"><h3>' + t.twiceTitle + '</h3><p style="margin:0 0 6px">' + t.twiceText + '</p><div class="calc" id="e_twice"></div>' +
     '<div class="inl" style="margin-top:4px"><span>' + t.withK.replace("k", "k'") + "</span>" + inp("k2") + "</div></div>";
-  h += '<div class="card"><h3>' + t.reuseTitle + '</h3><p style="margin:0 0 8px">' + t.reuseText + "</p>" +
-    '<div class="btns" style="margin-bottom:8px"><span class="inl"><span>' + t.m2Lbl + "</span>" + inp("M2") + "</span>" +
-    '<span class="tabs" style="margin-left:10px"><button data-action="reuse" data-v="1" aria-pressed="' + app.reuseSame + '">' + t.sameK + "</button>" +
-    '<button data-action="reuse" data-v="0" aria-pressed="' + !app.reuseSame + '" id="e_newk"></button></span></div>' +
-    '<div class="calc" id="e_reuse"></div><div class="why">' + t.rule + "</div></div>";
-  h += '<div class="card"><h3>' + t.realTitle + '</h3><p style="margin:0 0 8px">' + esc(t.realText) + "</p>" +
-    '<button class="dark" data-action="real6">' + t.realBtn + '</button><div id="e_real" style="margin-top:8px"></div></div>';
   return h;
 }
 function update3() {
   const t = L(), P = params();
-  const x = extra("x", P), M = extra("M", P, true), k = extra("k", P), k2 = extra("k2", P), M2 = extra("M2", P, true);
-  const er = { x: x.er, M: M.er, k: k.er, k2: k2.er, M2: M2.er };
+  const x = extra("x", P), M = extra("M", P, true), k = extra("k", P), k2 = extra("k2", P);
+  const er = { x: x.er, M: M.er, k: k.er, k2: k2.er };
   markInputs(er);
   setHTML("e_pg", esc(t.pgNow(fmt(P.p), fmt(P.g))));
   const bad = x.er || M.er || k.er;
-  const ids = ["e_y", "e_c1", "e_c2", "e_pair", "e_x", "e_s", "e_si", "e_m", "e_twice", "e_reuse"];
+  const ids = ["e_y", "e_c1", "e_c2", "e_pair", "e_x", "e_s", "e_si", "e_m", "e_twice"];
   setHTML("e_err", Object.values(er).some(Boolean) ? '<div class="banner neutral">' + errList(er) + "</div>" : "");
-  setHTML("e_newk", esc(t.newK) + (k2.er ? "?" : esc(fmt(k2.v))));
   if (x.er) { ids.forEach(i => setHTML(i, "")); return; }
   const y = modPow(P.g, x.v, P.p);
   setHTML("e_y", "= " + powEq("g", "x", P.g, x.v, P.p, y));
@@ -1273,24 +1293,8 @@ function update3() {
   setHTML("e_si", sm ? "= <b>" + d.sInv + "</b>, " + d.s + " × " + d.sInv + " mod " + P.p + " = 1" : "= <b>" + esc(fmt(d.sInv)) + "</b>");
   setHTML("e_m", (sm ? "= " + c.C2 + " × " + d.sInv + " mod " + P.p + " = <b>" + d.M + "</b>" : "= <b>" + esc(fmt(d.M)) + "</b>") + (d.M === M.v ? ' <span class="stamp ok">✓</span>' : ' <span class="stamp">✗</span>'));
   // the same message twice
-  const row = (kk, cc) => '<div class="cr"><span>M = ' + esc(fmt(M.v)) + ", k = " + esc(fmt(kk)) + "</span><span>→</span><span class=\"mark role-pub\">(" + esc(fmt(cc.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(cc.C2)).replace(/ \(.*/, "") + ")</span></div>";
+  const row = (kk, cc) => '<div class="cr"><span>M = ' + esc(fmt(M.v)) + ", k = " + esc(fmt(kk)) + "</span><span>→</span><span class=\"mark role-ctx\">(" + esc(fmt(cc.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(cc.C2)).replace(/ \(.*/, "") + ")</span></div>";
   setHTML("e_twice", row(k.v, c) + (k2.er ? "" : row(k2.v, egEncrypt(P.p, P.g, y, M.v, k2.v))));
-  // k used twice
-  if (M2.er || k2.er) { setHTML("e_reuse", ""); return; }
-  const kSecond = app.reuseSame ? k.v : k2.v;
-  const c2 = egEncrypt(P.p, P.g, y, M2.v, kSecond);
-  const at = reuseAttack(P.p, M.v, c.C2, c2.C2);
-  const ss = small(P.p);
-  const pr = cc => "(" + esc(fmt(cc.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(cc.C2)).replace(/ \(.*/, "") + ")";
-  let h = '<div class="cr"><span class="cn"></span><span>M = ' + esc(fmt(M.v)) + ' <span class="note">(known)</span> → <span class="mark role-pub">' + pr(c) + "</span></span></div>" +
-    '<div class="cr"><span class="cn"></span><span>M2 = ? → <span class="mark role-pub">' + pr(c2) + "</span> " + '<span class="note">(' + t.second + ")</span></span></div>" +
-    (c2.C1 === c.C1 ? '<div class="cr"><span class="cn"></span><span class="badline" style="font-family:var(--sans)">' + t.sameC1 + "</span></div>" : "") +
-    '<div class="cr"><span class="cn">1.</span><span>' + supTxt(t.rs1) + " = " + (ss ? c.C2 + " × " + at.M1inv + " mod " + P.p + " = " : "") + "<b>" + esc(fmt(at.mask)) + "</b></span></div>" +
-    '<div class="cr"><span class="cn">2.</span><span>' + supTxt(t.rs2) + " = " + (ss ? c2.C2 + " × " + at.maskInv + " mod " + P.p + " = " : "") + '<b class="mark role-msg">' + esc(fmt(at.M2)) + "</b></span></div>";
-  const ok = at.M2 === M2.v;
-  h += '<div class="cr"><span class="cn"></span><span class="' + (ok ? "badline" : "okline") + '" style="font-family:var(--sans)">' + (ok ? t.rsOk : t.rsBad) + "</span></div>";
-  if (lang === "pl") h = h.replace("(known)", "(znana)");
-  setHTML("e_reuse", h);
 }
 function showReal6() {
   const t = L();
@@ -1367,9 +1371,53 @@ function update4() {
     '<p class="note" style="margin:6px 0 0">' + t.pwReal + "</p>");
 }
 
+/* ---------- step 6: k used twice ---------- */
+function render5() {
+  const t = L(), P = params();
+  if (P.bad) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
+  let h = '<div class="card"><h3>' + t.reuseTitle + '</h3><p style="margin:0 0 8px">' + t.reuseText + "</p>" +
+    '<p class="note" style="margin:0 0 8px" id="e_keys6"></p>' +
+    '<div class="btns" style="margin-bottom:8px"><span class="inl"><span>' + t.m1Lbl + "</span>" + inp("M") + "</span>" +
+    '<span class="inl"><span>' + t.k1Lbl + "</span>" + inp("k") + "</span>" +
+    '<span class="inl"><span>' + t.m2Lbl + "</span>" + inp("M2") + "</span></div>" +
+    '<div class="btns" style="margin-bottom:8px"><span class="tabs"><button data-action="reuse" data-v="1" aria-pressed="' + app.reuseSame + '">' + t.sameK + "</button>" +
+    '<button data-action="reuse" data-v="0" aria-pressed="' + !app.reuseSame + '" id="e_newk"></button></span>' +
+    '<span class="inl"><span>k\' =</span>' + inp("k2") + "</span></div>" +
+    '<div class="calc" id="e_reuse"></div><div id="e_err6"></div>' + legend(["msg", "ctx", "mal"]) + '<div class="why">' + t.rule + "</div></div>";
+  h += '<div class="card"><h3>' + t.realTitle + '</h3><p style="margin:0 0 8px">' + esc(t.realText) + "</p>" +
+    '<button class="dark" data-action="real6">' + t.realBtn + '</button><div id="e_real" style="margin-top:8px"></div></div>';
+  return h;
+}
+function update5() {
+  const t = L(), P = params();
+  const x = extra("x", P), M = extra("M", P, true), k = extra("k", P), k2 = extra("k2", P), M2 = extra("M2", P, true);
+  const er = { x: x.er, M: M.er, k: k.er, k2: k2.er, M2: M2.er };
+  markInputs(er);
+  setHTML("e_err6", Object.values(er).some(Boolean) ? '<div class="banner neutral">' + errList(er) + "</div>" : "");
+  setHTML("e_newk", esc(t.newK) + (k2.er ? "?" : esc(fmt(k2.v))));
+  if (x.er || M.er || k.er || M2.er || k2.er) { setHTML("e_reuse", ""); setHTML("e_keys6", ""); return; }
+  const y = modPow(P.g, x.v, P.p);
+  setHTML("e_keys6", esc(t.keysNow(fmt(x.v), fmt(y))) + ", p = " + esc(fmt(P.p)) + ", g = " + esc(fmt(P.g)));
+  const c = egEncrypt(P.p, P.g, y, M.v, k.v);
+  const kSecond = app.reuseSame ? k.v : k2.v;
+  const c2 = egEncrypt(P.p, P.g, y, M2.v, kSecond);
+  const at = reuseAttack(P.p, M.v, c.C2, c2.C2);
+  const ss = small(P.p);
+  const pr = cc => "(" + esc(fmt(cc.C1)).replace(/ \(.*/, "") + ", " + esc(fmt(cc.C2)).replace(/ \(.*/, "") + ")";
+  let h = '<div class="cr"><span class="cn"></span><span>M = ' + esc(fmt(M.v)) + ' <span class="note">(known)</span> → <span class="mark role-ctx">' + pr(c) + "</span></span></div>" +
+    '<div class="cr"><span class="cn"></span><span>M2 = ? → <span class="mark role-ctx">' + pr(c2) + "</span> " + '<span class="note">(' + t.second + ")</span></span></div>" +
+    (c2.C1 === c.C1 ? '<div class="cr"><span class="cn"></span><span class="badline" style="font-family:var(--sans)">' + t.sameC1 + "</span></div>" : "") +
+    '<div class="cr"><span class="cn">1.</span><span>' + supTxt(t.rs1) + " = " + (ss ? c.C2 + " × " + at.M1inv + " mod " + P.p + " = " : "") + "<b>" + esc(fmt(at.mask)) + "</b></span></div>" +
+    '<div class="cr"><span class="cn">2.</span><span>' + supTxt(t.rs2) + " = " + (ss ? c2.C2 + " × " + at.maskInv + " mod " + P.p + " = " : "") + '<b class="mark role-msg">' + esc(fmt(at.M2)) + "</b></span></div>";
+  const ok = at.M2 === M2.v;
+  h += '<div class="cr"><span class="cn"></span><span class="' + (ok ? "badline" : "okline") + '" style="font-family:var(--sans)">' + (ok ? t.rsOk : t.rsBad) + "</span></div>";
+  if (lang === "pl") h = h.replace("(known)", "(znana)");
+  setHTML("e_reuse", h);
+}
+
 /* ---------- frame, navigation ---------- */
-const RENDER = [render0, render1, render2, render3, render4];
-const UPDATE = [update0, update1, update2, update3, update4];
+const RENDER = [render0, render1, render2, render3, render4, render5];
+const UPDATE = [update0, update1, update2, update3, update4, update5];
 function buildSide() {
   const t = L();
   document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
@@ -1401,11 +1449,13 @@ function render() {
   UPDATE[app.level]();
   fitSch();
   if (app.level === 1) renderT3(-1);
-  if (app.level === 3 && app.real6) showReal6();
+  if (app.level === 5 && app.real6) showReal6();
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
-  try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
+  if (location.hash !== hashStr()) { try { history.replaceState(null, "", hashStr()); } catch (e) {} }
 }
+/* the address of the current view: #N, and #2.2 for step 2 with the four searches open */
+function hashStr() { return "#" + (app.level + 1) + (app.level === 1 && app.t3open ? ".2" : ""); }
 function goTo(level) {
   stopTimers();
   if (app.level === 1 && level !== 1) app.t3 = app.t3 && app.t3.every(r => r.tries) ? app.t3 : null;
@@ -1414,7 +1464,7 @@ function goTo(level) {
   render();
   view.scrollTop = 0;
 }
-function zoomIn() { if (app.level < 4) { if (app.level + 1 === 4) app.pw.origin = "gA"; goTo(app.level + 1); } }
+function zoomIn() { if (app.level < 5) { if (app.level + 1 === 4) app.pw.origin = "gA"; goTo(app.level + 1); } }
 function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
 
 /* ---------- events ---------- */
@@ -1448,7 +1498,6 @@ new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { ch
 
 const PRESETS = {
   slides: { p: "23", g: "5", a: "6", b: "15" },
-  task1: { p: "23", g: "5", a: "4", b: "3" },
   book: { p: "353", g: "3", a: "97", b: "233" },   // Stallings, the Diffie-Hellman example
 };
 function setField(f, v) {
@@ -1493,8 +1542,9 @@ view.addEventListener("click", e => {
   else if (a === "eveall") eveAll();
   else if (a === "evereset") { if (app.eve && app.eve.timer) clearTimeout(app.eve.timer); app.eve = null; renderEve(); }
   else if (a === "t3run") runTask3();
+  else if (a === "t3open") { app.t3open = true; render(); scrollToT3(); }
   else if (a === "mal") { app.malStep = Math.max(1, Math.min(4, app.malStep + +el.dataset.d)); render(); }
-  else if (a === "reuse") { app.reuseSame = el.dataset.v === "1"; view.querySelectorAll('[data-action="reuse"]').forEach(b => b.setAttribute("aria-pressed", String(b === el))); update3(); }
+  else if (a === "reuse") { app.reuseSame = el.dataset.v === "1"; view.querySelectorAll('[data-action="reuse"]').forEach(b => b.setAttribute("aria-pressed", String(b === el))); update5(); }
   else if (a === "real6") { app.real6 = true; showReal6(); }
   else if (a === "pw0") { app.pw.step = 0; update4(); }
   else if (a === "pwd") { app.pw.step += +el.dataset.d; update4(); }
@@ -1534,12 +1584,25 @@ document.addEventListener("keydown", e => {
 
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-const startStep = parseInt(location.hash.slice(1), 10);
-if (startStep >= 1 && startStep <= 5) {
-  app.level = startStep - 1;
+function scrollToT3() { const c = document.getElementById("t3card"); if (c) c.scrollIntoView({ block: "start" }); }
+/* #N opens step N; #2.2 opens step 2 with the four searches */
+function readHash() {
+  const m = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
+  if (!m) return false;
+  const n = +m[1];
+  if (n < 1 || n > 6) return false;
+  stopTimers();
+  app.level = n - 1;
+  app.t3open = app.level === 1 && m[2] === "2";
   if (app.level === 4) setPowFrom("gA");
+  return true;
 }
+window.addEventListener("hashchange", () => {
+  if (location.hash !== hashStr() && readHash()) { render(); view.scrollTop = 0; if (app.t3open) scrollToT3(); }
+});
+readHash();
 render();
+if (app.t3open) scrollToT3();
 </script>
 </body>
 </html>
