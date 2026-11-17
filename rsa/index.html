@@ -992,6 +992,7 @@ const app = {
   msg: "HELLO BOB",
   guess: null, big: null, bigRun: 0, leaked: false,
   story: 1,                                     // step 1 is told as a story in STORY_N small steps
+  card: 1,                                      // steps 2 to 5: #N.M opens step N scrolled to its M-th card
   grid: null, fac: null, size: null, bits: 32, sizeHist: [], rate: 0,
   e3msg: "PIN 4821", e3key: null, mBigText: null, hybKey: null,
 };
@@ -1622,7 +1623,13 @@ function buildSide() {
 function updateAll() {
   [updateL0, updateL1, updateL2, updateL3, updateL4][app.level]();
 }
-function hashStr() { return "#" + (app.level + 1) + (app.level === 0 && app.story > 1 ? "." + app.story : ""); }
+function hashStr() { return "#" + (app.level + 1) + (app.level === 0 && app.story > 1 ? "." + app.story : app.level > 0 && app.card > 1 ? "." + app.card : ""); }
+// #5.5 scrolls step 5 to its 5th card (hybrid encryption), #4.2 step 4 to its 2nd card (a bigger n)
+function scrollToCard() {
+  if (app.level === 0 || app.card < 2) return;
+  const c = view.querySelectorAll(".fade > .card")[app.card - 1];
+  if (c) c.scrollIntoView({ block: "start" });
+}
 function render() {
   const t = L();
   document.documentElement.lang = lang;
@@ -1650,6 +1657,7 @@ function render() {
 }
 function goTo(level) {
   app.level = level;
+  app.card = 1;
   render();
   view.scrollTop = 0;
 }
@@ -1754,16 +1762,18 @@ document.addEventListener("keydown", e => {
 
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-// #3 opens step 3; #1.5 opens step 1 at story step 5
+// #3 opens step 3; #1.5 opens step 1 at story step 5; #5.5 opens step 5 at its 5th card
 function readHash() {
   const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
   if (hm && +hm[1] >= 1 && +hm[1] <= 5) app.level = +hm[1] - 1;
   if (hm && app.level === 0) app.story = hm[2] ? Math.max(1, Math.min(STORY_N, +hm[2])) : 1;
+  if (hm && app.level > 0) app.card = hm[2] ? Math.max(1, +hm[2]) : 1;
 }
 // a link from a slide opens the right step even in a tab that is already open
-window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { readHash(); render(); view.scrollTop = 0; } });
+window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { readHash(); render(); view.scrollTop = 0; scrollToCard(); } });
 readHash();
 render();
+requestAnimationFrame(scrollToCard);
 </script>
 </body>
 </html>

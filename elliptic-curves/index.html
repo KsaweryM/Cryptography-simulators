@@ -178,6 +178,7 @@ input,textarea,select{font-family:var(--mono);color:var(--ink);background:var(--
 .rd .v{font-family:var(--mono)}
 .nums{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .nums li{display:flex;gap:8px;align-items:center}
+.nwhy{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
 .nb{flex:none;width:22px;height:22px;border-radius:50%;background:var(--chg);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
 
 /* step 3 and 4: the grid of dots */
@@ -501,7 +502,7 @@ const T = {
     explain: {
       ecdh: ["Diffie-Hellman with points", "Alice and Bob each pick a secret number and publish a point: A = aG and B = bG. Each multiplies the other's point by their own secret, and both get the same point abG. Eve sees the curve, G, A and B. Change the secrets. Click an a × G box to see what multiplying a point means."],
       elg: ["ElGamal with points", "Bob publishes Q = dG. Alice's message is a point M. She picks a random k and sends C₁ = kG and C₂ = M + kQ. Bob subtracts dC₁ = kQ and gets M back. Eve sees Q, C₁ and C₂. Click a box to see how points are added."],
-      add: ["P + Q: draw a line, find the third point, reflect it", "Over the real numbers the curve y² = x³ + 2x + 2 is one smooth line. The line through P and Q meets the curve in exactly one more point. Its mirror image in the x-axis is P + Q. For P + P the line is the tangent. Drag P and Q."],
+      add: ["P + Q: draw a line, find the third point, reflect it", "Over the real numbers the curve y² = x³ + 2x + 2 is one smooth line. The line through P and Q meets the curve in exactly one more point. Its mirror image in the x-axis is P + Q. For P + P the line is the tangent. Why exactly one more point: put the line into the curve and you get a cubic in x with three roots; two are known, so the third is forced. Why reflect: so that O works as zero (P + O = P). Drag P and Q."],
       mod: ["The same curve modulo 17", "Computers need exact numbers, so x and y are whole numbers from 0 to 16 and every result is taken mod 17. The line becomes 18 dots, plus the point at infinity O. Click any square to check whether it is a point of the curve. Then add G again and again (G, 2G, 3G, …), or get to kG fast with double and add."],
       one: ["One addition, number by number", "The picture of step 2 becomes three formulas: the slope s, then x₃ and y₃, all mod 17. Dividing means multiplying by the modular inverse. Pick two points, or come here from step 3."],
     },
@@ -532,8 +533,8 @@ const T = {
     modeAdd: "P + Q", modeDbl: "P + P (doubling)", modeNeg: "P + (−P)",
     cardPlot: "y² = x³ + 2x + 2 over the real numbers", dragQ: "Drag P and Q along the curve.", dragP: "Drag P along the curve.",
     n1: { chord: "draw the line through P and Q", double: "draw the tangent at P", opposite: "the line through P and −P is vertical" },
-    n2: { chord: "it meets the curve in one more point", double: "it meets the curve in one more point", opposite: "it never meets the curve again" },
-    n3: { chord: "reflect it in the x-axis: P + Q", double: "reflect it in the x-axis: 2P", opposite: "we say it meets the curve at O, the point at infinity" },
+    n2: { chord: "it meets the curve in exactly one more point <span class=\"nwhy\">(why: the line put into the curve gives a cubic in x, with three roots; two are known, so the third is forced)</span>", double: "it meets the curve in exactly one more point <span class=\"nwhy\">(the same cubic; the tangent touches P twice, so P counts as two roots)</span>", opposite: "it never meets the curve again" },
+    n3: { chord: "reflect it in the x-axis: P + Q <span class=\"nwhy\">(why: so that O works as zero; the line through P and O meets the curve at −P, and reflecting gives back P, so P + O = P)</span>", double: "reflect it in the x-axis: 2P <span class=\"nwhy\">(the reflection makes O work as zero, as for P + Q)</span>", opposite: "we say it meets the curve at O, the point at infinity" },
     rdTitle: "The numbers", slope: "slope s", tangentS: "slope s of the tangent", thirdPt: "third point", sumPt: "P + Q", dblPt: "2P = P + P",
     oNote: "P + (−P) = O, and P + O = P: O works like zero.", offPic: "The third point is outside the picture: drag P or Q closer.",
     decimals: "These coordinates have endless decimals: at x = 1, y = √5 = 2.2360679774997896964… Computers need exact numbers, so the next step works modulo 17.",
@@ -580,7 +581,7 @@ const T = {
     explain: {
       ecdh: ["Diffie-Hellman na punktach", "Alice i Bob wybierają po tajnej liczbie i publikują punkt: A = aG oraz B = bG. Każde mnoży punkt drugiej strony przez swój sekret i oboje dostają ten sam punkt abG. Eve widzi krzywą, G, A i B. Zmień sekrety. Kliknij pole a × G, żeby zobaczyć, co znaczy mnożenie punktu."],
       elg: ["ElGamal na punktach", "Bob publikuje Q = dG. Wiadomość Alice to punkt M. Alice losuje k i wysyła C₁ = kG oraz C₂ = M + kQ. Bob odejmuje dC₁ = kQ i odzyskuje M. Eve widzi Q, C₁ i C₂. Kliknij pole, żeby zobaczyć, jak dodaje się punkty."],
-      add: ["P + Q: prosta, trzeci punkt, odbicie", "Nad liczbami rzeczywistymi krzywa y² = x³ + 2x + 2 to jedna gładka linia. Prosta przez P i Q przecina krzywą w dokładnie jednym kolejnym punkcie. Jego odbicie względem osi x to P + Q. Dla P + P prosta jest styczną. Przeciągnij P i Q."],
+      add: ["P + Q: prosta, trzeci punkt, odbicie", "Nad liczbami rzeczywistymi krzywa y² = x³ + 2x + 2 to jedna gładka linia. Prosta przez P i Q przecina krzywą w dokładnie jednym kolejnym punkcie. Jego odbicie względem osi x to P + Q. Dla P + P prosta jest styczną. Dlaczego dokładnie jeden punkt: prosta wstawiona do równania krzywej daje równanie trzeciego stopnia w x z trzema pierwiastkami; dwa znamy, więc trzeci jest wyznaczony. Dlaczego odbicie: żeby O działał jak zero (P + O = P). Przeciągnij P i Q."],
       mod: ["Ta sama krzywa modulo 17", "Komputer potrzebuje dokładnych liczb, więc x i y to liczby całkowite od 0 do 16, a każdy wynik bierzemy mod 17. Linia zmienia się w 18 kropek i punkt w nieskończoności O. Kliknij dowolne pole, żeby sprawdzić, czy to punkt krzywej. Potem dodawaj G raz za razem (G, 2G, 3G, …) albo szybko dojdź do kG podwajaniem i dodawaniem."],
       one: ["Jedno dodawanie, liczba po liczbie", "Rysunek z kroku 2 zamienia się w trzy wzory: nachylenie s, potem x₃ i y₃, wszystko mod 17. Dzielenie to mnożenie przez odwrotność modularną. Wybierz dwa punkty albo przyjdź tu z kroku 3."],
     },
@@ -610,8 +611,8 @@ const T = {
     modeAdd: "P + Q", modeDbl: "P + P (podwojenie)", modeNeg: "P + (−P)",
     cardPlot: "y² = x³ + 2x + 2 nad liczbami rzeczywistymi", dragQ: "Przeciągnij P i Q wzdłuż krzywej.", dragP: "Przeciągnij P wzdłuż krzywej.",
     n1: { chord: "poprowadź prostą przez P i Q", double: "poprowadź styczną w P", opposite: "prosta przez P i −P jest pionowa" },
-    n2: { chord: "przecina krzywą w jeszcze jednym punkcie", double: "przecina krzywą w jeszcze jednym punkcie", opposite: "nie przecina już krzywej" },
-    n3: { chord: "odbij go względem osi x: P + Q", double: "odbij go względem osi x: 2P", opposite: "mówimy, że spotyka krzywą w O, punkcie w nieskończoności" },
+    n2: { chord: "przecina krzywą w dokładnie jednym kolejnym punkcie <span class=\"nwhy\">(dlaczego: prosta wstawiona do równania krzywej daje równanie trzeciego stopnia w x, z trzema pierwiastkami; dwa znamy, więc trzeci jest wyznaczony)</span>", double: "przecina krzywą w dokładnie jednym kolejnym punkcie <span class=\"nwhy\">(to samo równanie; styczna dotyka P podwójnie, więc P liczy się jako dwa pierwiastki)</span>", opposite: "nie przecina już krzywej" },
+    n3: { chord: "odbij go względem osi x: P + Q <span class=\"nwhy\">(dlaczego: żeby O działał jak zero; prosta przez P i O spotyka krzywą w −P, a odbicie daje z powrotem P, więc P + O = P)</span>", double: "odbij go względem osi x: 2P <span class=\"nwhy\">(odbicie sprawia, że O działa jak zero, tak jak przy P + Q)</span>", opposite: "mówimy, że spotyka krzywą w O, punkcie w nieskończoności" },
     rdTitle: "Liczby", slope: "nachylenie s", tangentS: "nachylenie s stycznej", thirdPt: "trzeci punkt", sumPt: "P + Q", dblPt: "2P = P + P",
     oNote: "P + (−P) = O oraz P + O = P: O działa jak zero.", offPic: "Trzeci punkt jest poza rysunkiem: przysuń P albo Q.",
     decimals: "Te współrzędne mają nieskończone rozwinięcia: dla x = 1 mamy y = √5 = 2,2360679774997896964… Komputer potrzebuje dokładnych liczb, więc następny krok liczy modulo 17.",
@@ -933,7 +934,7 @@ function drawReal() {
   s += handle(P, "P", "P");
   svg.innerHTML = s;
   // the numbered steps and the numbers
-  document.getElementById("rsteps").innerHTML = [t.n1[kind], t.n2[kind], t.n3[kind]].map((x, i) => '<li><span class="nb">' + (i + 1) + "</span>" + x + "</li>").join("");
+  document.getElementById("rsteps").innerHTML = [t.n1[kind], t.n2[kind], t.n3[kind]].map((x, i) => '<li><span class="nb">' + (i + 1) + "</span><span>" + x + "</span></li>").join("");
   const row = (k, v) => '<span class="k">' + k + '</span><span class="v">' + v + "</span>";
   const pt = A => "(" + fr(A.x) + ", " + fr(A.y) + ")";
   let h = row("P", pt(P)) + row(app.rmode === "neg" ? "−P" : "Q", pt(Q));

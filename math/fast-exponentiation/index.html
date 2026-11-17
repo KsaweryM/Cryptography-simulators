@@ -238,7 +238,7 @@ function popcount(x) { let c = 0; while (x > 0n) { c += Number(x & 1n); x >>= 1n
       11^23 mod 187 = 88 with 11^1, 11^2, 11^4, 11^8, 11^16 mod 187 = 11, 121, 55, 33, 154.
    2. Wikipedia "RSA (cryptosystem)", the worked example with Euler's phi: 65^17 mod 3233 = 2790,
       2790^2753 mod 3233 = 65.
-   3. Lecture 3, Task 4 (Task4/solution/my_rsa.py): n = 2221701454780507748530735154427775990789,
+   3. Lecture 3, the task with two 20-digit primes (Task5/solution/my_rsa.py): n = 2221701454780507748530735154427775990789,
       2026^65537 mod n = 736246060401132335090489988934276767570.
    4. 3^16 mod 7 = 4 with 4 squarings (the old lecture slide "Good to know: fast powers").
    5. For every 1 <= n <= 30, 0 <= base <= n + 1 and 0 <= e <= 40: both fast algorithms equal the naive
@@ -251,7 +251,7 @@ const PRESETS = [   // [base, exp, n]
   [3n, 16n, 7n],         // 4 squarings
   [65n, 17n, 3233n],     // Wikipedia
   [2790n, 2753n, 3233n], // Wikipedia: decrypt
-  [2026n, 65537n, T4_N], // Lecture 3, Task 4
+  [2026n, 65537n, T4_N], // Lecture 3, the 20-digit key (not the default: it would show the task's C)
 ];
 
 function selfTest() {
@@ -266,8 +266,8 @@ function selfTest() {
   for (const f of [modPowTrace, ladderTrace]) {
     if (f(65n, 17n, 3233n).result !== 2790n || f(2790n, 2753n, 3233n).result !== 65n) { fails.push("Wikipedia 3233"); break; }
   }
-  // 3. Task 4
-  if (modPowTrace(2026n, 65537n, T4_N).result !== T4_C || ladderTrace(2026n, 65537n, T4_N).result !== T4_C) fails.push("Task 4: C");
+  // 3. the 20-digit key
+  if (modPowTrace(2026n, 65537n, T4_N).result !== T4_C || ladderTrace(2026n, 65537n, T4_N).result !== T4_C) fails.push("40-digit n: C");
   // 4. 3^16 mod 7
   const c = modPowTrace(3n, 16n, 7n);
   if (c.result !== 4n || c.rows.length - 1 !== 4 || ladderTrace(3n, 16n, 7n).result !== 4n) fails.push("3^16 mod 7");
@@ -311,7 +311,7 @@ const T = {
     selfOk: "✓ checked against the RSA slides, Wikipedia and plain repeated multiplication", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "← / →: step · n / p: next / previous row",
     cardIn: "One power: m^e mod n", presets: "examples:",
-    preNames: ["88^7 mod 187 (the slides)", "11^23 mod 187 (the slides)", "3^16 mod 7", "65^17 mod 3233 (Wikipedia)", "2790^2753 mod 3233", "Task 4: 2026^65537"],
+    preNames: ["88^7 mod 187 (the slides)", "11^23 mod 187 (the slides)", "3^16 mod 7", "65^17 mod 3233 (Wikipedia)", "2790^2753 mod 3233", "2026^65537 mod a 40-digit n"],
     inM: "m (the base)", inE: "e (the exponent)", inN: "n (the modulus)", inLimit: "whole numbers, up to 80 digits",
     errNum: "Type whole numbers (up to 80 digits) with e ≥ 1 and n ≥ 2.",
     cardNaive: "Multiply by m, one step at a time",
@@ -364,7 +364,7 @@ const T = {
     selfOk: "✓ sprawdzone z przykładami ze slajdów RSA, Wikipedii i zwykłym mnożeniem po kolei", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "← / →: krok · n / p: następny / poprzedni wiersz",
     cardIn: "Jedna potęga: m^e mod n", presets: "przykłady:",
-    preNames: ["88^7 mod 187 (slajdy)", "11^23 mod 187 (slajdy)", "3^16 mod 7", "65^17 mod 3233 (Wikipedia)", "2790^2753 mod 3233", "zadanie 4: 2026^65537"],
+    preNames: ["88^7 mod 187 (slajdy)", "11^23 mod 187 (slajdy)", "3^16 mod 7", "65^17 mod 3233 (Wikipedia)", "2790^2753 mod 3233", "2026^65537 mod 40-cyfrowe n"],
     inM: "m (podstawa)", inE: "e (wykładnik)", inN: "n (moduł)", inLimit: "liczby całkowite, do 80 cyfr",
     errNum: "Wpisz liczby całkowite (do 80 cyfr), e ≥ 1 i n ≥ 2.",
     cardNaive: "Mnożymy przez m, krok po kroku",

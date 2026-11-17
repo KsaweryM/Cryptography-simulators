@@ -373,7 +373,7 @@ function dhExchange(p, g, a, b) {
   const A = modPow(g, a, p), B = modPow(g, b, p);
   return { A: A, B: B, sAlice: modPow(B, a, p), sBob: modPow(A, b, p) };
 }
-// Mallory in the middle with her own secret m: Alice and Bob both receive M = g^m
+// Mallory in the middle with her own secret m: Alice and Bob both receive her public value g^m (called M in the code)
 function mitmExchange(p, g, a, b, m) {
   const A = modPow(g, a, p), B = modPow(g, b, p), M = modPow(g, m, p);
   return { A: A, B: B, M: M,
@@ -529,7 +529,7 @@ const T = {
     explain: [
       ["A secret in public", "Alice and Bob agree on a number without sending it. Eve hears everything on the channel: p, g, A and B. Both sides end with the same secret s, Eve does not. Change any number, everything is computed again. Click a dark box to look inside."],
       ["Why Eve cannot go back", "The powers of g modulo p jump around the clock with no order. Going forward (a to A) is fast. Going back (A to a) is the discrete logarithm: Eve has to try exponents one by one. Real p has 2048 bits."],
-      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own public value M = g^m (m is her secret). Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons."],
+      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own public value g^m (m is her secret). Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons."],
       ["Diffie-Hellman with a message", "Bob publishes y = g^x once. To send a number M, Alice picks a new secret k, sends C1 = g^k (her half of an exchange) and C2 = M × y^k (the message hidden by the shared value). Bob divides by the same value and gets M back."],
       ["One modular power", "How does Alice compute g^a mod p when a has 256 bits? Not by multiplying a times. Square-and-multiply goes through the bits of the exponent: square for every bit, multiply once more for every 1."],
       ["The same k for two messages", "ElGamal hides every message with the mask y^k. If the sender uses the same k twice, both messages get the same mask. Eve knows one of the messages: can she read the other one without Bob's private key x?"]],
@@ -584,22 +584,22 @@ const T = {
     t3Note: "The time depends on how big the random a was, so the growth is not even. On average 4 more bits mean 16 times more tries. Plain Python is slower than this browser.",
     // step 3
     malOn: "Mallory sits on the cable", malStepLbl: k => "attack, step " + k + " of 4",
-    malSteps: ["Alice sends A. Mallory keeps it and sends her own public value M = g^m to Bob.", "Bob sends B. Mallory keeps it and sends M to Alice.",
+    malSteps: ["Alice sends A. Mallory keeps it and sends her own public value g^m to Bob.", "Bob sends B. Mallory keeps it and sends g^m to Alice.",
                "Alice shares a secret with Mallory. Bob shares another one with Mallory.", "Alice sends a message. Mallory decrypts it, reads it, encrypts it again for Bob."],
-    mLbl: "m: Mallory's secret", malM: "her public value g^m mod p (= M), sent to both", malWithA: "key with Alice: A^m", malWithB: "key with Bob: B^m",
-    recvAsB: "\"from Bob\" (really M)", recvAsA: "\"from Alice\" (really M)",
+    mLbl: "m: Mallory's secret", malM: "her public value g^m mod p, sent to both", malWithA: "key with Alice: A^m", malWithB: "key with Bob: B^m",
+    recvAsB: "\"from Bob\" (really g^m)", recvAsA: "\"from Alice\" (really g^m)",
     sealOn: "Alice and Bob check a seal (authentication)",
     noSealB: "no seal of Bob: rejected", noSealA: "no seal of Alice: rejected", stopped: "exchange stopped",
     res3: (sa, sb) => "Alice has " + sa + ", Bob has " + sb + ": two different secrets, and Mallory knows both. Without Mallory both would have the same secret (step 1).",
     res3same: s => "By chance Alice and Bob both got " + s + ", but Mallory knows it too.",
-    res3seal: "Alice and Bob see that M carries no seal of the other side and stop. Mallory can replace B, but she cannot seal her M as Bob.",
+    res3seal: "Alice and Bob see that g^m carries no seal of the other side and stop. Mallory can replace B, but she cannot seal her g^m as Bob.",
     msgTitle: "What the attack gives", msgLbl: "Alice's message",
     lockedWith: (n, s) => "locked with key " + n + " (from " + s + ")", malReads: "Mallory opens it, reads, locks it again",
     bobReads: "Bob reads", aliceSends: "Alice sends",
     msgNote: "The key comes from the secret through SHA-256. Here we only show which key locks which envelope. Both sides see correct messages: nothing looks wrong.",
     msgStopped: "Nothing is sent: the exchange was stopped.",
     fixTitle: "The fix: authenticate the exchange",
-    fixText: "Bob adds to his B a seal that only his long-term private key (not b) can make. Alice checks the seal with Bob's public key, which comes vouched for by someone she already trusts. Mallory can replace B, but she cannot seal M as Bob. How such a seal works is a topic of its own, not covered here. Turn on the check above to see the effect.",
+    fixText: "Bob adds to his B a seal that only his long-term private key (not b) can make. Alice checks the seal with Bob's public key, which comes vouched for by someone she already trusts. Mallory can replace B, but she cannot seal her g^m as Bob. How such a seal works is a topic of its own, not covered here. Turn on the check above to see the effect.",
     // step 4
     keysTitle: "Bob's keys",
     xLbl: "x: Bob's private key", yLbl: "y = g^x mod p: Bob's public key, on a notice board", pgNow: (p, g) => "p = " + p + ", g = " + g + " (change them in step 1)",
@@ -609,7 +609,7 @@ const T = {
     sBox: "s = C1^x mod p", invBox: "s^-1 mod p", mBox: "M = C2 × s^-1 mod p",
     back: "the message is back", c1Is: "Alice's half of a Diffie-Hellman exchange", c2Is: "the message, hidden by y^k",
     sameS: "s is the same as y^k: (g^k)^x = (g^x)^k. Bob divides by it.",
-    twiceTitle: "The same message twice",
+    twiceTitle: "The same message twice", twiceOpen: "show: the same message encrypted twice",
     twiceText: "A new k gives a new ciphertext every time. Textbook RSA gives the same one, so an attacker can test guesses such as a PIN. The price: two numbers, twice as long as p.",
     withK: "with k =", reuseTitle: "k used twice", m1Lbl: "the first message M (known) =", k1Lbl: "k =", keysNow: (x, y) => "Bob's keys: x = " + x + ", y = " + y + " (change them in step 4)",
     reuseText: "The sender used the same k for a second message M2. Eve knows the first message M (it was printed on a public receipt). Can she read M2 without Bob's x?",
@@ -637,7 +637,7 @@ const T = {
     pwMore: n => "… " + n + " more steps …",
     errMod: "p must be at least 2.", errExp: "The exponent must be at least 1.", errLen: "At most 2048 bits for the exponent here.",
     origins: { gA: "Alice: A = g^a mod p", gB: "Bob: B = g^b mod p", Ba: "Alice: s = B^a mod p", Ab: "Bob: s = A^b mod p",
-               gk: "ElGamal: C1 = g^k mod p", yk: "ElGamal: y^k mod p", C1x: "ElGamal: s = C1^x mod p", gx: "Bob's public key: y = g^x mod p", gm: "Mallory: M = g^m mod p" },
+               gk: "ElGamal: C1 = g^k mod p", yk: "ElGamal: y^k mod p", C1x: "ElGamal: s = C1^x mod p", gx: "Bob's public key: y = g^x mod p", gm: "Mallory: g^m mod p" },
   },
   pl: {
     title: "Eksplorator Diffiego-Hellmana", home: "Wszystkie symulatory",
@@ -649,7 +649,7 @@ const T = {
     explain: [
       ["Sekret na oczach wszystkich", "Alice i Bob ustalają liczbę, nie wysyłając jej. Eve słyszy wszystko w kanale: p, g, A i B. Obie strony kończą z tym samym sekretem s, Eve go nie zna. Zmień dowolną liczbę, wszystko przeliczy się od nowa. Kliknij ciemne pole, żeby zajrzeć do środka."],
       ["Dlaczego Eve nie cofnie potęgi", "Potęgi g modulo p skaczą po tarczy zegara bez żadnego porządku. W przód (z a do A) jest szybko. Wstecz (z A do a) to logarytm dyskretny: Eve musi próbować wykładników po kolei. Prawdziwe p ma 2048 bitów."],
-      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość publiczną M = g^m (m to jej sekret). Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami."],
+      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość publiczną g^m (m to jej sekret). Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami."],
       ["Diffie-Hellman z wiadomością", "Bob raz publikuje y = g^x. Żeby wysłać liczbę M, Alice losuje nowe tajne k i wysyła C1 = g^k (swoją połowę wymiany) oraz C2 = M × y^k (wiadomość zakrytą wspólną wartością). Bob dzieli przez tę samą wartość i odzyskuje M."],
       ["Jedna potęga modulo", "Jak Alice liczy g^a mod p, gdy a ma 256 bitów? Na pewno nie mnożąc a razy. Metoda „kwadrat i mnożenie” idzie po bitach wykładnika: dla każdego bitu podnosi do kwadratu, a dla każdej jedynki mnoży jeszcze raz."],
       ["To samo k dla dwóch wiadomości", "ElGamal zakrywa każdą wiadomość maską y^k. Jeśli nadawca użyje tego samego k dwa razy, obie wiadomości dostaną tę samą maskę. Eve zna jedną z wiadomości: czy przeczyta drugą bez klucza prywatnego x Boba?"]],
@@ -700,22 +700,22 @@ const T = {
     t3Run: "uruchom szukanie", t3Bits: "bity", t3Tries: "próby do A", t3Time: "czas w tej przeglądarce", t3Ratio: "ile razy więcej prób niż wyżej",
     t3Note: "Czas zależy od tego, jak duże było losowe a, więc wzrost nie jest równy. Średnio 4 bity więcej to 16 razy więcej prób. Zwykły Python jest wolniejszy niż ta przeglądarka.",
     malOn: "Mallory siedzi na kablu", malStepLbl: k => "atak, krok " + k + " z 4",
-    malSteps: ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi swoją wartość publiczną M = g^m.", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice M.",
+    malSteps: ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi swoją wartość publiczną g^m.", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice g^m.",
                "Alice ma wspólny sekret z Mallory. Bob ma inny wspólny sekret z Mallory.", "Alice wysyła wiadomość. Mallory ją odszyfrowuje, czyta i szyfruje na nowo dla Boba."],
-    mLbl: "m: sekret Mallory", malM: "jej wartość publiczna g^m mod p (= M), wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
-    recvAsB: "„od Boba” (naprawdę M)", recvAsA: "„od Alice” (naprawdę M)",
+    mLbl: "m: sekret Mallory", malM: "jej wartość publiczna g^m mod p, wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
+    recvAsB: "„od Boba” (naprawdę g^m)", recvAsA: "„od Alice” (naprawdę g^m)",
     sealOn: "Alice i Bob sprawdzają pieczęć (uwierzytelnienie)",
     noSealB: "brak pieczęci Boba: odrzucone", noSealA: "brak pieczęci Alice: odrzucone", stopped: "wymiana przerwana",
     res3: (sa, sb) => "Alice ma " + sa + ", Bob ma " + sb + ": dwa różne sekrety, a Mallory zna oba. Bez Mallory oboje mieliby ten sam sekret (krok 1).",
     res3same: s => "Przypadkiem Alice i Bob dostali to samo " + s + ", ale Mallory też to zna.",
-    res3seal: "Alice i Bob widzą, że M nie ma pieczęci drugiej strony, i przerywają. Mallory może podmienić B, ale nie przyłoży do swojego M pieczęci Boba.",
+    res3seal: "Alice i Bob widzą, że g^m nie ma pieczęci drugiej strony, i przerywają. Mallory może podmienić B, ale nie przyłoży do swojego g^m pieczęci Boba.",
     msgTitle: "Co daje atak", msgLbl: "wiadomość Alice",
     lockedWith: (n, s) => "zamknięta kluczem " + n + " (z " + s + ")", malReads: "Mallory otwiera, czyta, zamyka na nowo",
     bobReads: "Bob czyta", aliceSends: "Alice wysyła",
     msgNote: "Klucz powstaje z sekretu przez SHA-256. Tutaj pokazujemy tylko, który klucz zamyka którą kopertę. Obie strony widzą poprawne wiadomości: nic nie wygląda podejrzanie.",
     msgStopped: "Nic nie zostaje wysłane: wymiana została przerwana.",
     fixTitle: "Ratunek: uwierzytelnić wymianę",
-    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego długoterminowy klucz prywatny (nie b). Alice sprawdza pieczęć kluczem publicznym Boba, za który poręczył ktoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje M jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie wyżej, żeby zobaczyć efekt.",
+    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego długoterminowy klucz prywatny (nie b). Alice sprawdza pieczęć kluczem publicznym Boba, za który poręczył ktoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje swojego g^m jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie wyżej, żeby zobaczyć efekt.",
     keysTitle: "Klucze Boba",
     xLbl: "x: klucz prywatny Boba", yLbl: "y = g^x mod p: klucz publiczny Boba, na tablicy ogłoszeń", pgNow: (p, g) => "p = " + p + ", g = " + g + " (zmienisz je w kroku 1)",
     MLbl: "M: wiadomość, liczba od 1 do p - 1", kLbl: "k: nowy losowy sekret",
@@ -724,7 +724,7 @@ const T = {
     sBox: "s = C1^x mod p", invBox: "s^-1 mod p", mBox: "M = C2 × s^-1 mod p",
     back: "wiadomość wróciła", c1Is: "połowa wymiany Diffiego-Hellmana od Alice", c2Is: "wiadomość zakryta przez y^k",
     sameS: "s to to samo co y^k: (g^k)^x = (g^x)^k. Bob przez nie dzieli.",
-    twiceTitle: "Ta sama wiadomość dwa razy",
+    twiceTitle: "Ta sama wiadomość dwa razy", twiceOpen: "pokaż: ta sama wiadomość zaszyfrowana dwa razy",
     twiceText: "Nowe k daje za każdym razem nowy szyfrogram. Podręcznikowe RSA daje ten sam, więc napastnik może sprawdzać zgadywane wartości, np. PIN. Cena: dwie liczby, dwa razy dłużej niż p.",
     withK: "dla k =", reuseTitle: "k użyte dwa razy", m1Lbl: "pierwsza wiadomość M (znana) =", k1Lbl: "k =", keysNow: (x, y) => "Klucze Boba: x = " + x + ", y = " + y + " (zmienisz je w kroku 4)",
     reuseText: "Nadawca użył tego samego k dla drugiej wiadomości M2. Eve zna pierwszą wiadomość M (była wydrukowana na publicznym paragonie). Czy przeczyta M2 bez x Boba?",
@@ -751,7 +751,7 @@ const T = {
     pwMore: n => "… jeszcze " + n + " " + plN(n, "krok", "kroki", "kroków") + " …",
     errMod: "p musi być co najmniej 2.", errExp: "Wykładnik musi być co najmniej 1.", errLen: "Tutaj wykładnik ma najwyżej 2048 bitów.",
     origins: { gA: "Alice: A = g^a mod p", gB: "Bob: B = g^b mod p", Ba: "Alice: s = B^a mod p", Ab: "Bob: s = A^b mod p",
-               gk: "ElGamal: C1 = g^k mod p", yk: "ElGamal: y^k mod p", C1x: "ElGamal: s = C1^x mod p", gx: "klucz publiczny Boba: y = g^x mod p", gm: "Mallory: M = g^m mod p" },
+               gk: "ElGamal: C1 = g^k mod p", yk: "ElGamal: y^k mod p", C1x: "ElGamal: s = C1^x mod p", gx: "klucz publiczny Boba: y = g^x mod p", gm: "Mallory: g^m mod p" },
   },
 };
 
@@ -769,6 +769,7 @@ const app = {
   eve: null,        // Eve's search: { key, e, v, found, done, running }
   t3: null,         // the four searches: results
   t3open: false,    // step 2: the card with the four searches is open (#2.2)
+  twiceOpen: false, // step 4: the card "the same message twice" is open (#4.2)
   real6: false,
   pw: { b: "5", e: "6", m: "23", origin: "gA", step: 0 },
   mmsg: "My new card PIN is 7314. Please keep it secret.",
@@ -1163,12 +1164,12 @@ function render2() {
     person(t.alice, 20, 2, "", "al") +
     '<div class="chip role-sec" style="left:20px;top:42px;width:280px;height:68px">' + rndBtn("a") + "<label>" + t.aLbl + inp("a") + "</label></div>" +
     '<div class="chip role-pub" style="left:20px;top:126px;width:280px;height:58px">A<small> (' + t.sendsA + ')</small><span class="v" id="m_A"></span></div>' +
-    '<div class="chip role-pub' + st(2) + '" style="left:20px;top:214px;width:280px;height:60px">B?<small> ' + esc(t.recvAsB) + '</small><span class="v" id="m_rA"></span></div>' +
+    '<div class="chip role-pub' + st(2) + '" style="left:20px;top:214px;width:280px;height:60px">B?<small> ' + supTxt(t.recvAsB) + '</small><span class="v" id="m_rA"></span></div>' +
     '<div class="chip role-sh' + st(3) + '" style="left:20px;top:302px;width:280px;height:64px">' + t.sharedA + '<span class="v" id="m_sA"></span></div>' +
     person(t.bob, 745, 2, "", "bo") +
     '<div class="chip role-sec" style="left:745px;top:42px;width:280px;height:68px">' + rndBtn("b") + "<label>" + t.bLbl + inp("b") + "</label></div>" +
     '<div class="chip role-pub' + st(2) + '" style="left:745px;top:126px;width:280px;height:58px">B<small> (' + t.sendsB + ')</small><span class="v" id="m_B"></span></div>' +
-    '<div class="chip role-pub' + st(1) + '" style="left:745px;top:214px;width:280px;height:60px">A?<small> ' + esc(t.recvAsA) + '</small><span class="v" id="m_rB"></span></div>' +
+    '<div class="chip role-pub' + st(1) + '" style="left:745px;top:214px;width:280px;height:60px">A?<small> ' + supTxt(t.recvAsA) + '</small><span class="v" id="m_rB"></span></div>' +
     '<div class="chip role-sh' + st(3) + '" style="left:745px;top:302px;width:280px;height:64px">' + t.sharedB + '<span class="v" id="m_sB"></span></div>' +
     // Mallory
     '<div class="chip role-mal" style="left:360px;top:2px;width:327px;height:366px">' +
@@ -1188,7 +1189,7 @@ function render2() {
     '<div class="card' + st(4) + '"><h3>' + t.msgTitle + '</h3><label style="font-size:12.5px;font-weight:600">' + t.msgLbl +
       '<input data-field="mmsg" spellcheck="false" style="display:block;width:100%;max-width:640px;font-family:var(--sans);margin-top:3px" value="' + esc(app.mmsg) + '"></label>' +
       '<div id="m_msg" style="margin-top:10px"></div><p class="note" style="margin:8px 0 0">' + t.msgNote + "</p></div>" +
-    '<div class="card"><h3>' + t.fixTitle + '</h3><p style="margin:0">' + t.fixText + "</p></div>";
+    '<div class="card"><h3>' + t.fixTitle + '</h3><p style="margin:0">' + supTxt(t.fixText) + "</p></div>";
   return h;
 }
 function update2() {
@@ -1206,19 +1207,19 @@ function update2() {
   setHTML("m_kA", "= " + powEq("A", "m", r.A, m.v, P.p, r.sMalAlice));
   setHTML("m_kB", "= " + powEq("B", "m", r.B, m.v, P.p, r.sMalBob));
   setHTML("mw_A", "A = " + sh(r.A)); setHTML("mw_B", "B = " + sh(r.B));
-  setHTML("mw_M1", "M = " + sh(r.M)); setHTML("mw_M2", "M = " + sh(r.M));
+  setHTML("mw_M1", "g<sup>m</sup> = " + sh(r.M)); setHTML("mw_M2", "g<sup>m</sup> = " + sh(r.M));  // r.M is Mallory's g^m
   if (app.seal) {
     setHTML("m_rA", '= <b>' + sh(r.M) + '</b><span class="stamp">' + t.noSealB + "</span>");
     setHTML("m_rB", '= <b>' + sh(r.M) + '</b><span class="stamp">' + t.noSealA + "</span>");
     setHTML("m_sA", '<span class="err">' + t.stopped + "</span>"); setHTML("m_sB", '<span class="err">' + t.stopped + "</span>");
-    setHTML("m_res", '<div class="banner good">' + esc(t.res3seal) + "</div>");
+    setHTML("m_res", '<div class="banner good">' + supTxt(t.res3seal) + "</div>");
     setHTML("m_msg", '<p class="err" style="margin:0">' + t.msgStopped + "</p>");
     return;
   }
   setHTML("m_rA", "= <b>" + sh(r.M) + "</b>");
   setHTML("m_rB", "= <b>" + sh(r.M) + "</b>");
-  setHTML("m_sA", "= " + powEq("M", "a", r.M, P.a, P.p, r.sAlice));
-  setHTML("m_sB", "= " + powEq("M", "b", r.M, P.b, P.p, r.sBob));
+  setHTML("m_sA", "= " + powEq("(g<sup>m</sup>)", "a", r.M, P.a, P.p, r.sAlice));
+  setHTML("m_sB", "= " + powEq("(g<sup>m</sup>)", "b", r.M, P.b, P.p, r.sBob));
   setHTML("m_res", '<div class="banner bad">' + esc(r.sAlice === r.sBob ? t.res3same(sh(r.sAlice)) : t.res3(sh(r.sAlice), sh(r.sBob))) + "</div>");
   const msg = esc(app.mmsg);
   const env = (lbl, c, sub) => '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 104px;text-align:center">' + ENV_SVG(c) +
@@ -1266,8 +1267,11 @@ function render3() {
       ch("role-msg", t.back + '<span class="v" id="e_m"></span>', "position:relative") +
     "</div></div></div>" +
     '<div class="why" id="e_why">' + supTxt(t.sameS) + '</div><div id="e_err"></div>' + legend(["pub", "sec", "sh", "msg", "ctx", "mal"]) + "</div>";
-  h += '<div class="card"><h3>' + t.twiceTitle + '</h3><p style="margin:0 0 6px">' + t.twiceText + '</p><div class="calc" id="e_twice"></div>' +
-    '<div class="inl" style="margin-top:4px"><span>' + t.withK.replace("k", "k'") + "</span>" + inp("k2") + "</div></div>";
+  // the same message twice (#4.2): open only on request, so that a link to #4 does not answer the exercise before it is done
+  if (app.twiceOpen)
+    h += '<div class="card" id="twicecard"><h3>' + t.twiceTitle + '</h3><p style="margin:0 0 6px">' + t.twiceText + '</p><div class="calc" id="e_twice"></div>' +
+      '<div class="inl" style="margin-top:4px"><span>' + t.withK.replace("k", "k'") + "</span>" + inp("k2") + "</div></div>";
+  else h += '<div class="card"><button data-action="twiceopen">▸ ' + t.twiceOpen + "</button></div>";
   return h;
 }
 function update3() {
@@ -1454,8 +1458,8 @@ function render() {
   updateMore();
   if (location.hash !== hashStr()) { try { history.replaceState(null, "", hashStr()); } catch (e) {} }
 }
-/* the address of the current view: #N, and #2.2 for step 2 with the four searches open */
-function hashStr() { return "#" + (app.level + 1) + (app.level === 1 && app.t3open ? ".2" : ""); }
+/* the address of the current view: #N, #2.2 for step 2 with the four searches open, #4.2 for step 4 with "the same message twice" open */
+function hashStr() { return "#" + (app.level + 1) + ((app.level === 1 && app.t3open) || (app.level === 3 && app.twiceOpen) ? ".2" : ""); }
 function goTo(level) {
   stopTimers();
   if (app.level === 1 && level !== 1) app.t3 = app.t3 && app.t3.every(r => r.tries) ? app.t3 : null;
@@ -1543,6 +1547,7 @@ view.addEventListener("click", e => {
   else if (a === "evereset") { if (app.eve && app.eve.timer) clearTimeout(app.eve.timer); app.eve = null; renderEve(); }
   else if (a === "t3run") runTask3();
   else if (a === "t3open") { app.t3open = true; render(); scrollToT3(); }
+  else if (a === "twiceopen") { app.twiceOpen = true; render(); scrollToTwice(); }
   else if (a === "mal") { app.malStep = Math.max(1, Math.min(4, app.malStep + +el.dataset.d)); render(); }
   else if (a === "reuse") { app.reuseSame = el.dataset.v === "1"; view.querySelectorAll('[data-action="reuse"]').forEach(b => b.setAttribute("aria-pressed", String(b === el))); update5(); }
   else if (a === "real6") { app.real6 = true; showReal6(); }
@@ -1585,7 +1590,8 @@ document.addEventListener("keydown", e => {
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
 function scrollToT3() { const c = document.getElementById("t3card"); if (c) c.scrollIntoView({ block: "start" }); }
-/* #N opens step N; #2.2 opens step 2 with the four searches */
+function scrollToTwice() { const c = document.getElementById("twicecard"); if (c) c.scrollIntoView({ block: "start" }); }
+/* #N opens step N; #2.2 opens step 2 with the four searches; #4.2 opens step 4 with "the same message twice" */
 function readHash() {
   const m = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
   if (!m) return false;
@@ -1594,15 +1600,17 @@ function readHash() {
   stopTimers();
   app.level = n - 1;
   app.t3open = app.level === 1 && m[2] === "2";
+  app.twiceOpen = app.level === 3 && m[2] === "2";
   if (app.level === 4) setPowFrom("gA");
   return true;
 }
 window.addEventListener("hashchange", () => {
-  if (location.hash !== hashStr() && readHash()) { render(); view.scrollTop = 0; if (app.t3open) scrollToT3(); }
+  if (location.hash !== hashStr() && readHash()) { render(); view.scrollTop = 0; if (app.t3open) scrollToT3(); if (app.twiceOpen) scrollToTwice(); }
 });
 readHash();
 render();
 if (app.t3open) scrollToT3();
+if (app.twiceOpen) scrollToTwice();
 </script>
 </body>
 </html>
