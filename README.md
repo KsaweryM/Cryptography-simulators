@@ -17,8 +17,8 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 - **RC4** (`rc4/`): black box, key scheduling (KSA), producing bytes (PRGA), the weaknesses (with WEP: the IV repeats, the FMS attack step by step).
 - **RSA** (`rsa/`): black box (a story in 9 steps), making the keys, why decryption works, Eve tries to break it, why textbook RSA is not enough. The algorithms behind
   d and the power are in the mathematics section.
-- **Diffie-Hellman and ElGamal** (`diffie-hellman/`): black box, the powers of g, Mallory in the middle, ElGamal, one power.
-- **Elliptic curves** (`elliptic-curves/`): black box, adding points, from real numbers to modulo 17, the curve modulo 17, one addition.
+- **Diffie-Hellman and ElGamal** (`diffie-hellman/`): black box, the powers of g, Mallory in the middle, ElGamal, one power, k used twice.
+- **Elliptic curves** (`elliptic-curves/`): black box, adding points, from real numbers to modulo 17 (four parts), the curve modulo 17 (multiples of G, double and add, with play), one addition as a line that wraps around the grid.
 - **Hash functions** (`hash/`): black box, the avalanche, padding and the chain of blocks, `update()` in pieces, one bit through the rounds, guessing a short hash.
 - **Collisions and passwords** (`passwords/`): the birthday paradox, one MD5 collision gives many, four ways to store a password, a rainbow table, the cost of bcrypt.
 - **Certificates and PKI** (`pki/`): black box (Mallory swaps a key, a CA signature stops her), inside a certificate (X.509 fields, DER

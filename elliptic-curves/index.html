@@ -539,6 +539,14 @@ function selfTest() {
   const tb = pointsByX(2, 2, 17), tpts = [];
   for (const c of tb.cols) for (const y of c.ys) tpts.push(c.x + "," + y);
   if (tpts.join(" ") !== SLIDE_POINTS || tb.cols[5].full !== 137 || tb.cols[5].r !== 1 || tb.cols[5].ys.join() !== "1,16") fails.push("the table of x");
+  // step 5: the line through P and Q, modulo 17, has exactly P, Q and -(P + Q) on the curve
+  lineTest: for (const P of curvePoints(C)) for (const Q of curvePoints(C)) {
+    const I = addInfo(C, P, Q);
+    if (I.kind !== "chord" && I.kind !== "double") continue;
+    const c0 = mod(P.y - I.s * P.x, C.p), want = new Set([P, Q, { x: I.x3, y: mod(-I.y3, C.p) }].map(A => A.x + "," + A.y)), got = new Set();
+    for (const A of curvePoints(C)) if (mod(I.s * A.x + c0, C.p) === A.y) got.add(A.x + "," + A.y);
+    if (got.size !== want.size || [...got].some(k => !want.has(k))) { fails.push("the line through (" + P.x + ", " + P.y + ") and (" + Q.x + ", " + Q.y + ")"); break lineTest; }
+  }
   return fails;
 }
 // CORE-END
@@ -557,14 +565,17 @@ const T = {
     stepOf: n => "Step " + n + " of 5 · ECC",
     steps: [["Black box", "two secrets in, one shared point out"], ["Adding points", "chord and tangent on the real curve"],
             ["Real to modulo 17", "the same formulas, exact numbers"],
-            ["Modulo 17", "dots, multiples of G, double and add"], ["One addition", "slope s, x₃ and y₃ modulo 17"]],
+            ["Modulo 17", "dots, multiples of G, double and add"], ["One addition", "the line wraps around the grid"]],
     explain: {
       ecdh: ["Diffie-Hellman with points", "Alice and Bob each pick a secret number and publish a point: A = aG and B = bG. Each multiplies the other's point by their own secret, and both get the same point abG. Eve sees the curve, G, A and B. Change the secrets. Click an a × G box to see what multiplying a point means."],
       elg: ["ElGamal with points", "Bob publishes Q = dG. Alice's message is a point M. She picks a random k and sends C₁ = kG and C₂ = M + kQ. Bob subtracts dC₁ = kQ and gets M back. Eve sees Q, C₁ and C₂. Click a box to see how points are added."],
       add: ["P + Q: draw a line, find the third point, reflect it", "Over the real numbers the curve y² = x³ + 2x + 2 is one smooth line. The line through P and Q meets the curve in exactly one more point. Its mirror image in the x-axis is P + Q. For P + P the line is the tangent. Why exactly one more point: put the line into the curve and you get a cubic in x with three roots; two are known, so the third is forced. Why reflect: so that O works as zero (P + O = P). Drag P and Q."],
-      trans: ["From real numbers to modulo 17: only the arithmetic changes", "The formulas of step 2 work in any arithmetic where you can add, multiply and divide. Over the real numbers every result has endless decimals and the computer rounds it; modulo 17 every result is a whole number from 0 to 16, and dividing by v means multiplying by its inverse v⁻¹. Below: the same addition both ways, what rounding does to Alice and Bob, and where the 18 dots of the curve come from."],
+      trans1: ["Only the arithmetic changes", "The formulas of step 2 work in any arithmetic where you can add, multiply and divide. Left: the real curve, where every result has endless decimals and the computer rounds. Right: modulo 17, where every result is a whole number from 0 to 16 and dividing by v means multiplying by v⁻¹."],
+      trans2: ["Why rounding is not good enough", "Diffie-Hellman needs Alice and Bob to end with exactly the same point. On the real curve each of them rounds at different moments, so the last digits disagree. Modulo 17 nothing is rounded."],
+      trans3: ["Where the 18 dots come from", "Go through x = 0, 1, …, 16: compute the right side x³ + 2x + 2 mod 17 and look for the y whose square is that number. Every match is a dot of the curve."],
+      trans4: ["Why the dots look random", "Click a bar to pick x: its value x³ + 2x + 2 goes round the clock of 17 and stops at the remainder."],
       mod: ["The same curve modulo 17", "The curve of step 3, dot by dot: its 18 points, plus the point at infinity O. Click any square to check whether it is a point of the curve. Then add G again and again (G, 2G, 3G, …), or get to kG fast with double and add."],
-      one: ["One addition, number by number", "The picture of step 2 becomes three formulas: the slope s, then x₃ and y₃, all mod 17. Dividing means multiplying by the modular inverse. Pick two points, or come here from step 4."],
+      one: ["One addition on the grid", "The picture of step 2 again, modulo 17: the line through P and Q wraps around the grid, meets the curve in exactly one more dot, and the mirror image of that dot is P + Q. Beside it, the same three formulas with numbers. Pick two points, or come here from step 4."],
     },
     selfOk: "✓ checked against the slides, Paar and Pelzl (ch. 9) and RFC 5903 (P-256)", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
@@ -610,6 +621,12 @@ const T = {
     multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
     seeAdd: "see this addition in step 5 →",
     bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bAll: "show all",
+    sub3: ["The same formulas", "Rounding", "Where the dots come from", "Why they look random"], sub3Next: x => "Next: " + x, bPlay: "▶ play / pause", third: "third point",
+    wrapNote: (dbl, sv, sr, st) => [
+      (dbl ? "The tangent at P" : "The line through P and Q") + ", slope s = " + sr + (sv !== sr ? " (the same as " + fmt(sv) + " mod 17: the gentler slope draws the same dots)" : "") + ". Modulo 17 the line wraps around: what leaves at the top comes back at the bottom. Small orange dots: its 17 points.",
+      "The line meets the curve in exactly one more dot: the third point, at x₃. As on the real curve.",
+      "Mirror the third point in the dashed line (y and 17 − y have the same square): that is " + (dbl ? "2P" : "P + Q") + ".",
+      "The check: " + (dbl ? "2P" : "P + Q") + " is on the curve."][st - 1],
     kLbl: "k (1 to 1 048 575)", inBin: "in binary", sumPow: (k, parts) => k + " = " + parts.join(" + "),
     colI: "i", colD: "2ⁱG (doubling)", colBit: "bit", colR: "R: the sum so far",
     opTake: (i, d) => "bit " + i + " is 1, R was O: R = " + d,
@@ -655,14 +672,17 @@ const T = {
     stepOf: n => "Krok " + n + " z 5 · ECC",
     steps: [["Czarna skrzynka", "dwa sekrety na wejściu, jeden wspólny punkt"], ["Dodawanie punktów", "sieczna i styczna na krzywej rzeczywistej"],
             ["Od liczb rzeczywistych do modulo 17", "te same wzory, dokładne liczby"],
-            ["Modulo 17", "kropki, wielokrotności G, podwajanie i dodawanie"], ["Jedno dodawanie", "nachylenie s, x₃ i y₃ modulo 17"]],
+            ["Modulo 17", "kropki, wielokrotności G, podwajanie i dodawanie"], ["Jedno dodawanie", "prosta zawija się na siatce"]],
     explain: {
       ecdh: ["Diffie-Hellman na punktach", "Alice i Bob wybierają po tajnej liczbie i publikują punkt: A = aG oraz B = bG. Każde mnoży punkt drugiej strony przez swój sekret i oboje dostają ten sam punkt abG. Eve widzi krzywą, G, A i B. Zmień sekrety. Kliknij pole a × G, żeby zobaczyć, co znaczy mnożenie punktu."],
       elg: ["ElGamal na punktach", "Bob publikuje Q = dG. Wiadomość Alice to punkt M. Alice losuje k i wysyła C₁ = kG oraz C₂ = M + kQ. Bob odejmuje dC₁ = kQ i odzyskuje M. Eve widzi Q, C₁ i C₂. Kliknij pole, żeby zobaczyć, jak dodaje się punkty."],
       add: ["P + Q: prosta, trzeci punkt, odbicie", "Nad liczbami rzeczywistymi krzywa y² = x³ + 2x + 2 to jedna gładka linia. Prosta przez P i Q przecina krzywą w dokładnie jednym kolejnym punkcie. Jego odbicie względem osi x to P + Q. Dla P + P prosta jest styczną. Dlaczego dokładnie jeden punkt: prosta wstawiona do równania krzywej daje równanie trzeciego stopnia w x z trzema pierwiastkami; dwa znamy, więc trzeci jest wyznaczony. Dlaczego odbicie: żeby O działał jak zero (P + O = P). Przeciągnij P i Q."],
-      trans: ["Od liczb rzeczywistych do modulo 17: zmienia się tylko arytmetyka", "Wzory z kroku 2 działają w każdej arytmetyce, w której można dodawać, mnożyć i dzielić. Na liczbach rzeczywistych każdy wynik ma nieskończone rozwinięcie i komputer go zaokrągla; modulo 17 każdy wynik to liczba całkowita od 0 do 16, a dzielenie przez v to mnożenie przez odwrotność v⁻¹. Niżej: to samo dodawanie na dwa sposoby, co zaokrąglenia robią z Alice i Bobem i skąd biorą się 18 kropek krzywej."],
+      trans1: ["Zmienia się tylko arytmetyka", "Wzory z kroku 2 działają w każdej arytmetyce, w której można dodawać, mnożyć i dzielić. Po lewej krzywa rzeczywista: każdy wynik ma nieskończone rozwinięcie i komputer go zaokrągla. Po prawej modulo 17: każdy wynik to liczba całkowita od 0 do 16, a dzielenie przez v to mnożenie przez v⁻¹."],
+      trans2: ["Dlaczego zaokrąglenia nie wystarczą", "Diffie-Hellman wymaga, żeby Alice i Bob skończyli z dokładnie tym samym punktem. Na krzywej rzeczywistej każde z nich zaokrągla w innych momentach, więc ostatnie cyfry się rozjeżdżają. Modulo 17 nic się nie zaokrągla."],
+      trans3: ["Skąd się bierze 18 kropek", "Przejdź przez x = 0, 1, …, 16: policz prawą stronę x³ + 2x + 2 mod 17 i znajdź y, którego kwadrat to ta liczba. Każde trafienie to kropka krzywej."],
+      trans4: ["Dlaczego kropki wyglądają na losowe", "Kliknij słupek, żeby wybrać x: jego wartość x³ + 2x + 2 obiega tarczę z 17 liczbami i zatrzymuje się na reszcie."],
       mod: ["Ta sama krzywa modulo 17", "Krzywa z kroku 3, kropka po kropce: jej 18 punktów i punkt w nieskończoności O. Kliknij dowolne pole, żeby sprawdzić, czy to punkt krzywej. Potem dodawaj G raz za razem (G, 2G, 3G, …) albo szybko dojdź do kG podwajaniem i dodawaniem."],
-      one: ["Jedno dodawanie, liczba po liczbie", "Rysunek z kroku 2 zamienia się w trzy wzory: nachylenie s, potem x₃ i y₃, wszystko mod 17. Dzielenie to mnożenie przez odwrotność modularną. Wybierz dwa punkty albo przyjdź tu z kroku 4."],
+      one: ["Jedno dodawanie na siatce", "Rysunek z kroku 2 jeszcze raz, modulo 17: prosta przez P i Q zawija się na siatce, trafia w krzywą w dokładnie jednej kropce więcej, a odbicie tej kropki to P + Q. Obok te same trzy wzory z liczbami. Wybierz dwa punkty albo przyjdź tu z kroku 4."],
     },
     selfOk: "✓ sprawdzone ze slajdami, z Paarem i Pelzlem (rozdz. 9) i z RFC 5903 (P-256)", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
@@ -706,6 +726,12 @@ const T = {
     multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
     seeAdd: "zobacz to dodawanie w kroku 5 →",
     bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bAll: "pokaż wszystko",
+    sub3: ["Te same wzory", "Zaokrąglenia", "Skąd się biorą kropki", "Dlaczego wyglądają na losowe"], sub3Next: x => "Dalej: " + x, bPlay: "▶ odtwórz / pauza", third: "trzeci punkt",
+    wrapNote: (dbl, sv, sr, st) => [
+      (dbl ? "Styczna w P" : "Prosta przez P i Q") + ", nachylenie s = " + sr + (sv !== sr ? " (to samo co " + fmt(sv) + " mod 17: łagodniejsze nachylenie rysuje te same kropki)" : "") + ". Modulo 17 prosta się zawija: co wychodzi u góry, wraca na dole. Małe pomarańczowe kropki: jej 17 punktów.",
+      "Prosta trafia w krzywą w dokładnie jednej kropce więcej: to trzeci punkt, w x₃. Tak jak na krzywej rzeczywistej.",
+      "Odbij trzeci punkt względem przerywanej linii (y i 17 − y mają ten sam kwadrat): to jest " + (dbl ? "2P" : "P + Q") + ".",
+      "Sprawdzenie: " + (dbl ? "2P" : "P + Q") + " leży na krzywej."][st - 1],
     kLbl: "k (od 1 do 1 048 575)", inBin: "dwójkowo", sumPow: (k, parts) => k + " = " + parts.join(" + "),
     colI: "i", colD: "2ⁱG (podwajanie)", colBit: "bit", colR: "R: dotychczasowa suma",
     opTake: (i, d) => "bit " + i + " to 1, R było O: R = " + d,
@@ -763,6 +789,7 @@ const app = {
   a: 3, b: 10, d: 7, m: 11, k: 4,
   bigA: RFC5903.i.toString(16), bigB: RFC5903.r.toString(16),
   rmode: "add", rP: { x: -0.7, up: true }, rQ: { x: 0.2, up: true },
+  sub3: 1, timer: null,
   mode3: "pts", mk: 1, dk: 100, dstep: 0, cell: { x: 5, y: 1 },
   p4: 1, q4: 1, s4: 1, origin4: null,
   tmode: "add", tP: { x: -0.7, up: true }, tQ: { x: 0.2, up: true }, tp: 7, tq: 4, ta: 3, tb: 10, tx: 0, tpp: 17,
@@ -789,6 +816,7 @@ const numCtl = f => '<span class="ctrline"><button data-action="dec" data-f="' +
   '<button class="icon-btn" data-action="rand" data-f="' + f + '" title="' + esc(L().rand) + '" aria-label="' + esc(L().rand) + '">' + DICE + "</button></span>";
 
 /* the 17 x 17 grid of the small curve. o: { c: cell size, marks: [{P, col, label, big}], path: [points], vline: x, mirror, click, sel } */
+let CLIP_N = 0;
 function gridSVG(o) {
   const c = o.c, ML = 26, MT = 12, MR = 12, MB = 24;
   const W = ML + 16 * c + MR, H = MT + 16 * c + MB;
@@ -813,6 +841,18 @@ function gridSVG(o) {
       const A = o.path[i - 1], B = o.path[i], last = i === o.path.length - 1;
       s += '<line x1="' + gx(A.x) + '" y1="' + gy(A.y) + '" x2="' + gx(B.x) + '" y2="' + gy(B.y) + '" stroke="var(--chg)" stroke-width="' + (last ? 2.6 : 1.4) + '" opacity="' + (last ? 1 : 0.55) + '"' + (last ? ' marker-end="url(#gm_chg)"' : "") + ' pointer-events="none"/>';
     }
+  }
+  if (o.wline) {   // the line y = s x + c mod 17, drawn with the gentler of s and s - 17, and its copies 17 apart
+    const sl = Number(o.wline.s), c0 = Number(o.wline.c), sv = sl > 8 ? sl - 17 : sl, id = "wc" + (++CLIP_N);
+    s += '<clipPath id="' + id + '"><rect x="' + (gx(0) - c / 2) + '" y="' + (gy(16) - c / 2) + '" width="' + (17 * c) + '" height="' + (17 * c) + '"/></clipPath><g clip-path="url(#' + id + ')" pointer-events="none">';
+    for (let k = -10; k <= 10; k++)
+      s += '<line x1="' + gx(-0.5) + '" y1="' + gy(sv * -0.5 + c0 - 17 * k) + '" x2="' + gx(16.5) + '" y2="' + gy(sv * 16.5 + c0 - 17 * k) + '" stroke="var(--chg)" stroke-width="1.5" opacity="0.55"/>';
+    s += "</g>";
+    for (let x = 0; x <= 16; x++) s += '<circle cx="' + gx(x) + '" cy="' + gy(((sv * x + c0) % 17 + 17) % 17) + '" r="' + (c * 0.13) + '" fill="var(--chg)" pointer-events="none"/>';
+  }
+  if (o.reflect) {
+    const A = o.reflect.from, B = o.reflect.to, d = Number(B.y) > Number(A.y) ? 1 : -1;
+    s += '<line x1="' + gx(A.x) + '" y1="' + (gy(A.y) - d * c * 0.45) + '" x2="' + gx(B.x) + '" y2="' + (gy(B.y) + d * c * 0.55) + '" stroke="var(--chg)" stroke-width="2.2" stroke-dasharray="5 4" marker-end="url(#gm_chg)" pointer-events="none"/>';
   }
   for (const P of (o.only || curvePoints(TOY))) s += '<circle class="pt" cx="' + gx(P.x) + '" cy="' + gy(P.y) + '" r="' + (c * 0.24) + '" pointer-events="none"/>';
   for (const m of (o.marks || [])) {
@@ -1084,24 +1124,28 @@ function renderT() {
   const slider = (f, name) => '<label class="tsl"><b>' + name + '</b> x <input type="range" min="' + (ROOT + 0.02).toFixed(3) + '" max="3" step="0.01" data-field="' + f + '" value="' + app[f].x + '">' +
     '<button data-action="tflip" data-f="' + f + '">' + (app[f].up ? t.upper : t.lower) + "</button></label>";
   const dbl = app.tmode === "double";
-  return '<div class="card"><h3>' + t.cardSide + '</h3><p class="note" style="margin:0 0 8px">' + t.sideNote + "</p>" +
+  const cards = ['<div class="card"><h3>' + t.cardSide + '</h3><p class="note" style="margin:0 0 8px">' + t.sideNote + "</p>" +
       '<span class="tabs"><button data-action="tmode" data-m="add"' + pr(!dbl) + ">" + t.modeAdd + '</button><button data-action="tmode" data-m="double"' + pr(dbl) + ">" + t.modeDbl + "</button></span>" +
       '<div class="tgrid" style="margin-top:10px"><span></span><span class="hd">' + t.colReal + '</span><span class="hd">' + t.colMod + "</span>" +
       '<span class="lb">' + t.rowIn + "</span><span>" + slider("tP", "P") + (dbl ? "" : slider("tQ", "Q")) + "</span>" +
       '<span><label class="tsl"><b>P</b> <select data-field="tp">' + opts(app.tp) + "</select></label>" + (dbl ? "" : '<label class="tsl"><b>Q</b> <select data-field="tq">' + opts(app.tq) + "</select></label>") + "</span>" +
-      '</div><div class="tgrid" id="sideRows"></div></div>' +
+      '</div><div class="tgrid" id="sideRows"></div></div>',
     '<div class="card"><h3>' + t.cardRound + '</h3><p class="note" style="margin:0 0 8px">' + t.roundNote + "</p>" +
       '<div class="pick" style="margin-bottom:8px"><span class="chip role-priv" style="position:static">' + t.secA + numCtl("ta") + '</span><span class="chip role-priv" style="position:static">' + t.secB + numCtl("tb") + "</span></div>" +
-      '<div class="side2" id="roundBody"></div></div>' +
+      '<div class="side2" id="roundBody"></div></div>',
     '<div class="card"><h3>' + t.cardTable + '</h3><p class="note" style="margin:0 0 8px">' + t.tableNote + "</p>" +
       '<div class="btns" style="margin:0 0 8px"><button data-action="tx-reset">' + t.bReset + '</button><button data-action="tx-prev">' + t.bPrev + "</button>" +
       '<button class="dark" data-action="tx-next">' + t.bNext + '</button><button data-action="tx-all">' + t.bAll + "</button></div>" +
-      '<div class="calcwrap"><div class="left" style="min-width:0"><div class="schwrap" id="sqTable"></div><div class="schwrap" id="xTable"></div><p class="opline" id="xLine"></p></div><div id="gT"></div></div></div>' +
+      '<div class="calcwrap"><div class="left" style="min-width:0"><div class="schwrap" id="sqTable"></div><div class="schwrap" id="xTable"></div><p class="opline" id="xLine"></p></div><div id="gT"></div></div></div>',
     '<div class="card"><h3>' + t.cardWhy + '</h3><p style="margin:0 0 8px">' + t.whyText + "</p>" +
       '<div class="calcwrap"><div id="clock"></div><div class="left" style="min-width:0"><div id="bars"></div><p class="note" id="clockLine"></p></div></div>' +
       '<h3 style="margin:14px 0 6px">' + t.bigP + '</h3><span class="tabs">' + [17, 41, 97].map(p => '<button data-action="tpp" data-p="' + p + '"' + pr(app.tpp === p) + ">p = " + p + "</button>").join("") + "</span>" +
       '<div id="gP" style="margin-top:8px"></div><p class="note" id="pLine"></p>' +
-      '<div class="btns"><button class="dark" data-action="zoom">' + t.goGrid + " →</button></div></div>";
+      '<div class="btns"><button class="dark" data-action="zoom">' + t.goGrid + " →</button></div></div>"];
+  const n = app.sub3;
+  const nav = '<div class="tabs" style="margin-bottom:12px;flex-wrap:wrap">' + t.sub3.map((x, i) => '<button data-action="sub3" data-n="' + (i + 1) + '"' + pr(n === i + 1) + ">" + (i + 1) + ". " + x + "</button>").join("") + "</div>";
+  const next = n < 4 ? '<div class="btns"><button class="dark" data-action="sub3" data-n="' + (n + 1) + '">' + t.sub3Next(t.sub3[n]) + " →</button></div>" : "";
+  return nav + cards[n - 1] + next;
 }
 // a small picture of the real curve for the side by side card: P, Q, the line, the third point and its reflection
 function smallReal(P, Q, r, dbl) {
@@ -1129,6 +1173,7 @@ function smallReal(P, Q, r, dbl) {
   return s + "</svg>";
 }
 function sideRows() {
+  if (!document.getElementById("sideRows")) return;
   const t = L(), dbl = app.tmode === "double";
   // the real side
   const P = rpt(app.tP), Q = dbl ? P : rpt(app.tQ), r = realAdd(P, Q);
@@ -1184,6 +1229,7 @@ function sideRows() {
   document.getElementById("sideRows").innerHTML = h;
 }
 function roundBody() {
+  if (!document.getElementById("roundBody")) return;
   const t = L(), a = app.ta, b = app.tb;
   const A = realMulSlow(a, REAL_P), B = realMulSlow(b, REAL_P), SA = realMulSlow(a, B), SB = realMulSlow(b, A);
   const sa = SA === null ? "O" : fx(SA.x), sb = SB === null ? "O" : fx(SB.x);
@@ -1203,6 +1249,7 @@ function roundBody() {
 }
 const TB = pointsByX(2, 2, 17);
 function tableBody() {
+  if (!document.getElementById("sqTable")) { whyBody(); return; }
   const t = L(), n = app.tx;
   let sq = '<table class="xt"><tr><td class="h">y</td>';
   for (let y = 0; y < 17; y++) sq += "<td>" + y + "</td>";
@@ -1230,6 +1277,7 @@ function tableBody() {
 }
 // the clock of 17: x^3 + 2x + 2 goes around it many times and stops at the remainder
 function whyBody() {
+  if (!document.getElementById("clock")) return;
   const t = L(), x = app.tx > 0 ? app.tx - 1 : 5, c = TB.cols[x];
   const W = 230, cx = 115, cy = 115, R = 98;
   let s = '<svg width="' + W + '" height="' + W + '" viewBox="0 0 ' + W + " " + W + '" role="img" aria-label="clock of 17">';
@@ -1257,7 +1305,7 @@ function whyBody() {
     b += '<text x="0" y="' + (top - 4) + '" font-family="var(--sans)" font-size="12" font-weight="600" fill="var(--muted)">' + esc(k === 0 ? t.barsFull : t.barsMod) + "</text>";
     for (const cc of TB.cols) {
       const h = k === 0 ? BH * cc.full / maxF : BH * cc.r / 16, X = 10 + cc.x * BW;
-      b += '<rect x="' + X + '" y="' + (top + BH - h) + '" width="' + (BW - 5) + '" height="' + Math.max(1, h) + '" rx="2" fill="' + (cc.x === x ? "var(--chg)" : k === 0 ? "var(--muted)" : "var(--ink)") + '"/>';
+      b += '<rect data-action="tx-set" data-x="' + cc.x + '" style="cursor:pointer" x="' + X + '" y="' + (top + BH - h) + '" width="' + (BW - 5) + '" height="' + Math.max(1, h) + '" rx="2" fill="' + (cc.x === x ? "var(--chg)" : k === 0 ? "var(--muted)" : "var(--ink)") + '"/>';
       if (k === 1) b += '<text x="' + (X + (BW - 5) / 2) + '" y="' + (top + BH + 13) + '" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="var(--muted)">' + cc.x + "</text>";
     }
   }
@@ -1271,7 +1319,7 @@ function whyBody() {
   document.getElementById("gP").innerHTML = g + "</svg>";
   document.getElementById("pLine").textContent = t.pLine(p, cnt);
 }
-function renderTBody() { sideRows(); roundBody(); tableBody(); }
+function renderTBody() { [sideRows, roundBody, tableBody, whyBody][app.sub3 - 1](); }
 
 /* ---------- step 4: modulo 17 ---------- */
 function render2() {
@@ -1281,10 +1329,10 @@ function render2() {
     '<button data-action="mode3" data-m="dbl"' + pr(app.mode3 === "dbl") + ">" + t.tabDbl + "</button></span>";
   if (app.mode3 === "pts") right += '<h3 style="margin:14px 0 6px">' + t.tabMult + '</h3><p style="margin:0 0 10px">' + t.multHidden + '</p><div class="btns"><button class="dark" data-action="mode3" data-m="mult">' + t.multShow + "</button></div>";
   else if (app.mode3 === "mult") right += '<div class="btns"><button data-action="mk-reset">' + t.bReset + '</button><button data-action="mk-prev">' + t.bPrev + "</button>" +
-    '<button class="dark" data-action="mk-next">' + t.bNext + '</button></div><div id="multBody"></div>';
+    '<button class="dark" data-action="mk-next">' + t.bNext + '</button><button data-action="mk-play">' + t.bPlay + '</button></div><div id="multBody"></div>';
   else right += '<div class="btns"><label style="font-weight:600;font-size:14px">' + t.kLbl + ' <input class="sm-in" type="number" min="1" max="1048575" data-field="dk" value="' + app.dk + '"></label></div>' +
     '<div class="btns"><button data-action="ds-reset">' + t.bReset + '</button><button data-action="ds-prev">' + t.bPrev + "</button>" +
-    '<button class="dark" data-action="ds-next">' + t.bNext + '</button><button data-action="ds-all">' + t.bAll + '</button></div><div id="dblBody"></div>';
+    '<button class="dark" data-action="ds-next">' + t.bNext + '</button><button data-action="ds-play">' + t.bPlay + '</button><button data-action="ds-all">' + t.bAll + '</button></div><div id="dblBody"></div>';
   return '<div class="row"><div class="card" style="flex:0 0 auto"><h3>' + t.cardGrid + '</h3><div id="g3"></div>' +
       '<p class="note" style="margin:4px 0 0;max-width:420px">' + t.mirror + "<br>" + t.gridNote + '</p><p class="chk" id="chk" style="max-width:420px"></p></div>' +
     '<div class="card" style="flex:1 1 360px;min-width:0">' + right + "</div></div>";
@@ -1380,6 +1428,12 @@ function renderL2Body() {
     '<p class="note" style="margin:0">' + t.opsCount(nD, nA, k) + "</p>" +
     (k >= 19 ? '<p class="note" style="margin:4px 0 0">' + t.reduce(k, Math.floor(k / 19), red) + "</p>" : "");
 }
+// play / pause: one step every 0.7 s until stepFn says there is nothing left
+function playTimer(stepFn) {
+  if (app.timer) { clearInterval(app.timer); app.timer = null; return; }
+  if (!stepFn()) return;
+  app.timer = setInterval(() => { if (!stepFn()) { clearInterval(app.timer); app.timer = null; } }, 700);
+}
 function setDk(v) {
   if (!Number.isFinite(v)) return;
   app.dk = clampInt(Math.round(v), 1, 1048575); app.dstep = 0;
@@ -1398,7 +1452,7 @@ function render3() {
     '<div class="card"><h3>' + t.cardForm + '</h3><div id="formbox"></div><p class="note" style="margin:8px 0 0">' + t.divNote + "</p></div>" +
     '<div class="card"><h3 id="calcHead"></h3><div class="btns" style="margin:0 0 6px" id="s4btns"><button data-action="s4-reset">' + t.bReset + '</button><button data-action="s4-prev">' + t.bPrev + "</button>" +
       '<button class="dark" data-action="s4-next">' + t.bNext + '</button><button data-action="s4-all">' + t.bAll + "</button></div>" +
-      '<div class="calcwrap"><div class="left" id="calc"></div><div id="g4"></div></div></div>';
+      '<div class="calcwrap"><div id="g4"></div><div class="left" id="calc"></div></div></div>';
 }
 function modLine(v, p) {   // "159 = 9 × 17 + 6"
   const r = mod(v, p), q = (v - r) / p;
@@ -1426,7 +1480,7 @@ function renderL3Body() {
     btns.style.display = "none";
     document.getElementById("calc").innerHTML = '<div class="why" style="margin-top:0">' + (kind === "leftO" ? t.leftO : kind === "rightO" ? t.rightO : t.opp(P.y, Q.y)) + "</div>" +
       '<div class="bigline">P + Q = ' + psH(I.R) + "</div>";
-    g4.innerHTML = gridSVG({ c: 16, marks: baseMarks.concat(I.R ? [{ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: "P + Q", big: true }] : []), vline: kind === "opposite" ? P.x : undefined });
+    g4.innerHTML = gridSVG({ c: 20, marks: baseMarks.concat(I.R ? [{ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: "P + Q", big: true }] : []), vline: kind === "opposite" ? P.x : undefined });
     return;
   }
   btns.style.display = "";
@@ -1459,9 +1513,14 @@ function renderL3Body() {
   document.getElementById("calc").innerHTML = '<div class="stepsf">' +
     blk(1, t.stSlope, L1 + "<br>" + reds.join(", ") + " &nbsp;<span class=\"note\">(" + t.because + " " + I.denM + " × " + I.denInv + " = " + prod + (prod >= p ? " = " + modLine(prod, p).split(" = ")[1] : "") + ")</span><br>" + inv + sLine) +
     blk(2, t.stX, x3L + "<br>" + x3M) + blk(3, t.stY, y3L + "<br>" + y3M) + blk(4, t.stCheck, ck) + "</div>";
+  // the third point of the line on the curve is -(P + Q); its mirror image is P + Q
+  const T3 = { x: I.x3, y: mod(-I.y3, p) }, c0 = mod(y1 - I.s * x1, p), sr = Number(I.s), sv = sr > 8 ? sr - 17 : sr;
   const marks = baseMarks.slice();
-  if (s4 >= 3) marks.push({ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: kind === "double" ? "2P" : "P + Q", big: true });
-  g4.innerHTML = gridSVG({ c: 16, marks: marks, vline: s4 === 2 ? I.x3 : undefined });
+  if (s4 >= 2 && !samePoint(T3, I.R)) marks.push({ P: T3, col: "var(--chg)", label: t.third, up: T3.y < 8n });
+  if (s4 >= 3 || (s4 >= 2 && samePoint(T3, I.R))) marks.push({ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: kind === "double" ? "2P" : "P + Q", big: true, up: I.R.y >= 8n });
+  g4.innerHTML = gridSVG({ c: 20, marks: marks, wline: { s: I.s, c: c0 }, mirror: s4 >= 3, vline: s4 === 2 ? I.x3 : undefined,
+      reflect: s4 >= 3 && !samePoint(T3, I.R) ? { from: T3, to: I.R } : undefined }) +
+    '<p class="note" style="max-width:' + (38 + 16 * 20) + 'px;margin:4px 0 0">' + esc(t.wrapNote(kind === "double", sv, sr, s4)) + "</p>";
 }
 function setTx(v) { app.tx = clampInt(v, 0, 17); tableBody(); }
 function setS4(v) { app.s4 = clampInt(v, 1, 4); renderL3Body(); }
@@ -1475,6 +1534,7 @@ function buildSide() {
 }
 function render() {
   const t = L();
+  if (app.timer) { clearInterval(app.timer); app.timer = null; }
   document.documentElement.lang = lang;
   document.title = t.title;
   document.getElementById("title").textContent = t.title;
@@ -1489,7 +1549,7 @@ function render() {
   document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
   document.getElementById("mhSub").textContent = t.steps[app.level][1];
-  const ex = t.explain[[app.tab1, "add", "trans", "mod", "one"][app.level]];
+  const ex = t.explain[[app.tab1, "add", "trans" + app.sub3, "mod", "one"][app.level]];
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
     [render0, render1, renderT, render2, render3][app.level]() + "</div>";
   if (app.level === 0) updateL0();
@@ -1504,11 +1564,12 @@ function render() {
 }
 /* the address: #N is a step, #N.M a tab or a card of the step
    #1 (#1.1) ECDH, #1.2 ElGamal, #1.3 ECDH with Eve's attack open, #1.4 ECDH, scrolled to P-256
-   #3 from real numbers to modulo 17
+   #3 (#3.1) from real numbers to modulo 17: the same formulas, #3.2 rounding, #3.3 where the dots come from, #3.4 why they look random
    #4 (#4.1) the points, #4.2 kG: double and add, #4.3 the multiples of G */
 function hashStr() {
   let h = "#" + (app.level + 1);
   if (app.level === 0 && app.tab1 === "elg") h += ".2";
+  if (app.level === 2 && app.sub3 > 1) h += "." + app.sub3;
   if (app.level === 3 && app.mode3 === "dbl") h += ".2";
   if (app.level === 3 && app.mode3 === "mult") h += ".3";
   return h;
@@ -1524,6 +1585,7 @@ function readHash() {
     if (sub === 3) { app.eveOpen = true; app.scrollTo = "eveCard"; }
     if (sub === 4) app.scrollTo = "bigCard";
   }
+  if (n === 3) app.sub3 = Math.min(4, Math.max(1, sub));
   if (n === 4) {
     app.mode3 = sub === 2 ? "dbl" : sub === 3 ? "mult" : "pts";
     if (sub === 3 && app.mk < 1) app.mk = 1;
@@ -1591,6 +1653,17 @@ view.addEventListener("click", e => {
   if (!el) return;
   const a = el.dataset.action;
   if (a === "zoom") zoomIn();
+  else if (a === "sub3") { app.sub3 = +el.dataset.n; render(); view.scrollTop = 0; }
+  else if (a === "tx-set") setTx(+el.dataset.x + 1);
+  else if (a === "mk-play") {
+    if (app.mk >= 19 && !app.timer) app.mk = 0;
+    playTimer(() => { if (app.mk >= 19 || app.level !== 3) return false; app.mk++; renderL2Body(); return true; });
+  }
+  else if (a === "ds-play") {
+    const n = mulTrace(TOY, BigInt(app.dk), TOY.G).ops.length;
+    if (app.dstep >= n && !app.timer) app.dstep = 0;
+    playTimer(() => { if (app.dstep >= n || app.level !== 3) return false; app.dstep++; renderL2Body(); return true; });
+  }
   else if (a === "tab1") { app.tab1 = el.dataset.t; render(); }
   else if (a === "eve-show") { app.eveOpen = true; updateL0(); }
   else if (a === "dec" || a === "inc") setSmall(el.dataset.f, app[el.dataset.f] + (a === "inc" ? 1 : -1));
