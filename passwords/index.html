@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Collisions and passwords explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#B8372B;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  /* role colours = the slide colours: password / input sViolet, salt sAmber, digest sBrown,
+     Bob / the server sTeal, Mallory sPink, Alice sIndigo; mechanisms neutral dark */
+  --pw-b:#7E57C2; --pw-bg:#EBE5F5;
+  --salt-b:#FFB300; --salt-bg:#FFE8B2;
+  --dig-b:#8D6E63; --dig-bg:#EEE9E7;
+  --srv-b:#26A69A; --srv-bg:#DEF2F0;
+  --mal-b:#EC407A; --mal-bg:#FCE2EB;
+  --alice:#5C6BC0; --bob:#26A69A; --mal:#C2185B;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E; --const-b:#4A5663; --const-bg:#222C37;
+    --pw-b:#B39DDB; --pw-bg:#2A2142; --salt-b:#FFCA28; --salt-bg:#3A2E10; --dig-b:#BCAAA4; --dig-bg:#2E2522;
+    --srv-b:#4DB6AC; --srv-bg:#12302D; --mal-b:#F48FB1; --mal-bg:#3A1A26; --alice:#9FA8DA; --bob:#4DB6AC; --mal:#F48FB1;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:13.5px}
+.mono{font-family:var(--mono)}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.step.past .gnum{background:var(--ink);color:var(--surface)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tabs button[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.seg{display:inline-flex;gap:4px;flex-wrap:wrap;margin-right:12px;align-items:center}
+.seg .lbl{font-size:13px;font-weight:600;color:var(--muted);margin-right:4px}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1.5px solid;white-space:nowrap}
+.r-pw{border-color:var(--pw-b);background:var(--pw-bg)}
+.r-salt{border-color:var(--salt-b);background:var(--salt-bg)}
+.r-dig{border-color:var(--dig-b);background:var(--dig-bg)}
+.r-srv{border-color:var(--srv-b);background:var(--srv-bg)}
+.r-mal{border-color:var(--mal-b);background:var(--mal-bg)}
+.r-neu{border-color:var(--const-b);background:var(--const-bg)}
+.chg{outline:2.5px solid var(--chg);outline-offset:-2px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.stat{border:1.5px solid var(--rule);border-radius:8px;padding:6px 12px;min-width:120px}
+.stat small{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.stat b{font-family:var(--mono);font-size:18px}
+.stat.r-mal{border-color:var(--mal-b)} .stat.r-srv{border-color:var(--srv-b)}
+canvas{display:block;max-width:100%}
+.days{display:grid;grid-template-columns:repeat(31,18px);gap:2px;margin:6px 0}
+.days span{width:18px;height:18px;border-radius:3px;background:var(--sunken);border:1px solid var(--rule)}
+.days span.hit{background:var(--pw-bg);border-color:var(--pw-b)}
+.days span.rep{background:var(--chg);border-color:var(--chg)}
+.days span.tgt{outline:2px solid var(--mal-b);outline-offset:-1px}
+table.t{border-collapse:collapse;font-size:13.5px;margin-top:6px}
+table.t th{text-align:left;font-size:12px;color:var(--muted);padding:4px 10px;border-bottom:1px solid var(--rule)}
+table.t td{padding:4px 10px;border-bottom:1px solid var(--rule);vertical-align:middle}
+table.t td.m{font-family:var(--mono);font-size:13px}
+.cell{display:inline-block;border:1.5px solid;border-radius:5px;padding:0 6px;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.bytes{display:grid;grid-template-columns:repeat(32,1fr);gap:2px;max-width:900px;font-family:var(--mono);font-size:11px}
+.bytes span{text-align:center;border-radius:3px;padding:1px 0;background:var(--pw-bg);border:1px solid var(--pw-b)}
+.bytes span.d{background:var(--chg);color:#fff;border-color:var(--chg);font-weight:700}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-family:var(--mono);font-size:13px;margin:4px 0}
+.chain .arr{color:var(--muted);font-size:11px}
+.walk td{font-family:var(--mono);font-size:12.5px}
+.walk tr.cur td{background:var(--chg-bg)}
+.box{background:var(--ink);color:var(--surface);border-radius:8px;padding:6px 12px;font-weight:600;font-size:13.5px;display:inline-block}
+.dial{display:flex;align-items:center;gap:12px;font-weight:600}
+.dial input[type=range]{width:300px}
+.code{font-family:var(--mono);font-size:13.5px;background:#191919;color:#F5F5F5;border-radius:8px;padding:10px 14px;white-space:pre;overflow:auto}
+.code .k{color:#50B4FF;font-weight:600} .code .c{color:#50DC50;font-style:italic}
+.viewer{border:1.5px solid var(--pw-b);background:var(--pw-bg);border-radius:8px;padding:8px 12px;min-height:44px;font-size:15px}
+.flex{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.flex > div{flex:1 1 320px}
+.bar{height:10px;border-radius:5px;background:var(--sunken);overflow:hidden;max-width:520px;margin:4px 0}
+.bar span{display:block;height:100%;background:var(--mal-b);width:0}
+@media (max-width:900px){.app{height:auto;display:block}.top{flex-wrap:wrap}.body{display:block}.side{border-right:0;border-bottom:1px solid var(--rule)}.main{display:block}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== core: SHA-256, MD5 with its block states, bcrypt, the toy rainbow table ===================== */
+// CORE-BEGIN
+const enc = s => new TextEncoder().encode(s);
+const hex = b => Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+function concat(a, b) { const r = new Uint8Array(a.length + b.length); r.set(a, 0); r.set(b, a.length); return r; }
+
+// ---------- SHA-256 (FIPS 180-4) ----------
+const K256 = new Uint32Array([
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,
+  0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,
+  0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,
+  0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+const W256 = new Uint32Array(64);
+function sha256(msg) {
+  const n = msg.length, total = ((n + 9 + 63) >> 6) << 6;
+  const m = new Uint8Array(total); m.set(msg); m[n] = 0x80;
+  const bits = n * 8;
+  m[total - 4] = (bits >>> 24) & 255; m[total - 3] = (bits >>> 16) & 255; m[total - 2] = (bits >>> 8) & 255; m[total - 1] = bits & 255;
+  m[total - 5] = Math.floor(bits / 4294967296) & 255;
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a, h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  const W = W256;
+  for (let off = 0; off < total; off += 64) {
+    for (let i = 0; i < 16; i++) W[i] = (m[off + 4 * i] << 24) | (m[off + 4 * i + 1] << 16) | (m[off + 4 * i + 2] << 8) | m[off + 4 * i + 3];
+    for (let i = 16; i < 64; i++) {
+      const a = W[i - 15], b = W[i - 2];
+      const s0 = ((a >>> 7) | (a << 25)) ^ ((a >>> 18) | (a << 14)) ^ (a >>> 3);
+      const s1 = ((b >>> 17) | (b << 15)) ^ ((b >>> 19) | (b << 13)) ^ (b >>> 10);
+      W[i] = (W[i - 16] + s0 + W[i - 7] + s1) | 0;
+    }
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+    for (let i = 0; i < 64; i++) {
+      const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+      const t1 = (h + S1 + ((e & f) ^ (~e & g)) + K256[i] + W[i]) | 0;
+      const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+      const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + h) | 0;
+  }
+  const out = new Uint8Array(32), hs = [h0, h1, h2, h3, h4, h5, h6, h7];
+  for (let i = 0; i < 8; i++) { out[4 * i] = hs[i] >>> 24; out[4 * i + 1] = (hs[i] >>> 16) & 255; out[4 * i + 2] = (hs[i] >>> 8) & 255; out[4 * i + 3] = hs[i] & 255; }
+  return out;
+}
+const sha256hex = s => hex(sha256(typeof s === "string" ? enc(s) : s));
+
+// ---------- MD5 (RFC 1321), keeping the state after every 64-byte block ----------
+const MD5_S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+               4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+const MD5_K = new Int32Array(64);
+for (let i = 0; i < 64; i++) MD5_K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) | 0;
+function md5Compress(st, m, off) {
+  const X = new Int32Array(16);
+  for (let i = 0; i < 16; i++) X[i] = m[off + 4 * i] | (m[off + 4 * i + 1] << 8) | (m[off + 4 * i + 2] << 16) | (m[off + 4 * i + 3] << 24);
+  let a = st[0], b = st[1], c = st[2], d = st[3];
+  for (let i = 0; i < 64; i++) {
+    let f, g;
+    if (i < 16) { f = (b & c) | (~b & d); g = i; }
+    else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) & 15; }
+    else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) & 15; }
+    else { f = c ^ (b | ~d); g = (7 * i) & 15; }
+    const t = d; d = c; c = b;
+    const x = (a + f + MD5_K[i] + X[g]) | 0;
+    b = (b + ((x << MD5_S[i]) | (x >>> (32 - MD5_S[i])))) | 0;
+    a = t;
+  }
+  return [(st[0] + a) | 0, (st[1] + b) | 0, (st[2] + c) | 0, (st[3] + d) | 0];
+}
+function md5StateHex(st) { let s = ""; for (const w of st) for (let k = 0; k < 4; k++) s += ((w >>> (8 * k)) & 255).toString(16).padStart(2, "0"); return s; }
+// returns the state after every block (the last one is the digest) and the padded message
+function md5Trace(msg) {
+  const n = msg.length, total = ((n + 9 + 63) >> 6) << 6;
+  const m = new Uint8Array(total); m.set(msg); m[n] = 0x80;
+  let bits = n * 8;
+  for (let k = 0; k < 8; k++) { m[total - 8 + k] = bits & 255; bits = Math.floor(bits / 256); }
+  let st = [0x67452301, 0xefcdab89 | 0, 0x98badcfe | 0, 0x10325476];
+  const states = [];
+  for (let off = 0; off < total; off += 64) { st = md5Compress(st, m, off); states.push(md5StateHex(st)); }
+  return { states: states, digest: states[states.length - 1], padded: m };
+}
+const md5hex = b => md5Trace(b).digest;
+// the first MD5 collision (Wang, Feng, Lai, Yu, 2004): B differs from A in 6 bytes (each by 0x80)
+const WANG_A = Uint8Array.from(("d131dd02c5e6eec4693d9a0698aff95c2fcab58712467eab4004583eb8fb7f89" +
+  "55ad340609f4b30283e488832571415a085125e8f7cdc99fd91dbdf280373c5b" +
+  "d8823e3156348f5bae6dacd436c919c6dd53e2b487da03fd02396306d248cda0" +
+  "e99f33420f577ee8ce54b67080a80d1ec69821bcb6a8839396f9652b6ff72a70").match(/../g), x => parseInt(x, 16));
+const WANG_DIFF = [19, 45, 59, 83, 109, 123];
+const WANG_B = WANG_A.slice(); for (const i of WANG_DIFF) WANG_B[i] ^= 0x80;
+
+// ---------- bcrypt ($2b$), a port of the course's pure-Python module ----------
+const PI_HEX = (
+  "243f6a8885a308d313198a2e03707344a4093822299f31d0082efa98ec4e6c89452821e638d01377be5466cf34e90c6cc0ac29b7c97c50dd3f84d5b5b5470917" +
+  "9216d5d98979fb1bd1310ba698dfb5ac2ffd72dbd01adfb7b8e1afed6a267e96ba7c9045f12c7f9924a19947b3916cf70801f2e2858efc16636920d871574e69" +
+  "a458fea3f4933d7e0d95748f728eb658718bcd5882154aee7b54a41dc25a59b59c30d5392af26013c5d1b023286085f0ca417918b8db38ef8e79dcb0603a180e" +
+  "6c9e0e8bb01e8a3ed71577c1bd314b2778af2fda55605c60e65525f3aa55ab945748986263e8144055ca396a2aab10b6b4cc5c341141e8cea15486af7c72e993" +
+  "b3ee1411636fbc2a2ba9c55d741831f6ce5c3e169b87931eafd6ba336c24cf5c7a325381289586773b8f48986b4bb9afc4bfe81b6628219361d809ccfb21a991" +
+  "487cac605dec8032ef845d5de98575b1dc262302eb651b8823893e81d396acc50f6d6ff383f442392e0b4482a484200469c8f04a9e1f9b5e21c66842f6e96c9a" +
+  "670c9c61abd388f06a51a0d2d8542f68960fa728ab5133a36eef0b6c137a3be4ba3bf0507efb2a98a1f1651d39af017666ca593e82430e888cee8619456f9fb4" +
+  "7d84a5c33b8b5ebee06f75d885c12073401a449f56c16aa64ed3aa62363f77061bfedf72429b023d37d0d724d00a1248db0fead349f1c09b075372c980991b7b" +
+  "25d479d8f6e8def7e3fe501ab6794c3b976ce0bd04c006bac1a94fb6409f60c45e5c9ec2196a246368fb6faf3e6c53b51339b2eb3b52ec6f6dfc511f9b30952c" +
+  "cc814544af5ebd09bee3d004de334afd660f2807192e4bb3c0cba85745c8740fd20b5f39b9d3fbdb5579c0bd1a60320ad6a100c6402c7279679f25fefb1fa3cc" +
+  "8ea5e9f8db3222f83c7516dffd616b152f501ec8ad0552ab323db5fafd23876053317b483e00df829e5c57bbca6f8ca01a87562edf1769dbd542a8f6287effc3" +
+  "ac6732c68c4f5573695b27b0bbca58c8e1ffa35db8f011a010fa3d98fd2183b84afcb56c2dd1d35b9a53e479b6f84565d28e49bc4bfb9790e1ddf2daa4cb7e33" +
+  "62fb1341cee4c6e8ef20cada36774c01d07e9efe2bf11fb495dbda4dae909198eaad8e716b93d5a0d08ed1d0afc725e08e3c5b2f8e7594b78ff6e2fbf2122b64" +
+  "8888b812900df01c4fad5ea0688fc31cd1cff191b3a8c1ad2f2f2218be0e1777ea752dfe8b021fa1e5a0cc0fb56f74e818acf3d6ce89e299b4a84fe0fd13e0b7" +
+  "7cc43b81d2ada8d9165fa2668095770593cc7314211a1477e6ad206577b5fa86c75442f5fb9d35cfebcdaf0c7b3e89a0d6411bd3ae1e7e4900250e2d2071b35e" +
+  "226800bb57b8e0af2464369bf009b91e5563911d59dfa6aa78c14389d95a537f207d5ba202e5b9c5832603766295cfa911c819684e734a41b3472dca7b14a94a" +
+  "1b5100529a532915d60f573fbc9bc6e42b60a47681e6740008ba6fb5571be91ff296ec6b2a0dd915b6636521e7b9f9b6ff34052ec585566453b02d5da99f8fa1" +
+  "08ba47996e85076a4b7a70e9b5b32944db75092ec4192623ad6ea6b049a7df7d9cee60b88fedb266ecaa8c71699a17ff5664526cc2b19ee1193602a575094c29" +
+  "a0591340e4183a3e3f54989a5b429d656b8fe4d699f73fd6a1d29c07efe830f54d2d38e6f0255dc14cdd20868470eb266382e9c6021ecc5e09686b3f3ebaefc9" +
+  "3c9718146b6a70a1687f358452a0e286b79c5305aa5007373e07841c7fdeae5c8e7d44ec5716f2b8b03ada37f0500c0df01c1f040200b3ffae0cf51a3cb574b2" +
+  "25837a58dc0921bdd19113f97ca92ff69432477322f547013ae5e58137c2dadcc8b576349af3dda7a94461460fd0030eecc8c73ea4751e41e238cd993bea0e2f" +
+  "3280bba1183eb3314e548b384f6db9086f420d03f60a04bf2cb8129024977c795679b072bcaf89afde9a771fd9930810b38bae12dccf3f2e5512721f2e6b7124" +
+  "501adde69f84cd877a5847187408da17bc9f9abce94b7d8cec7aec3adb851dfa63094366c464c3d2ef1c18473215d908dd433b3724c2ba1612a14d432a65c451" +
+  "50940002133ae4dd71dff89e10314e5581ac77d65f11199b043556f1d7a3c76b3c11183b5924a509f28fe6ed97f1fbfa9ebabf2c1e153c6e86e34570eae96fb1" +
+  "860e5e0a5a3e2ab3771fe71c4e3d06fa2965dcb999e71d0f803e89d65266c8252e4cc9789c10b36ac6150eba94e2ea78a5fc3c531e0a2df4f2f74ea7361d2b3d" +
+  "1939260f19c279605223a708f71312b6ebadfe6eeac31f66e3bc4595a67bc883b17f37d1018cff28c332ddefbe6c5aa56558218568ab9802eecea50fdb2f953b" +
+  "2aef7dad5b6e2f841521b62829076170ecdd4775619f151013cca830eb61bd960334fe1eaa0363cfb5735c904c70a239d59e9e0bcbaade14eecc86bc60622ca7" +
+  "9cab5cabb2f3846e648b1eaf19bdf0caa02369b9655abb5040685a323c2ab4b3319ee9d5c021b8f79b540b19875fa09995f7997e623d7da8f837889a97e32d77" +
+  "11ed935f166812810e358829c7e61fd696dedfa17858ba9957f584a51b2272639b83c3ff1ac24696cdb30aeb532e30548fd948e46dbc312858ebf2ef34c6ffea" +
+  "fe28ed61ee7c3c735d4a14d9e864b7e342105d14203e13e045eee2b6a3aaabeadb6c4f15facb4fd0c742f442ef6abbb5654f3b1d41cd2105d81e799e86854dc7" +
+  "e44b476a3d816250cf62a1f25b8d2646fc8883a0c1c7b6a37f1524c369cb749247848a0b5692b285095bbf00ad19489d1462b17423820e0058428d2a0c55f5ea" +
+  "1dadf43e233f70613372f0928d937e41d65fecf16c223bdb7cde3759cbee74604085f2a7ce77326ea607808419f8509ee8efd85561d99735a969a7aac50c06c2" +
+  "5a04abfc800bcadc9e447a2ec3453484fdd567050e1e9ec9db73dbd3105588cd675fda79e3674340c5c43465713e38d83d28f89ef16dff20153e21e78fb03d4a" +
+  "e6e39f2bdb83adf7e93d5a68948140f7f64c261c94692934411520f77602d4f7bcf46b2ed4a20068d40824713320f46a43b7d4b7500061af1e39f62e97244546" +
+  "14214f74bf8b88404d95fc1d96b591af70f4ddd366a02f45bfbc09ec03bd97857fac6dd031cb850496eb27b355fd3941da2547e6abca0a9a28507825530429f4" +
+  "0a2c86dae9b66dfb68dc1462d7486900680ec0a427a18dee4f3ffea2e887ad8cb58ce0067af4d6b6aace1e7cd3375fecce78a399406b2a4220fe9e35d9f385b9" +
+  "ee39d7ab3b124e8b1dc9faf74b6d185626a36631eae397b23a6efa74dd5b43326841e7f7ca7820fbfb0af54ed8feb397454056acba48952755533a3a20838d87" +
+  "fe6ba9b7d096954b55a867bca1159a58cca9296399e1db33a62a4a563f3125f95ef47e1c9029317cfdf8e80204272f7080bb155c05282ce395c11548e4c66d22" +
+  "48c1133fc70f86dc07f9c9ee41041f0f404779a45d886e17325f51ebd59bc0d1f2bcc18f41113564257b7834602a9c60dff8e8a31f636c1b0e12b4c202e1329e" +
+  "af664fd1cad181156b2395e0333e92e13b240b62eebeb92285b2a20ee6ba0d99de720c8c2da2f728d012784595b794fd647d0862e7ccf5f05449a36f877d48fa" +
+  "c39dfd27f33e8d1e0a476341992eff743a6f6eabf4f8fd37a812dc60a1ebddf8991be14cdb6e6b0dc67b55106d672c372765d43bdcd0e804f1290dc7cc00ffa3" +
+  "b5390f92690fed0b667b9ffbcedb7d9ca091cf0bd9155ea3bb132f88515bad247b9479bf763bd6eb37392eb3cc1159798026e297f42e312d6842ada7c66a2b3b" +
+  "12754ccc782ef11c6a124237b79251e706a1bbe64bfb63501a6b101811caedfa3d25bdd8e2e1c3c9444216590a121386d90cec6ed5abea2a64af674eda86a85f" +
+  "bebfe98864e4c3fe9dbc8057f0f7c08660787bf86003604dd1fd8346f6381fb07745ae04d736fccc83426b33f01eab71b08041873c005e5f77a057bebde8ae24" +
+  "55464299bf582e614e58f48ff2ddfda2f474ef388789bdc25366f9c3c8b38e74b475f25546fcd9b97aeb26618b1ddf84846a0e79915f95e2466e598e20b45770" +
+  "8cd55591c902de4cb90bace1bb8205d011a862487574a99eb77f19b6e0a9dc09662d09a1c4324633e85a1f0209f0be8c4a99a0251d6efe101ab93d1d0ba5a4df" +
+  "a186f20f2868f169dcb7da83573906fea1e2ce9b4fcd7f5250115e01a70683faa002b5c40de6d0279af88c27773f8641c3604c0661a806b5f0177a28c0f586e0" +
+  "006058aa30dc7d6211e69ed72338ea6353c2dd94c2c21634bbcbee5690bcb6deebfc7da1ce591d766f05e4094b7c018839720a3d7c927c2486e3725f724d9db9" +
+  "1ac15bb4d39eb8fced54557808fca5b5d83d7cd34dad0fc41e50ef5eb161e6f8a28514d96c51133c6fd5c7e756e14ec4362abfceddc6c837d79a323492638212" +
+  "670efa8e406000e03a39ce37d3faf5cfabc277375ac52d1b5cb0679e4fa33742d382274099bc9bbed5118e9dbf0f7315d62d1c7ec700c47bb78c1b6b21a19045" +
+  "b26eb1be6a366eb45748ab2fbc946e79c6a376d26549c2c8530ff8ee468dde7dd5730a1d4cd04dc62939bbdba9ba4650ac9526e8be5ee304a1fad5f06a2d519a" +
+  "63ef8ce29a86ee22c089c2b843242ef6a51e03aa9cf2d0a483c061ba9be96a4d8fe51550ba645bd62826a2f9a73a3ae14ba99586ef5562e9c72fefd3f752f7da" +
+  "3f046f6977fa0a5980e4a91587b086019b09e6ad3b3ee593e990fd5a9e34d7972cf0b7d9022b8b5196d5ac3a017da67dd1cf3ed67c7d2d281f9f25cfadf2b89b" +
+  "5ad6b4725a88f54ce029ac71e019a5e647b0acfded93fa9be8d3c48d283b57ccf8d5662979132e28785f0191ed756055f7960e44e3d35e8c15056dd488f46dba" +
+  "03a161250564f0bdc3eb9e153c9057a297271aeca93a072a1b3f6d9b1e6321f5f59c66fb26dcf3197533d928b155fdf5035634828aba3cbb28517711c20ad9f8" +
+  "abcc5167ccad925f4de817513830dc8e379d58629320f991ea7a90c2fb3e7bce5121ce64774fbe32a8b6e37ec3293d4648de53696413e680a2ae0810dd6db224" +
+  "69852dfd09072166b39a460a6445c0dd586cdecf1c20c8ae5bbef7dd1b588d40ccd2017f6bb4e3bbdda26a7e3a59ff453e350a44bcb4cdd572eacea8fa6484bb" +
+  "8d6612aebf3c6f47d29be463542f5d9eaec2771bf64e6370740e0d8de75b1357f8721671af537d5d4040cb084eb4e2cc34d2466a0115af84e1b0042895983a1d" +
+  "06b89fb4ce6ea0486f3f3b823520ab82011a1d4b277227f8611560b1e7933fdcbb3a792b344525bda08839e151ce794b2f32c9b7a01fbac9e01cc87ebcc7d1f6" +
+  "cf0111c3a1e8aac71a908749d44fbd9ad0dadecbd50ada380339c32ac69136678df9317ce0b12b4ff79e59b743f5bb3af2d519ff27d9459cbf97222c15e6fc2a" +
+  "0f91fc719b941525fae59361ceb69cebc2a8645912baa8d1b6c1075ee3056a0c10d25065cb03a442e0ec6e0e1698db3b4c98a0be3278e9649f1f9532e0d392df" +
+  "d3a0342b8971f21e1b0a74414ba3348cc5be7120c37632d8df359f8d9b992f2ee60b6f470fe3f11de54cda541edad891ce6279cfcd3e7e6f1618b166fd2c1d05" +
+  "848fd2c5f6fb2299f523f357a632762393a8353156cccd02acf081625a75ebb56e16369788d273ccde96629281b949d04c50901b71c65614e6c6c7bd327a140a" +
+  "45e1d006c3f27b9ac9aa53fd62a80f00bb25bfe235bdd2f671126905b2040222b6cbcf7ccd769c2b53113ec01640e3d338abbd602547adf0ba38209cf746ce76" +
+  "77afa1c52075606085cbfe4e8ae88dd87aaaf9b04cf9aa7e1948c25c02fb8a8c01c36ae4d6ebe1f990d4f869a65cdea03f09252dc208e69fb74e6132ce77e25b" +
+  "578fdfe33ac372e6");
+const PI_WORDS = new Uint32Array(1042);
+for (let i = 0; i < 1042; i++) PI_WORDS[i] = parseInt(PI_HEX.substr(8 * i, 8), 16);
+const B64 = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+function b64enc(d) {
+  let out = "", i = 0;
+  while (i < d.length) {
+    let c1 = d[i++]; out += B64[c1 >> 2]; c1 = (c1 & 3) << 4;
+    if (i >= d.length) { out += B64[c1]; break; }
+    let c2 = d[i++]; out += B64[c1 | (c2 >> 4)]; c1 = (c2 & 15) << 2;
+    if (i >= d.length) { out += B64[c1]; break; }
+    c2 = d[i++]; out += B64[c1 | (c2 >> 6)]; out += B64[c2 & 63];
+  }
+  return out;
+}
+function b64dec(t, n) {
+  const v = Array.from(t, ch => B64.indexOf(ch)), out = [];
+  let i = 0;
+  while (out.length < n && i + 1 < v.length) {
+    out.push(((v[i] << 2) | (v[i + 1] >> 4)) & 255); if (out.length >= n || i + 2 >= v.length) break;
+    out.push(((v[i + 1] << 4) | (v[i + 2] >> 2)) & 255); if (out.length >= n || i + 3 >= v.length) break;
+    out.push(((v[i + 2] << 6) | v[i + 3]) & 255); i += 4;
+  }
+  return Uint8Array.from(out);
+}
+// the state: S = 1042 words, P = S[0..17], S-box k = S[18 + 256 k .. ]
+function bfEncrypt(S, L, R) {
+  for (let i = 0; i < 16; i += 2) {
+    L ^= S[i];
+    R ^= ((((S[18 + (L >>> 24)] + S[274 + ((L >>> 16) & 255)]) | 0) ^ S[530 + ((L >>> 8) & 255)]) + S[786 + (L & 255)]) | 0;
+    R ^= S[i + 1];
+    L ^= ((((S[18 + (R >>> 24)] + S[274 + ((R >>> 16) & 255)]) | 0) ^ S[530 + ((R >>> 8) & 255)]) + S[786 + (R & 255)]) | 0;
+  }
+  return [(R ^ S[17]) >>> 0, (L ^ S[16]) >>> 0];
+}
+function words18(data) {
+  const out = new Uint32Array(18); let j = 0;
+  for (let i = 0; i < 18; i++) { let w = 0; for (let k = 0; k < 4; k++) { w = ((w << 8) | data[j]) >>> 0; j = (j + 1) % data.length; } out[i] = w; }
+  return out;
+}
+// one Blowfish key setup: 9 + 512 = 521 encryptions rewrite all 1042 words; onWrite(index) is told every word written
+function expandKey(S, key, salt, onWrite) {
+  for (let i = 0; i < 18; i++) S[i] ^= key[i];
+  let L = 0, R = 0, s = 0;
+  for (let i = 0; i < 1042; i += 2) {
+    if (salt) { L ^= salt[s]; R ^= salt[s + 1]; s = (s + 2) & 3; }
+    [L, R] = bfEncrypt(S, L, R);
+    S[i] = L; S[i + 1] = R;
+    if (onWrite) onWrite(i);
+  }
+}
+function bcryptRaw(key, cost, salt) {
+  const S = PI_WORDS.slice(), kw = words18(key), sw = words18(salt);
+  expandKey(S, kw, sw.subarray(0, 4));
+  for (let r = 0; r < (1 << cost); r++) { expandKey(S, kw, null); expandKey(S, sw, null); }
+  const ct = words18(enc("OrpheanBeholderScryDoubt")).slice(0, 6);
+  for (let r = 0; r < 64; r++) for (let j = 0; j < 6; j += 2) { const o = bfEncrypt(S, ct[j], ct[j + 1]); ct[j] = o[0]; ct[j + 1] = o[1]; }
+  const out = new Uint8Array(24);
+  for (let j = 0; j < 6; j++) { out[4 * j] = ct[j] >>> 24; out[4 * j + 1] = (ct[j] >>> 16) & 255; out[4 * j + 2] = (ct[j] >>> 8) & 255; out[4 * j + 3] = ct[j] & 255; }
+  return out.subarray(0, 23);
+}
+function bcrypt(password, cost, saltText) {
+  const key = concat(enc(password), new Uint8Array([0])).subarray(0, 72);
+  const salt = b64dec(saltText.slice(0, 22), 16);
+  return "$2b$" + String(cost).padStart(2, "0") + "$" + b64enc(salt) + b64enc(bcryptRaw(key, cost, salt));
+}
+function bcryptCheck(password, stored) {
+  const p = stored.split("$");
+  return bcrypt(password, +p[2], p[3].slice(0, 22)) === stored;
+}
+
+// ---------- a seeded random generator (mulberry32), so that salts and tables are the same for everybody ----------
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+// ---------- the toy rainbow table: words = 3 lowercase letters, h = the first 16 bits of SHA-256 ----------
+const RB_N = 17576;
+const LET = "abcdefghijklmnopqrstuvwxyz";
+const rbWord = i => LET[Math.floor(i / 676)] + LET[Math.floor(i / 26) % 26] + LET[i % 26];
+const rbIndex = w => LET.indexOf(w[0]) * 676 + LET.indexOf(w[1]) * 26 + LET.indexOf(w[2]);
+let RB_H = null;                                    // h of every word, computed once
+function rbTable() { if (!RB_H) { RB_H = new Uint16Array(RB_N); for (let i = 0; i < RB_N; i++) { const d = sha256(enc(rbWord(i))); RB_H[i] = (d[0] << 8) | d[1]; } } return RB_H; }
+const rbH = i => rbTable()[i];
+function rbHSalt(salt, i) { const d = sha256(concat(new Uint8Array([salt >> 8, salt & 255]), enc(rbWord(i)))); return (d[0] << 8) | d[1]; }
+const rbR = (j, d) => (d + j) % RB_N;               // reduce in step j: word number (digest + j) mod 17 576
+function rbChain(start, t) { const ws = [start], ds = []; let w = start; for (let j = 0; j < t; j++) { const d = rbH(w); ds.push(d); w = rbR(j, d); ws.push(w); } return { ws: ws, ds: ds }; }
+function rbBuild(m, t, seed) {
+  const r = rng(seed), used = new Uint8Array(RB_N), cover = new Uint8Array(RB_N), ends = new Map(), rows = [];
+  let hashes = 0;
+  while (rows.length < m) {
+    const s = Math.floor(r() * RB_N); if (used[s]) continue; used[s] = 1;
+    let w = s; cover[w] = 1;
+    for (let j = 0; j < t; j++) { w = rbR(j, rbH(w)); cover[w] = 1; hashes++; }
+    rows.push([s, w]);
+    if (!ends.has(w)) ends.set(w, []);
+    ends.get(w).push(s);
+  }
+  let c = 0; for (let i = 0; i < RB_N; i++) c += cover[i];
+  return { m: m, t: t, rows: rows, ends: ends, covered: c, hashes: hashes };
+}
+// every try of a lookup: "if d came from step j", finish the chain, look at the ends, rebuild if one matches
+function rbLookup(tab, d) {
+  const tries = []; let hashes = 0, found = null;
+  for (let j = tab.t - 1; j >= 0 && found === null; j--) {
+    let w = rbR(j, d);
+    for (let k = j + 1; k < tab.t; k++) { w = rbR(k, rbH(w)); hashes++; }
+    const tr = { j: j, end: w, starts: tab.ends.get(w) || [], res: "none", word: null };
+    for (const s of tr.starts) {
+      let x = s;
+      for (let k = 0; k < j; k++) { x = rbR(k, rbH(x)); hashes++; }
+      hashes++;
+      if (rbH(x) === d) { tr.res = "found"; tr.word = x; found = x; break; }
+      tr.res = "false";
+    }
+    tries.push(tr);
+  }
+  return { tries: tries, found: found, hashes: hashes };
+}
+
+// ---------- the users of the "store and attack" step (made up, not those of any exercise) ----------
+const USERS = [["mike", "hunter2"], ["nina", "rosebud"], ["olivia", "penguin42"], ["rupert", "rosebud"],
+               ["sybil", "Chelsea7"], ["trent", "letmein"], ["victor", "a8#Lq0vZt!"], ["wendy", "blue tulip river"]];
+function guessList() {
+  const top = ["123456", "password", "12345678", "111111", "abc123", "letmein", "admin", "welcome", "hunter2", "trustno1",
+               "000000", "iloveyou2", "qwerty1", "passw0rd", "starwars", "master", "hello123", "football1"];
+  const base = ["rose", "tiger", "penguin", "chelsea", "arsenal", "cookie", "ginger", "pepper", "rocket", "silver", "purple", "falcon",
+                "summer", "winter", "dolphin", "bubbles", "sparky", "mustang", "shadow", "flower", "angel", "pirate", "zebra", "rosebud"];
+  const suf = ["", "1", "7", "12", "42", "99", "123", "!", "2024"];
+  const out = [], seen = new Set();
+  for (const w of top) if (!seen.has(w)) { seen.add(w); out.push(w); }
+  for (const s of suf) for (const b of base) for (const w of [b, b[0].toUpperCase() + b.slice(1)]) { const x = w + s; if (!seen.has(x)) { seen.add(x); out.push(x); } }
+  return out;
+}
+const GUESSES = guessList();
+// the four databases
+function makeDB() {
+  const r = rng(2026);
+  const salts = USERS.map(() => { const s = new Uint8Array(16); for (let i = 0; i < 16; i++) s[i] = Math.floor(r() * 256); return s; });
+  return USERS.map((u, i) => ({
+    name: u[0], pw: u[1], sha: sha256hex(u[1]), salt: salts[i], salted: hex(sha256(concat(salts[i], enc(u[1])))),
+    bc: bcrypt(u[1], 4, b64enc(salts[i]))
+  }));
+}
+
+// ---------- reference numbers from the slides ----------
+const GPU = { md5: 164.1e9, sha1: 50.6e9, sha256: 21.98e9, bcrypt5: 184.0e3 };   // hashcat 6.2.6, one RTX 4090
+const C_LAPTOP = { 4: 1.7e-3, 8: 22e-3, 10: 88e-3, 12: 0.338 };                     // libxcrypt, i5-8265U
+const CLASSES = [["leak", 14e6], ["lower8", Math.pow(26, 8)], ["dice4", Math.pow(7776, 4)], ["rand12", Math.pow(94, 12)]];
+
+function selfTest() {
+  const f = [];
+  // SHA-256: FIPS 180-4 examples and the slides
+  if (sha256hex("") !== "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") f.push("SHA-256 ''");
+  if (sha256hex("abc") !== "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") f.push("SHA-256 abc");
+  if (sha256hex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq") !== "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1") f.push("SHA-256 2 blocks");
+  if (!sha256hex("Hello").startsWith("185f8db3") || !sha256hex("sunflower8").startsWith("4725a727")) f.push("SHA-256 slides");
+  // MD5: RFC 1321 test suite, Wang's pair
+  if (md5hex(enc("")) !== "d41d8cd98f00b204e9800998ecf8427e") f.push("MD5 ''");
+  if (md5hex(enc("abc")) !== "900150983cd24fb0d6963f7d28e17f72") f.push("MD5 abc");
+  if (md5hex(enc("12345678901234567890123456789012345678901234567890123456789012345678901234567890")) !== "57edf4a22be3c955ac49da2e2107b67a") f.push("MD5 80 digits");
+  const ta = md5Trace(WANG_A), tb = md5Trace(WANG_B);
+  if (ta.digest !== "79054025255fb1a26e4bc422aef54eb4" || tb.digest !== ta.digest) f.push("Wang's pair");
+  if (ta.states[0] === tb.states[0] || ta.states[1] !== tb.states[1]) f.push("Wang: states after blocks 1 and 2");
+  const sfx = enc("any suffix at all");
+  if (md5hex(concat(WANG_A, sfx)) !== md5hex(concat(WANG_B, sfx))) f.push("Wang + suffix");
+  // bcrypt: pyca/bcrypt test vector (also on the slides) and the counts of the slides
+  if (bcrypt("Kk4DQuMMfZL9o", 4, "cVWp4XaNU8a4v1uMRum2SO") !== "$2b$04$cVWp4XaNU8a4v1uMRum2SO026BWLIoQMD/TXg5uZV.0P.uO8m3YEm") f.push("bcrypt vector");
+  if (!bcryptCheck("Kk4DQuMMfZL9o", "$2b$04$cVWp4XaNU8a4v1uMRum2SO026BWLIoQMD/TXg5uZV.0P.uO8m3YEm") || bcryptCheck("Kk4DQuMMfZL9p", "$2b$04$cVWp4XaNU8a4v1uMRum2SO026BWLIoQMD/TXg5uZV.0P.uO8m3YEm")) f.push("bcrypt check");
+  if (PI_WORDS[0] !== 0x243f6a88 || PI_WORDS[18] !== 0xd1310ba6) f.push("pi tables");
+  let writes = 0; const S0 = PI_WORDS.slice(); expandKey(S0, words18(enc("x\0")), null, () => writes++);
+  if (writes !== 521 || 65 * 521 + 192 !== 34057) f.push("521 encryptions per key setup");
+  // the toy rainbow chain and lookup of the slides
+  const c = rbChain(rbIndex("sun"), 4);
+  if (c.ws.map(rbWord).join(" ") !== "sun oyn crf iah nur" || c.ds.map(d => d.toString(16).padStart(4, "0")).join(" ") !== "2775 0706 9e75 adba") f.push("rainbow chain");
+  if (rbWord(rbR(3, 0x9e75)) !== "iai" || rbWord(rbR(2, 0x9e75)) !== "iah") f.push("rainbow lookup");
+  const one = { t: 4, ends: new Map([[rbIndex("nur"), [rbIndex("sun")]]]) };
+  const lk = rbLookup(one, 0x9e75);
+  if (lk.found === null || rbWord(lk.found) !== "crf" || lk.tries.length !== 2) f.push("rainbow walk");
+  // birthday numbers and the bill of the slides
+  if (Math.abs(1.18 * Math.sqrt(365) - 22.54) > 0.01) f.push("1.18 sqrt(365)");
+  let pn = 1; for (let i = 0; i < 23; i++) pn *= (365 - i) / 365;
+  if (Math.abs(1 - pn - 0.5073) > 0.0001) f.push("P(23)");
+  if (GPU.bcrypt5 / 128 !== 1437.5 || Math.abs(14e6 / GPU.sha256 * 1000 - 0.637) > 0.001) f.push("bill");
+  // none of the users' passwords is a password of an exercise
+  for (const u of USERS) if (["monkey123", "Liverpool1", "iloveyou", "qwerty", "dragon2024", "123456", "Summer2025", "football!", "sunshine"].includes(u[1])) f.push("user " + u[0]);
+  return f;
+}
+// CORE-END
+
+/* ===================== texts (EN and PL) ===================== */
+const T = {
+  en: {
+    title: "Collisions and passwords explorer", home: "All simulators",
+    intro: "Where a hash is beaten without reversing it. Pick a step on the left.",
+    stepOf: n => "Step " + n + " of 5 · Breaking hashes",
+    steps: [["Birthdays", "any pair or a given value"], ["One collision gives many", "Wang's MD5 pair, block by block"],
+            ["Store and attack", "four ways to store a password"], ["Rainbow table", "build chains, look a digest up"],
+            ["The cost dial", "the server's time and Mallory's"]],
+    explain: [
+      ["A repeat comes after about √N picks", "Draw random values from N possible ones. Any pair: stop at the first value seen twice. A given value: stop when one fixed value comes up. Run it many times and watch where the runs end."],
+      ["Equal states, equal digests", "MD5 reads 64-byte blocks and carries a 16-byte state. Wang's two messages differ in 6 bytes; after block 1 the states differ, after block 2 they are equal again. From there on, any common text keeps them equal."],
+      ["The same guesses against four databases", "Mallory stole the user table of a web shop and tries a list of common passwords. Change how the shop stored the passwords and watch her work counter."],
+      ["Trade time for memory", "A toy: passwords of 3 lowercase letters, a hash of 16 bits. Mallory builds chains once and keeps only their two ends. Later she finds a password from its digest by finishing chains."],
+      ["One setting for both sides", "bcrypt's cost doubles the work at every +1. Bob's server pays once per login; Mallory pays once per guess. Turn the dial and compare."]],
+    selfOk: "✓ self-test: SHA-256 and MD5 vectors, Wang's pair, bcrypt vector, slide numbers", selfBad: f => "✗ self-test failed: " + f,
+    moreBelow: "More below", keys: "← / → : previous / next step",
+    // step 1
+    nLbl: "N =", modeLbl: "stop at", any: "any pair", given: "a given value", one: "one run", nonstop: "non-stop", stop: "stop", reset: "reset",
+    runs: "runs", median: "median of the runs", mean: "mean", predAny: "1.18 √N", predGiven: "N ln 2 (median)",
+    lastRun: (k, v, a, b) => "Last run: " + k + " draws. " + (a === null ? "Value " + v + " came up." : "Draw " + a + " and draw " + b + " both gave " + v + "."),
+    daysCap: "the 365 days of the last run: violet = drawn, orange = drawn twice, pink frame = the given day",
+    histCap: "how many draws each run needed (thousands of runs)",
+    why1: "Any pair: every new draw can match any earlier one, so the chances add up like the pairs, n(n−1)/2. A given value: each draw has only a 1 in N chance.",
+    // step 2
+    bytesCap: "Wang's 128 bytes: orange = the 6 bytes where A and B differ (always by 0x80)",
+    stTab: "the MD5 state after each block", blk: "block", fileA: "A", fileB: "B", same: "equal", diff: "different",
+    suffixLbl: "common suffix (type anything)", padNote: "the last block also holds the padding and the length",
+    digestRow: "digest (the last state)",
+    viewerH: "A viewer that shows two contents", rule: "the rule, in the common suffix",
+    page1: "page 1", page2: "page 2", shows: "the viewer shows", md5same: "MD5 of both files", sha256of: "SHA-256 of both files",
+    whyV: "Both files contain both pages and the rule. The only difference is inside the collision block, and the rule reads one of those bytes.",
+    // step 3
+    tabs: ["plain text", "SHA-256", "SHA-256 with salt", "bcrypt, cost 4"],
+    tabNotes: ["The shop stored the passwords themselves. Mallory needs no work at all.",
+               "The shop stored SHA-256(password). Mallory hashes each guess once and compares it with every user.",
+               "The shop stored a random salt per user and SHA-256(salt + password). Each guess must be hashed again for every user.",
+               "The shop stored bcrypt texts (cost 4, the lowest). Same work as with salt, but each hash is thousands of times slower."],
+    colUser: "user", colStored: "stored", colSalt: "salt", colFound: "Mallory found",
+    attack: "attack", stopAttack: "stop", again: "reset",
+    guessesN: n => "Mallory's list: " + n + " common passwords (most likely first).",
+    stTried: "guesses tried", stHashes: "hash computations", stCracked: "users cracked", stTime: "time", stRate: "hashes per second",
+    sameDig: "same digest: same password", readsAll: "she just reads the table",
+    // step 4
+    buildH: "1. Build the table", mLbl: "chains m", tLbl: "chain length t", build: "build", built: (m, t, h, c) => m + " chains × " + t + " steps: " + h.toLocaleString("en") + " hashes once; the table keeps " + m + " pairs (start, end) and covers " + c + " of the 17 576 words.",
+    lookH: "2. Look a digest up", wordLbl: "the victim's password", rand: "random word", nextTry: "next try", allTries: "all tries",
+    tryCol: "try", ifCol: "if the digest came from step", endCol: "finish the chain: end", resCol: "result",
+    resNone: "no chain ends here", resFalse: "a chain ends here, but rebuilding it does not give the digest: false alarm", resFound: w => "rebuilt from its start: found " + w,
+    lkDone: (w, h) => w === null ? "Not found: the word is not covered by the table (" + h + " hashes)." : "Found " + w + " after " + h + " hashes (building cost the hashes above once).",
+    otherWord: "another word with the same 16-bit digest: it logs in just as well",
+    saltH: "3. Add a salt", saltOn: "the shop adds a 16-bit salt", saltNote: s => "Salt " + s + ": the stored digest is h(salt + password). The table was built without salt, so its chains never contain this digest; every lookup fails or gives a false word. Mallory would need one table per salt value: 65 536 tables.",
+    // step 5
+    costLbl: "cost", devLbl: "Mallory guesses on", gpu: "one RTX 4090 graphics card", cpu: "this browser",
+    srvH: "Bob's server: one bcrypt per login", malH: "Mallory: try every choice for one salted user",
+    measure: "measure this browser", measuring: "measuring…",
+    cLaptop: "a laptop, C library (measured)", thisB: "this browser (measured, ×2 per cost)",
+    cls: { leak: "a word from a leak list", lower8: "8 random lowercase letters", dice4: "4 random words from 7 776", rand12: "12 random characters (94 kinds)" },
+    choices: "choices", withSha: "SHA-256", withBc: c => "bcrypt, cost " + c,
+    rateNote: (r, c) => "bcrypt at cost " + c + ": " + r + " guesses per second.",
+    insideH: "Inside one bcrypt: the tables being rewritten", play: "play", pause: "pause", stepOne: "one encryption", speed: "speed",
+    insideCap: "1042 words of 32 bits: the 18 words P (top left), then the 4 S-boxes of 256 words. Orange = just written.",
+    insideStat: (k, K, e, E) => "key setup " + k + " of " + K + " · Blowfish encryptions " + e.toLocaleString("en") + " of " + E.toLocaleString("en"),
+    insideWhy: "Each key setup rewrites all 4 KB with 521 Blowfish encryptions, and each encryption reads the tables at addresses that depend on the data. Cost 4 needs 1 + 2 × 16 = 33 key setups.",
+    units: { ms: "ms", s: "s", min: "min", h: "hours", d: "days", y: "years", ky: "thousand years", My: "million years", By: "billion years", more: "longer than the age of the universe" }
+  },
+  pl: {
+    title: "Kolizje i hasła: symulator", home: "Wszystkie symulatory",
+    intro: "Jak pokonać funkcję skrótu, nie odwracając jej. Wybierz krok po lewej.",
+    stepOf: n => "Krok " + n + " z 5 · Łamanie skrótów",
+    steps: [["Urodziny", "dowolna para albo dana wartość"], ["Jedna kolizja daje wiele", "para MD5 Wanga, blok po bloku"],
+            ["Przechowywanie i atak", "cztery sposoby przechowywania hasła"], ["Tablica tęczowa", "budowa łańcuchów, wyszukiwanie"],
+            ["Pokrętło kosztu", "czas serwera i czas Mallory"]],
+    explain: [
+      ["Powtórka przychodzi po około √N losowaniach", "Losuj wartości spośród N możliwych. Dowolna para: koniec przy pierwszej wartości, która wypadła drugi raz. Dana wartość: koniec, gdy wypadnie jedna ustalona wartość. Powtórz wiele razy i zobacz, gdzie kończą się przebiegi."],
+      ["Równe stany, równe skróty", "MD5 czyta bloki po 64 bajty i niesie 16-bajtowy stan. Dwie wiadomości Wanga różnią się 6 bajtami; po bloku 1 stany są różne, po bloku 2 znów równe. Od tego miejsca każdy wspólny tekst zostawia je równe."],
+      ["Te same zgadnięcia na czterech bazach", "Mallory ukradła tabelę użytkowników sklepu i próbuje listy popularnych haseł. Zmień sposób przechowywania haseł i patrz na licznik jej pracy."],
+      ["Czas za pamięć", "Zabawka: hasła z 3 małych liter, skrót 16-bitowy. Mallory raz buduje łańcuchy i zapisuje tylko ich końce. Potem znajduje hasło do skrótu, licząc łańcuchy do końca."],
+      ["Jedno ustawienie dla obu stron", "Koszt bcrypt podwaja pracę przy każdym +1. Serwer Boba płaci raz na logowanie, Mallory raz na zgadnięcie. Przekręć pokrętło i porównaj."]],
+    selfOk: "✓ autotest: wektory SHA-256 i MD5, para Wanga, wektor bcrypt, liczby ze slajdów", selfBad: f => "✗ autotest nie przeszedł: " + f,
+    moreBelow: "Więcej niżej", keys: "← / → : poprzedni / następny krok",
+    nLbl: "N =", modeLbl: "koniec przy", any: "dowolnej parze", given: "danej wartości", one: "jeden przebieg", nonstop: "bez przerwy", stop: "stop", reset: "od nowa",
+    runs: "przebiegi", median: "mediana przebiegów", mean: "średnia", predAny: "1,18 √N", predGiven: "N ln 2 (mediana)",
+    lastRun: (k, v, a, b) => "Ostatni przebieg: " + k + " losowań. " + (a === null ? "Wypadła wartość " + v + "." : "Losowanie " + a + " i losowanie " + b + " dały " + v + "."),
+    daysCap: "365 dni ostatniego przebiegu: fiolet = wylosowany, pomarańczowy = dwa razy, różowa ramka = dany dzień",
+    histCap: "ile losowań potrzebował każdy przebieg (tysiące przebiegów)",
+    why1: "Dowolna para: każde nowe losowanie może trafić w dowolne wcześniejsze, więc szanse sumują się jak pary, n(n−1)/2. Dana wartość: każde losowanie ma tylko szansę 1 na N.",
+    bytesCap: "128 bajtów Wanga: pomarańczowe = 6 bajtów, w których A i B się różnią (zawsze o 0x80)",
+    stTab: "stan MD5 po każdym bloku", blk: "blok", fileA: "A", fileB: "B", same: "równe", diff: "różne",
+    suffixLbl: "wspólna końcówka (wpisz cokolwiek)", padNote: "ostatni blok zawiera też dopełnienie i długość",
+    digestRow: "skrót (ostatni stan)",
+    viewerH: "Przeglądarka, która pokazuje dwie treści", rule: "reguła, we wspólnej końcówce",
+    page1: "strona 1", page2: "strona 2", shows: "przeglądarka pokazuje", md5same: "MD5 obu plików", sha256of: "SHA-256 obu plików",
+    whyV: "Oba pliki zawierają obie strony i regułę. Jedyna różnica jest w bloku kolizji, a reguła czyta jeden z tych bajtów.",
+    tabs: ["jawny tekst", "SHA-256", "SHA-256 z solą", "bcrypt, koszt 4"],
+    tabNotes: ["Sklep zapisał same hasła. Mallory nie musi nic liczyć.",
+               "Sklep zapisał SHA-256(hasło). Mallory liczy skrót każdego zgadnięcia raz i porównuje ze wszystkimi.",
+               "Sklep zapisał losową sól dla każdego użytkownika i SHA-256(sól + hasło). Każde zgadnięcie trzeba liczyć od nowa dla każdego użytkownika.",
+               "Sklep zapisał teksty bcrypt (koszt 4, najniższy). Praca jak z solą, ale każdy skrót jest tysiące razy wolniejszy."],
+    colUser: "użytkownik", colStored: "zapisane", colSalt: "sól", colFound: "Mallory znalazła",
+    attack: "atak", stopAttack: "stop", again: "od nowa",
+    guessesN: n => "Lista Mallory: " + n + " popularnych haseł (najbardziej prawdopodobne najpierw).",
+    stTried: "sprawdzone zgadnięcia", stHashes: "obliczenia skrótu", stCracked: "złamani użytkownicy", stTime: "czas", stRate: "skrótów na sekundę",
+    sameDig: "ten sam skrót: to samo hasło", readsAll: "po prostu czyta tabelę",
+    buildH: "1. Budowa tablicy", mLbl: "łańcuchy m", tLbl: "długość łańcucha t", build: "zbuduj", built: (m, t, h, c) => m + " łańcuchów × " + t + " kroków: " + h.toLocaleString("pl") + " skrótów raz; tablica trzyma " + m + " par (początek, koniec) i obejmuje " + c + " z 17 576 słów.",
+    lookH: "2. Wyszukanie skrótu", wordLbl: "hasło ofiary", rand: "losowe słowo", nextTry: "następna próba", allTries: "wszystkie próby",
+    tryCol: "próba", ifCol: "jeśli skrót był w kroku", endCol: "dokończ łańcuch: koniec", resCol: "wynik",
+    resNone: "żaden łańcuch tu się nie kończy", resFalse: "łańcuch tu się kończy, ale odbudowany nie daje skrótu: fałszywy alarm", resFound: w => "odbudowany od początku: znaleziono " + w,
+    lkDone: (w, h) => w === null ? "Nie znaleziono: tablica nie obejmuje tego słowa (" + h + " skrótów)." : "Znaleziono " + w + " po " + h + " skrótach (budowa kosztowała raz skróty podane wyżej).",
+    otherWord: "inne słowo z tym samym 16-bitowym skrótem: loguje tak samo dobrze",
+    saltH: "3. Dodaj sól", saltOn: "sklep dodaje 16-bitową sól", saltNote: s => "Sól " + s + ": zapisany skrót to h(sól + hasło). Tablica powstała bez soli, więc jej łańcuchy nigdy nie zawierają tego skrótu; każde wyszukanie zawodzi albo daje fałszywe słowo. Mallory potrzebowałaby jednej tablicy na każdą sól: 65 536 tablic.",
+    costLbl: "koszt", devLbl: "Mallory zgaduje na", gpu: "jednej karcie RTX 4090", cpu: "tej przeglądarce",
+    srvH: "Serwer Boba: jeden bcrypt na logowanie", malH: "Mallory: wszystkie możliwości dla jednego użytkownika z solą",
+    measure: "zmierz tę przeglądarkę", measuring: "mierzę…",
+    cLaptop: "laptop, biblioteka w C (pomiar)", thisB: "ta przeglądarka (pomiar, ×2 na koszt)",
+    cls: { leak: "słowo z listy wycieku", lower8: "8 losowych małych liter", dice4: "4 losowe słowa z 7776", rand12: "12 losowych znaków (94 rodzaje)" },
+    choices: "możliwości", withSha: "SHA-256", withBc: c => "bcrypt, koszt " + c,
+    rateNote: (r, c) => "bcrypt przy koszcie " + c + ": " + r + " zgadnięć na sekundę.",
+    insideH: "Wewnątrz jednego bcrypt: przepisywane tablice", play: "start", pause: "pauza", stepOne: "jedno szyfrowanie", speed: "szybkość",
+    insideCap: "1042 słowa po 32 bity: 18 słów P (lewy górny róg), potem 4 S-boxy po 256 słów. Pomarańczowe = właśnie zapisane.",
+    insideStat: (k, K, e, E) => "ustawienie klucza " + k + " z " + K + " · szyfrowania Blowfish " + e.toLocaleString("pl") + " z " + E.toLocaleString("pl"),
+    insideWhy: "Każde ustawienie klucza przepisuje całe 4 KB 521 szyfrowaniami Blowfish, a każde szyfrowanie czyta tablice pod adresami zależnymi od danych. Koszt 4 to 1 + 2 × 16 = 33 ustawienia klucza.",
+    units: { ms: "ms", s: "s", min: "min", h: "godz.", d: "dni", y: "lat", ky: "tys. lat", My: "mln lat", By: "mld lat", more: "dłużej niż wiek Wszechświata" }
+  }
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const fmt = n => Math.round(n).toLocaleString(lang);
+function dur(sec) {
+  const u = L().units;
+  if (!isFinite(sec) || sec > 4.4e17) return u.more;
+  const y = sec / 3.156e7;
+  if (sec < 1) return (sec * 1000).toPrecision(2) + " " + u.ms;
+  if (sec < 60) return sec.toPrecision(2) + " " + u.s;
+  if (sec < 3600) return (sec / 60).toPrecision(2) + " " + u.min;
+  if (sec < 86400 * 2) return (sec / 3600).toPrecision(2) + " " + u.h;
+  if (y < 1) return (sec / 86400).toPrecision(2) + " " + u.d;
+  if (y < 1e3) return y.toPrecision(2).replace(/e\+?/, "e") + " " + u.y;
+  if (y < 1e6) return (y / 1e3).toPrecision(2) + " " + u.ky;
+  if (y < 1e9) return (y / 1e6).toPrecision(2) + " " + u.My;
+  return (y / 1e9).toPrecision(2) + " " + u.By;
+}
+
+const app = {
+  level: 0, card: 1,
+  b: { N: 365, mode: "any", hist: new Map(), runs: 0, sum: 0, all: [], last: null, run: false, stamp: null, id: 0 },
+  c: { suffix: "Any common text at all.", p1: "Bob gets the bike.", p2: "Bob gets the bike and 500 pounds." },
+  s: { tab: 1, db: null, st: null, timer: 0 },
+  r: { m: 300, t: 40, tab: null, word: "", look: null, shown: 0, salt: false, saltV: 0 },
+  k: { cost: 12, dev: "gpu", t6: null, anim: null }
+};
+
+/* ---------- step 1: birthdays ---------- */
+function bReset() { const b = app.b; b.hist = new Map(); b.runs = 0; b.sum = 0; b.all = []; b.last = null; b.stamp = null; }
+function bOneRun(keep) {
+  const b = app.b, N = b.N;
+  if (!b.stamp || b.stamp.length !== N) { b.stamp = new Uint32Array(N); b.pos = new Uint32Array(N); b.id = 0; }
+  b.id++;
+  if (b.id === 0xFFFFFFFF) { b.stamp.fill(0); b.id = 1; }
+  let k = 0, v, a = null, drawn = keep ? [] : null;
+  if (b.mode === "any") {
+    for (;;) { v = Math.floor(Math.random() * N); k++; if (drawn) drawn.push(v); if (b.stamp[v] === b.id) { a = b.pos[v]; break; } b.stamp[v] = b.id; b.pos[v] = k; }
+  } else {
+    for (;;) { v = Math.floor(Math.random() * N); k++; if (drawn) drawn.push(v); if (v === 0) break; }
+  }
+  b.runs++; b.sum += k; b.all.push(k);
+  b.hist.set(k, (b.hist.get(k) || 0) + 1);
+  if (keep) b.last = { k: k, v: v, a: a, drawn: drawn };
+  return k;
+}
+function bLoop() {
+  const b = app.b;
+  if (!b.run || app.level !== 0) { b.run = false; return; }
+  const t0 = performance.now();
+  let n = 0;
+  while (performance.now() - t0 < 25) { bOneRun(false); n++; if (b.mode === "given" && b.N > 365 && n > 3) break; }
+  bOneRun(true);
+  updB();
+  requestAnimationFrame(bLoop);
+}
+function median(arr) { if (!arr.length) return 0; const s = arr.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
+function render0() {
+  const t = L(), b = app.b;
+  const nb = [[365, "365"], [65536, "2<sup>16</sup>"], [1048576, "2<sup>20</sup>"]].map(([n, l]) => '<button data-action="bn" data-n="' + n + '" aria-pressed="' + (b.N === n) + '">' + l + "</button>").join("");
+  const mb = ["any", "given"].map(m => '<button data-action="bm" data-m="' + m + '" aria-pressed="' + (b.mode === m) + '">' + t[m] + "</button>").join("");
+  return '<div class="card"><div class="btns"><span class="seg"><span class="lbl">' + t.nLbl + "</span>" + nb + '</span><span class="seg"><span class="lbl">' + t.modeLbl + "</span>" + mb + "</span></div>" +
+    '<div class="btns"><button class="dark" data-action="b1">' + t.one + '</button><button data-action="bgo" id="bgo">' + (b.run ? t.stop : t.nonstop) + '</button><button data-action="br">' + t.reset + "</button></div>" +
+    '<div class="stats" id="bstats"></div><div id="blast" class="note"></div><div id="bdays"></div>' +
+    '<canvas id="bhist" width="900" height="260"></canvas><div class="note">' + t.histCap + '</div><div class="why">' + t.why1 + "</div></div>";
+}
+function updB() {
+  const t = L(), b = app.b;
+  const st = document.getElementById("bstats"); if (!st) return;
+  const pred = b.mode === "any" ? 1.18 * Math.sqrt(b.N) : b.N * Math.LN2;
+  const med = b.all.length ? median(b.all.length > 4000 ? b.all.slice(-4000) : b.all) : 0;
+  st.innerHTML = '<div class="stat"><small>' + t.runs + "</small><b>" + fmt(b.runs) + '</b></div><div class="stat"><small>' + t.median + "</small><b>" + (b.runs ? fmt(med) : "–") +
+    '</b></div><div class="stat"><small>' + t.mean + "</small><b>" + (b.runs ? fmt(b.sum / b.runs) : "–") + '</b></div><div class="stat" style="border-color:var(--chg)"><small>' + (b.mode === "any" ? t.predAny : t.predGiven) + "</small><b>" + fmt(pred) + "</b></div>";
+  const l = b.last;
+  document.getElementById("blast").textContent = l ? t.lastRun(fmt(l.k), l.v, l.a === null ? null : l.a, l.k) : "";
+  const dd = document.getElementById("bdays");
+  if (b.N === 365) {
+    let cells = new Array(365).fill("");
+    if (l) { for (const v of l.drawn) cells[v] = "hit"; cells[l.v] = b.mode === "any" ? "rep" : "hit"; }
+    dd.innerHTML = '<div class="days">' + cells.map((c, i) => '<span class="' + c + (b.mode === "given" && i === 0 ? " tgt" : "") + '"></span>').join("") + '</div><div class="note">' + t.daysCap + "</div>";
+  } else dd.innerHTML = "";
+  drawHist(pred, med);
+}
+function drawHist(pred, med) {
+  const cv = document.getElementById("bhist"); if (!cv) return;
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height, b = app.b, cs = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, W, H);
+  const xmax = b.mode === "any" ? 3.5 * Math.sqrt(b.N) : 4 * b.N, bins = 60, cnt = new Array(bins).fill(0);
+  for (const [k, c] of b.hist) { const i = Math.min(bins - 1, Math.floor(k / xmax * bins)); cnt[i] += c; }
+  const top = Math.max(1, ...cnt), x0 = 40, y0 = H - 28, w = (W - x0 - 10) / bins;
+  g.fillStyle = cs.getPropertyValue("--ink").trim();
+  for (let i = 0; i < bins; i++) { const h = (y0 - 10) * cnt[i] / top; g.fillRect(x0 + i * w + 1, y0 - h, w - 2, h); }
+  g.strokeStyle = cs.getPropertyValue("--rule").trim(); g.beginPath(); g.moveTo(x0, y0); g.lineTo(W - 10, y0); g.stroke();
+  g.fillStyle = cs.getPropertyValue("--muted").trim(); g.font = "12px sans-serif";
+  for (let i = 0; i <= 4; i++) { const v = xmax * i / 4; g.fillText(fmt(v), x0 + (W - x0 - 10) * i / 4 - 8, H - 8); }
+  const mark = (v, col, txt, y) => { const x = x0 + (W - x0 - 10) * v / xmax; g.strokeStyle = col; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(x, 6); g.lineTo(x, y0); g.stroke(); g.setLineDash([]); g.lineWidth = 1; g.fillStyle = col; g.font = "bold 13px sans-serif"; g.fillText(txt, x + 5, y); };
+  mark(pred, cs.getPropertyValue("--chg").trim(), (b.mode === "any" ? L().predAny : L().predGiven) + " = " + fmt(pred), 18);
+  if (b.runs) mark(med, cs.getPropertyValue("--pw-b").trim(), L().median + " = " + fmt(med), 36);
+}
+
+/* ---------- step 2: one collision gives many ---------- */
+function render1() {
+  const t = L();
+  const bytes = Array.from(WANG_A, (x, i) => '<span class="' + (WANG_DIFF.includes(i) ? "d" : "") + '" title="byte ' + i + ": A " + x.toString(16).padStart(2, "0") + ", B " + WANG_B[i].toString(16).padStart(2, "0") + '">' + x.toString(16).padStart(2, "0") + "</span>").join("");
+  return '<div class="card"><h3>' + t.bytesCap + '</h3><div class="bytes">' + bytes + "</div>" +
+    '<div class="btns"><label class="note" style="font-weight:600">' + t.suffixLbl + '</label><input data-field="suffix" style="flex:1;min-width:260px" value="' + esc(app.c.suffix) + '"></div>' +
+    '<h3 style="margin-top:12px">' + t.stTab + '</h3><div style="overflow-x:auto"><table class="t" id="mdtab"></table></div><div class="note">' + t.padNote + "</div></div>" +
+    '<div class="card"><h3>' + t.viewerH + '</h3><div class="flex"><div><div class="btns"><label class="note" style="font-weight:600;min-width:4em">' + t.page1 + '</label><input data-field="p1" style="flex:1" value="' + esc(app.c.p1) + '"></div>' +
+    '<div class="btns"><label class="note" style="font-weight:600;min-width:4em">' + t.page2 + '</label><input data-field="p2" style="flex:1" value="' + esc(app.c.p2) + '"></div>' +
+    '<div class="note" style="margin-top:6px">' + t.rule + ':</div><div class="code"><span class="k">if</span> (data[19] == 0x87) show(page_1);   <span class="c">/* A: 0x87 */</span>\n<span class="k">else</span>                  show(page_2);   <span class="c">/* B: 0x07 */</span></div></div>' +
+    '<div id="views"></div></div><div class="why">' + t.whyV + "</div></div>";
+}
+function viewerFile(base) { return concat(concat(base, enc(app.c.p1)), concat(new Uint8Array([0]), enc(app.c.p2))); }
+function viewerShow(data) { const sep = data.indexOf(0, 128); return new TextDecoder().decode(data[19] === 0x87 ? data.subarray(128, sep) : data.subarray(sep + 1)); }
+function updC() {
+  const t = L(), tab = document.getElementById("mdtab"); if (!tab) return;
+  const sfx = enc(app.c.suffix), A = md5Trace(concat(WANG_A, sfx)), B = md5Trace(concat(WANG_B, sfx));
+  let h = "<tr><th>" + t.blk + "</th><th>" + t.fileA + "</th><th>" + t.fileB + "</th><th></th></tr>";
+  for (let i = 0; i < A.states.length; i++) {
+    const eq = A.states[i] === B.states[i], last = i === A.states.length - 1;
+    const lbl = (i + 1) + (i < 2 ? " (Wang)" : "") + (last ? " · " + t.digestRow : "");
+    h += "<tr><td>" + lbl + '</td><td class="m"><span class="cell ' + (last ? "r-dig" : "r-neu") + '">' + A.states[i] + '</span></td><td class="m"><span class="cell ' + (last ? "r-dig" : "r-neu") + (eq ? "" : " chg") + '">' + B.states[i] +
+      '</span></td><td class="' + (eq ? "okline" : "badline") + '">' + (eq ? t.same : t.diff) + "</td></tr>";
+  }
+  tab.innerHTML = h;
+  const fa = viewerFile(WANG_A), fb = viewerFile(WANG_B);
+  document.getElementById("views").innerHTML = ["A", "B"].map((n, i) => '<div class="note" style="margin-top:6px">' + t.shows + " (" + n + "):</div><div class=\"viewer\">" + esc(viewerShow(i ? fb : fa)) + "</div>").join("") +
+    '<div class="note" style="margin-top:8px">' + t.md5same + ':</div><div><span class="cell r-dig">' + md5hex(fa) + '</span> <span class="cell r-dig">' + md5hex(fb) + "</span> " + (md5hex(fa) === md5hex(fb) ? '<span class="okline">' + t.same + "</span>" : "") + "</div>" +
+    '<div class="note" style="margin-top:6px">' + t.sha256of + ':</div><div><span class="cell r-dig">' + sha256hex(fa).slice(0, 16) + '…</span> <span class="cell r-dig">' + sha256hex(fb).slice(0, 16) + '…</span> <span class="badline">' + t.diff + "</span></div>";
+}
+
+/* ---------- step 3: store and attack ---------- */
+function render2() {
+  const t = L(), s = app.s;
+  if (!s.db) s.db = makeDB();
+  return '<div class="card"><div class="tabs">' + t.tabs.map((x, i) => '<button data-action="tab" data-i="' + i + '" aria-pressed="' + (s.tab === i) + '">' + x + "</button>").join("") + "</div>" +
+    '<p class="note" id="tabnote"></p><div style="overflow-x:auto"><table class="t" id="dbtab"></table></div>' +
+    '<p class="note">' + t.guessesN(GUESSES.length) + '</p><div class="btns"><button class="dark" data-action="atk" id="atk">' + t.attack + '</button><button data-action="atkr">' + t.again + "</button></div>" +
+    '<div class="bar"><span id="atkbar"></span></div><div class="stats" id="atkstats"></div></div>';
+}
+function storedCell(u) {
+  const tab = app.s.tab;
+  if (tab === 0) return '<span class="cell r-pw">' + esc(u.pw) + "</span>";
+  if (tab === 1) return '<span class="cell r-dig">' + u.sha.slice(0, 20) + "…</span>";
+  if (tab === 2) return '<span class="cell r-salt">' + hex(u.salt).slice(0, 12) + '…</span> <span class="cell r-dig">' + u.salted.slice(0, 20) + "…</span>";
+  const p = u.bc; return '<span class="cell r-neu">' + p.slice(0, 7) + '</span><span class="cell r-salt">' + p.slice(7, 29) + '</span><span class="cell r-dig">' + p.slice(29, 41) + "…</span>";
+}
+function updS() {
+  const t = L(), s = app.s, tb = document.getElementById("dbtab"); if (!tb) return;
+  document.getElementById("tabnote").textContent = t.tabNotes[s.tab];
+  const st = s.st, counts = {};
+  if (s.tab === 1) for (const u of s.db) counts[u.sha] = (counts[u.sha] || 0) + 1;
+  let h = "<tr><th>" + t.colUser + "</th><th>" + t.colStored + "</th><th>" + t.colFound + "</th></tr>";
+  s.db.forEach((u, i) => {
+    const f = st && st.found[i];
+    h += '<tr><td><span class="cell r-srv">' + u.name + "</span></td><td>" + storedCell(u) + (s.tab === 1 && counts[u.sha] > 1 ? ' <span class="pill" style="border-color:var(--chg);color:var(--chg)">' + t.sameDig + "</span>" : "") +
+      "</td><td>" + (f ? '<span class="cell r-mal">' + esc(f) + "</span>" : "") + "</td></tr>";
+  });
+  tb.innerHTML = h;
+  const S = document.getElementById("atkstats");
+  if (!st) { S.innerHTML = ""; document.getElementById("atkbar").style.width = "0"; document.getElementById("atk").textContent = t.attack; return; }
+  const el = st.ms / 1000, cr = st.found.filter(x => x).length;
+  S.innerHTML = '<div class="stat r-mal"><small>' + t.stTried + "</small><b>" + fmt(st.tried) + '</b></div><div class="stat r-mal"><small>' + t.stHashes + "</small><b>" + fmt(st.hashes) + (s.tab === 0 ? '</b><small>' + t.readsAll + "</small>" : "</b>") +
+    '</div><div class="stat r-mal"><small>' + t.stCracked + "</small><b>" + cr + " / " + s.db.length + '</b></div><div class="stat"><small>' + t.stTime + "</small><b>" + el.toFixed(2) + ' s</b></div><div class="stat"><small>' + t.stRate + "</small><b>" + (el > 0 && st.hashes ? fmt(st.hashes / el) : "–") + "</b></div>";
+  document.getElementById("atkbar").style.width = (100 * st.progress) + "%";
+  document.getElementById("atk").textContent = st.running ? t.stopAttack : t.attack;
+}
+function atkStart() {
+  const s = app.s;
+  if (s.st && s.st.running) { s.st.running = false; updS(); return; }
+  const db = s.db, n = db.length, G = GUESSES.length;
+  const st = s.st = { tried: 0, hashes: 0, found: new Array(n).fill(null), ms: 0, running: true, progress: 0, u: 0, g: 0 };
+  if (s.tab === 0) { db.forEach((u, i) => { st.found[i] = u.pw; }); st.running = false; st.progress = 1; updS(); return; }
+  const tick = () => {
+    if (!st.running || s.st !== st || app.level !== 2) { st.running = false; return; }
+    const t0 = performance.now();
+    if (s.tab === 1) {
+      while (st.g < G && performance.now() - t0 < 20) {
+        const d = sha256hex(GUESSES[st.g]); st.hashes++; st.tried++;
+        for (let i = 0; i < n; i++) if (!st.found[i] && db[i].sha === d) st.found[i] = GUESSES[st.g];
+        st.g++;
+      }
+      st.progress = st.g / G;
+      if (st.g >= G) st.running = false;
+    } else {
+      while (st.u < n && performance.now() - t0 < 20) {
+        const u = db[st.u], gw = GUESSES[st.g];
+        const hit = s.tab === 2 ? hex(sha256(concat(u.salt, enc(gw)))) === u.salted : bcryptCheck(gw, u.bc);
+        st.hashes++; st.tried++;
+        if (hit) { st.found[st.u] = gw; st.u++; st.g = 0; }
+        else if (++st.g >= G) { st.u++; st.g = 0; }
+      }
+      st.progress = (st.u + st.g / G) / n;
+      if (st.u >= n) st.running = false;
+    }
+    st.ms += performance.now() - t0;
+    updS();
+    if (st.running) setTimeout(tick, 0);
+  };
+  updS(); setTimeout(tick, 0);
+}
+
+/* ---------- step 4: rainbow table ---------- */
+function render3() {
+  const t = L(), r = app.r;
+  return '<div class="card"><h3>' + t.buildH + '</h3><div class="chain" id="rbdemo"></div><div class="btns"><label class="note">' + t.mLbl + ' <input data-field="rm" type="number" min="10" max="3000" value="' + r.m + '" style="width:6em"></label>' +
+    '<label class="note">' + t.tLbl + ' <input data-field="rt" type="number" min="2" max="200" value="' + r.t + '" style="width:5em"></label><button class="dark" data-action="rbbuild">' + t.build + '</button></div><div id="rbbuilt" class="note"></div><div style="overflow-x:auto"><table class="t" id="rbrows"></table></div></div>' +
+    '<div class="card"><h3>' + t.lookH + '</h3><div class="btns"><label class="note">' + t.wordLbl + ' <input data-field="rw" maxlength="3" value="' + esc(rbWord(r.word === "" ? 0 : r.word)) + '" style="width:5em"></label><button data-action="rbrand">' + t.rand + "</button>" +
+    '<button class="dark" data-action="rbnext">' + t.nextTry + '</button><button data-action="rball">' + t.allTries + '</button></div><div id="rbdig"></div><div style="overflow-x:auto"><table class="t walk" id="rbwalk"></table></div><div id="rbres" class="note"></div></div>' +
+    '<div class="card"><h3>' + t.saltH + '</h3><label><input type="checkbox" data-field="rsalt"' + (r.salt ? " checked" : "") + "> " + t.saltOn + '</label><div id="rbsalt" class="why" hidden></div></div>';
+}
+function rbEnsure() {
+  const r = app.r;
+  if (!r.tab) { r.tab = rbBuild(r.m, r.t, 7); if (r.word === "") { const rr = rng(11); for (;;) { const w = Math.floor(rr() * RB_N); if (rbLookup(r.tab, rbH(w)).found !== null) { r.word = w; break; } } } }
+}
+function rbDigest() { const r = app.r; return r.salt ? rbHSalt(r.saltV, r.word) : rbH(r.word); }
+function updR() {
+  const t = L(), r = app.r; if (!document.getElementById("rbrows")) return;
+  rbEnsure();
+  const wi = view.querySelector('input[data-field="rw"]'); if (wi && document.activeElement !== wi) wi.value = rbWord(r.word);
+  const c = rbChain(rbIndex("sun"), 4);
+  document.getElementById("rbdemo").innerHTML = c.ws.map((w, i) => '<span class="cell r-pw">' + rbWord(w) + "</span>" + (i < 4 ? '<span class="arr">h →</span><span class="cell r-dig">' + c.ds[i].toString(16).padStart(4, "0") + '</span><span class="arr">R<sub>' + i + "</sub> →</span>" : "")).join("");
+  document.getElementById("rbbuilt").textContent = t.built(r.tab.m, r.tab.t, r.tab.hashes, fmt(r.tab.covered));
+  document.getElementById("rbrows").innerHTML = "<tr><th>#</th><th>start</th><th></th><th>end</th></tr>" + r.tab.rows.slice(0, 6).map((x, i) => "<tr><td>" + (i + 1) + '</td><td><span class="cell r-pw">' + rbWord(x[0]) + '</span></td><td class="note">… ' + r.tab.t + ' …</td><td><span class="cell r-pw">' + rbWord(x[1]) + "</span></td></tr>").join("") + '<tr><td colspan="4" class="note">… ' + fmt(r.tab.rows.length - 6) + "</td></tr>";
+  const d = rbDigest();
+  document.getElementById("rbdig").innerHTML = '<div class="chain"><span class="cell r-pw">' + rbWord(r.word) + '</span><span class="arr">' + (r.salt ? "h(salt + ·)" : "h") + ' →</span><span class="cell r-dig">' + d.toString(16).padStart(4, "0") + "</span></div>";
+  if (!r.look) r.look = rbLookup(r.tab, d);
+  const lk = r.look, sh = Math.min(r.shown, lk.tries.length);
+  let h = "<tr><th>" + t.tryCol + "</th><th>" + t.ifCol + "</th><th>" + t.endCol + "</th><th>" + t.resCol + "</th></tr>";
+  for (let i = 0; i < sh; i++) {
+    const x = lk.tries[i];
+    h += '<tr class="' + (i === sh - 1 ? "cur" : "") + '"><td>' + (i + 1) + "</td><td>" + x.j + '</td><td><span class="cell r-pw">' + rbWord(x.end) + "</span></td><td>" +
+      (x.res === "found" ? '<span class="okline">' + t.resFound(rbWord(x.word)) + "</span>" + (x.word !== r.word ? " (" + t.otherWord + ")" : "") : x.res === "false" ? '<span class="badline">' + t.resFalse + "</span>" : t.resNone) + "</td></tr>";
+  }
+  document.getElementById("rbwalk").innerHTML = h;
+  document.getElementById("rbres").textContent = sh >= lk.tries.length ? t.lkDone(lk.found === null ? null : rbWord(lk.found), fmt(lk.hashes)) : "";
+  const sn = document.getElementById("rbsalt"); sn.hidden = !r.salt; if (r.salt) sn.textContent = t.saltNote(r.saltV.toString(16).padStart(4, "0"));
+}
+function rbNewWord(w) { const r = app.r; r.word = w; r.look = null; r.shown = 0; if (r.salt) r.saltV = Math.floor(Math.random() * 65536); updR(); }
+
+/* ---------- step 5: the cost dial ---------- */
+function render4() {
+  const t = L(), k = app.k;
+  return '<div class="card"><div class="dial">' + t.costLbl + ' <input type="range" min="4" max="16" step="1" data-field="cost" value="' + k.cost + '"><span class="box" id="costv"></span></div>' +
+    '<div class="flex" style="margin-top:12px"><div><h3 class="who" style="color:var(--bob)">' + t.srvH + '</h3><table class="t" id="srvtab"></table><div class="btns"><button data-action="measure" id="meas">' + t.measure + "</button></div></div>" +
+    '<div><h3 style="color:var(--mal)">' + t.malH + '</h3><div class="btns"><span class="seg"><span class="lbl">' + t.devLbl + '</span><button data-action="dev" data-d="gpu" aria-pressed="' + (k.dev === "gpu") + '">' + t.gpu + '</button><button data-action="dev" data-d="cpu" aria-pressed="' + (k.dev === "cpu") + '">' + t.cpu + "</button></span></div>" +
+    '<table class="t" id="maltab"></table><div class="note" id="ratenote"></div></div></div></div>' +
+    '<div class="card"><h3>' + t.insideH + '</h3><div class="btns"><button class="dark" data-action="iplay" id="iplay">' + t.play + '</button><button data-action="istep">' + t.stepOne + '</button><label class="note">' + t.speed +
+    ' <input type="range" min="0" max="4" value="2" data-field="ispeed"></label></div><canvas id="icv" width="704" height="352"></canvas><div class="note">' + t.insideCap + '</div><div class="note" id="istat"></div><div class="why">' + t.insideWhy + "</div></div>";
+}
+function bcSecs(c) {   // one bcrypt in this browser at cost c, from the measurement at cost 6
+  return app.k.t6 === null ? null : app.k.t6 * Math.pow(2, c - 6);
+}
+function cLaptopSecs(c) { const ks = [4, 8, 10, 12]; let best = 12; for (const x of ks) if (Math.abs(x - c) < Math.abs(best - c)) best = x; return C_LAPTOP[best] * Math.pow(2, c - best); }
+function updK() {
+  const t = L(), k = app.k, c = k.cost; if (!document.getElementById("srvtab")) return;
+  document.getElementById("costv").textContent = c + " → 2^" + c + " = " + fmt(Math.pow(2, c));
+  const mine = bcSecs(c);
+  document.getElementById("srvtab").innerHTML = "<tr><td>" + t.cLaptop + '</td><td class="m"><b>' + dur(cLaptopSecs(c)) + "</b></td></tr><tr><td>" + t.thisB + '</td><td class="m"><b>' + (mine === null ? "–" : dur(mine)) + "</b></td></tr>";
+  const rate = k.dev === "gpu" ? GPU.bcrypt5 * Math.pow(2, 5 - c) : (mine === null ? null : 1 / mine);
+  const shaRate = k.dev === "gpu" ? GPU.sha256 : (k.shaRate || null);
+  let h = "<tr><th></th><th>" + t.choices + "</th><th>" + t.withSha + "</th><th>" + t.withBc(c) + "</th></tr>";
+  for (const [id, n] of CLASSES) h += '<tr><td><span class="cell r-pw">' + t.cls[id] + '</span></td><td class="m">' + n.toExponential(1).replace("e+", " × 10^") + '</td><td class="m">' + (shaRate ? dur(n / shaRate) : "–") + '</td><td class="m"><b>' + (rate ? dur(n / rate) : "–") + "</b></td></tr>";
+  document.getElementById("maltab").innerHTML = h;
+  document.getElementById("ratenote").textContent = rate ? t.rateNote(rate >= 100 ? fmt(rate) : rate.toPrecision(2), c) : "";
+}
+function measure() {
+  const b = document.getElementById("meas"); if (b) { b.disabled = true; b.textContent = L().measuring; }
+  setTimeout(() => {
+    let best = Infinity;
+    for (let i = 0; i < 2; i++) { const t0 = performance.now(); bcrypt("test password", 6, "abcdefghijklmnopqrstuu"); best = Math.min(best, performance.now() - t0); }
+    app.k.t6 = best / 1000;
+    const t0 = performance.now(); let n = 0; while (performance.now() - t0 < 150) { sha256(enc("guess" + n)); n++; }
+    app.k.shaRate = n / ((performance.now() - t0) / 1000);
+    if (b) { b.disabled = false; b.textContent = L().measure; }
+    updK();
+  }, 30);
+}
+// the inside view: records every word written by one bcrypt at cost 4, then replays it
+function insideInit() {
+  const k = app.k;
+  if (k.anim) return;
+  const writes = [], S = PI_WORDS.slice(), kw = words18(enc("blue tulip 42\0")), sw = words18(b64dec("Rk9yR2V0TWVOb3RzYWx0LA", 16));
+  let setup = 0; const marks = [];
+  const rec = i => writes.push(i);
+  marks.push(writes.length); expandKey(S, kw, sw.subarray(0, 4), rec);
+  for (let r = 0; r < 16; r++) { marks.push(writes.length); expandKey(S, kw, null, rec); marks.push(writes.length); expandKey(S, sw, null, rec); }
+  k.anim = { writes: writes, marks: marks, pos: 0, play: false, age: new Float32Array(1042).fill(1e9), vals: PI_WORDS.slice(), S: PI_WORDS.slice(), kw: kw, sw: sw };
+}
+function insideDraw() {
+  const cv = document.getElementById("icv"); if (!cv || !app.k.anim) return;
+  const a = app.k.anim, g = cv.getContext("2d"), cs = getComputedStyle(document.documentElement), chg = cs.getPropertyValue("--chg").trim();
+  g.clearRect(0, 0, cv.width, cv.height);
+  for (let i = 0; i < 1042; i++) {
+    const x = (i % 32) * 22, y = Math.floor(i / 32) * 10.6;
+    if (a.age[i] < 30) { g.fillStyle = chg; g.globalAlpha = 1 - a.age[i] / 40; }
+    else { const v = a.vals[i] >>> 24; g.fillStyle = "rgb(" + (90 + v / 3) + "," + (100 + v / 3) + "," + (110 + v / 3) + ")"; g.globalAlpha = 1; }
+    g.fillRect(x, y, 20, 9);
+  }
+  g.globalAlpha = 1;
+  const setupNo = a.marks.filter(m => m <= Math.max(0, a.pos - 1)).length;
+  document.getElementById("istat").textContent = L().insideStat(Math.max(1, setupNo), 33, Math.floor(a.pos / 2), Math.floor(a.writes.length / 2));
+}
+function insideAdvance(n) {
+  const a = app.k.anim;
+  for (let i = 0; i < 1042; i++) a.age[i] += 1;
+  for (let s = 0; s < n && a.pos < a.writes.length; s++) {
+    const i = a.writes[a.pos]; a.age[i] = 0; a.age[i + 1] = 0;
+    a.vals[i] = (a.vals[i] * 2654435761 + a.pos) >>> 0; a.vals[i + 1] = (a.vals[i + 1] * 2246822519 + a.pos) >>> 0;
+    a.pos += 1;
+  }
+  if (a.pos >= a.writes.length) a.play = false;
+}
+function insideLoop() {
+  const a = app.k.anim; if (!a || !a.play || app.level !== 4) { if (a) a.play = false; return; }
+  const sp = +(document.querySelector('input[data-field="ispeed"]') || { value: 2 }).value;
+  insideAdvance([1, 4, 20, 120, 600][sp]);
+  insideDraw();
+  const b = document.getElementById("iplay"); if (b) b.textContent = a.play ? L().pause : L().play;
+  requestAnimationFrame(insideLoop);
+}
+
+/* ---------- frame, navigation ---------- */
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function updateAll() { [updB, updC, updS, updR, () => { updK(); insideInit(); insideDraw(); }][app.level](); }
+function hashStr() { return "#" + (app.level + 1) + (app.card > 1 ? "." + app.card : ""); }
+function scrollToCard() {
+  if (app.card < 2) return;
+  const c = view.querySelectorAll(".fade > .card")[app.card - 1];
+  if (c) c.scrollIntoView({ block: "start" });
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  const st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : t.selfOk;
+  st.className = SELF_FAILS.length ? "badt" : "okt";
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" + [render0, render1, render2, render3, render4][app.level]() + "</div>";
+  updateAll();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", hashStr()); } catch (e) {}
+}
+function goTo(level) { app.level = level; app.card = 1; app.b.run = false; render(); view.scrollTop = 0; }
+
+const view = document.getElementById("view");
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more"); if (!b) return;
+  const sc = scroller(), h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => { const sc = scroller(), h = sc === view ? view.clientHeight : window.innerHeight; sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" }); });
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]"); if (!el) return;
+  const a = el.dataset.action;
+  if (a === "bn") { app.b.N = +el.dataset.n; app.b.run = false; bReset(); render(); }
+  else if (a === "bm") { app.b.mode = el.dataset.m; app.b.run = false; bReset(); render(); }
+  else if (a === "b1") { bOneRun(true); updB(); }
+  else if (a === "bgo") { app.b.run = !app.b.run; el.textContent = app.b.run ? L().stop : L().nonstop; if (app.b.run) requestAnimationFrame(bLoop); }
+  else if (a === "br") { app.b.run = false; bReset(); render(); }
+  else if (a === "tab") { if (app.s.st) app.s.st.running = false; app.s.tab = +el.dataset.i; app.s.st = null; render(); }
+  else if (a === "atk") atkStart();
+  else if (a === "atkr") { if (app.s.st) app.s.st.running = false; app.s.st = null; updS(); }
+  else if (a === "rbbuild") { const r = app.r; r.tab = rbBuild(r.m, r.t, 7); r.look = null; r.shown = 0; updR(); }
+  else if (a === "rbrand") { rbNewWord(Math.floor(Math.random() * RB_N)); const i = view.querySelector('input[data-field="rw"]'); if (i) i.value = rbWord(app.r.word); }
+  else if (a === "rbnext") { app.r.shown++; updR(); }
+  else if (a === "rball") { app.r.shown = 1e9; updR(); }
+  else if (a === "measure") measure();
+  else if (a === "dev") { app.k.dev = el.dataset.d; if (app.k.dev === "cpu" && app.k.t6 === null) measure(); view.querySelectorAll('[data-action="dev"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.d === app.k.dev))); updK(); }
+  else if (a === "iplay") { insideInit(); const an = app.k.anim; if (an.pos >= an.writes.length) { an.pos = 0; an.vals = PI_WORDS.slice(); } an.play = !an.play; el.textContent = an.play ? L().pause : L().play; if (an.play) requestAnimationFrame(insideLoop); }
+  else if (a === "istep") { insideInit(); insideAdvance(1); insideDraw(); }
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field; if (!f) return;
+  const v = e.target.value;
+  if (f === "suffix" || f === "p1" || f === "p2") { app.c[f] = v.replace(/\0/g, ""); updC(); }
+  else if (f === "rm") app.r.m = Math.max(10, Math.min(3000, +v || 10));
+  else if (f === "rt") app.r.t = Math.max(2, Math.min(200, +v || 2));
+  else if (f === "rw") { const w = v.toLowerCase(); if (/^[a-z]{3}$/.test(w)) rbNewWord(rbIndex(w)); }
+  else if (f === "rsalt") { app.r.salt = e.target.checked; app.r.saltV = Math.floor(Math.random() * 65536); app.r.look = null; app.r.shown = 0; updR(); }
+  else if (f === "cost") { app.k.cost = +v; updK(); }
+});
+document.getElementById("steps").addEventListener("click", e => { const b = e.target.closest("[data-step]"); if (b) goTo(+b.dataset.step); });
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "ArrowRight" && app.level < 4) { e.preventDefault(); goTo(app.level + 1); }
+  else if (e.key === "ArrowLeft" && app.level > 0) { e.preventDefault(); goTo(app.level - 1); }
+});
+
+const SELF_FAILS = selfTest();
+// #3 opens step 3; #5.2 opens step 5 scrolled to its 2nd card (inside bcrypt), #4.2 step 4 at the lookup
+function readHash() {
+  const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
+  if (hm && +hm[1] >= 1 && +hm[1] <= 5) { app.level = +hm[1] - 1; app.card = hm[2] ? Math.max(1, +hm[2]) : 1; }
+}
+window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { app.b.run = false; readHash(); render(); view.scrollTop = 0; scrollToCard(); } });
+readHash();
+render();
+requestAnimationFrame(scrollToCard);
+</script>
+</body>
+</html>

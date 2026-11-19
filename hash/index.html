@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hash function explorer</title>
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --sunken:#EAEEF2; --ink:#16202B; --muted:#5B6673; --rule:#D5DBE1; --focus:#2F6FDB;
+  --chg:#D9621C; --chg-bg:#FCE8DA; --ok:#1E7E4F; --bad:#C62828;
+  --flip:#E53935; --flip-bg:#FDE3E2;
+  --const-b:#BCC4CC; --const-bg:#EEF1F4;
+  /* role colours = the slide colours of the hash lecture: Alice sIndigo, Mallory/Eve sPink, message sViolet,
+     secret value sAmber, Bob/server sTeal, digest sBrown; the end marker 0x80 orange as on the slides */
+  --alice:#5C6BC0; --alice-bg:#E6E8F6;
+  --eve:#EC407A; --eve-ink:#C2185B; --eve-bg:#FCE2EB;
+  --msg-b:#7E57C2; --msg-bg:#EBE5F5;
+  --sec-b:#FFB300; --sec-bg:#FFE8B2;
+  --bob:#26A69A; --bob-ink:#00796B; --bob-bg:#DEF2F0;
+  --dg-b:#8D6E63; --dg-bg:#EEE9E7;
+  --mark-b:#EB5A14; --mark-bg:#FCE3D6;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1419; --surface:#171E26; --sunken:#1E2731; --ink:#E6EBF0; --muted:#93A0AD; --rule:#2B3542; --focus:#7FA8F0;
+    --chg:#F29A5C; --chg-bg:#3D2414; --ok:#5FD19A; --bad:#F08A7E; --flip:#FF6F61; --flip-bg:#4A1D1B;
+    --const-b:#4A5663; --const-bg:#222C37;
+    --alice:#9FA8DA; --alice-bg:#23284A; --eve:#F48FB1; --eve-ink:#F48FB1; --eve-bg:#3A1A26;
+    --msg-b:#B39DDB; --msg-bg:#2A2142; --sec-b:#FFCA28; --sec-bg:#3A2E10;
+    --bob:#4DB6AC; --bob-ink:#80CBC4; --bob-bg:#12302D; --dg-b:#BCAAA4; --dg-bg:#2E2522;
+    --mark-b:#FF8A50; --mark-bg:#3D2414;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:6px;cursor:pointer;padding:6px 12px}
+button:hover{background:var(--sunken)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input[type=text]{font-family:var(--mono);color:var(--ink);background:var(--surface);border:1.5px solid var(--rule);border-radius:6px;padding:6px 9px;font-size:15px}
+input[type=range]{accent-color:var(--chg)}
+.mono{font-family:var(--mono)}
+
+/* frame (the same as the other explorers) */
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.home{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+.home:hover{color:var(--ink);text-decoration:underline}
+.top h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.top p{margin:0;color:var(--muted);font-size:13.5px}
+.langs{display:flex;gap:6px;flex:none}
+.langs button{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:13px;font-weight:500}
+.langs button svg{width:22px;height:14px;border-radius:2px;box-shadow:0 0 0 1px var(--rule);display:block}
+.langs button[aria-pressed="true"]{border-color:var(--ink);background:var(--sunken)}
+.body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.side{overflow:auto;padding:12px 10px 16px;border-right:1px solid var(--rule);background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.step{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px}
+.step:hover{background:var(--sunken)}
+.step b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.step small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.step .gnum{flex:none;width:30px;height:30px;border-radius:8px;background:var(--sunken);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px}
+.step[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.step[aria-pressed="true"] small{color:var(--surface);opacity:.75}
+.step[aria-pressed="true"] .gnum{background:var(--surface);color:var(--ink)}
+.sidefoot{margin-top:auto;padding:14px 10px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+#selftest.okt{color:var(--ok);font-weight:600}
+#selftest.badt{color:var(--bad);font-weight:600}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.modhead{padding:12px 20px 10px;border-bottom:1px solid var(--rule)}
+.modhead span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.modhead h2{font-size:20px;margin:1px 0 0;font-weight:600}
+.modhead p{margin:0;color:var(--muted);font-size:13.5px}
+.content{overflow:auto;padding:16px 20px 24px}
+.more{position:fixed;right:24px;bottom:22px;z-index:20;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:0;background:var(--chg);color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:nudge 1.6s ease-in-out infinite}
+.more[hidden]{display:none}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.more{animation:none}}
+.fade{animation:fin .2s ease-out}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.cardhead h3{margin:0}
+.explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
+.explain b{display:block;font-size:15px;margin-bottom:2px}
+.note{font-size:13px;color:var(--muted)}
+.okline{color:var(--ok);font-weight:600}
+.badline{color:var(--bad);font-weight:600}
+.btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.btns button.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dark:hover{background:var(--ink);opacity:.9}
+.why{margin-top:10px;padding:8px 12px;border-left:3px solid var(--chg);background:var(--chg-bg);border-radius:4px;font-size:13.5px}
+.gate{border:2px dashed var(--chg);border-radius:10px;padding:16px 18px;margin-bottom:14px;background:var(--surface)}
+.gate b{display:block;font-size:15px;margin-bottom:4px}
+.legend{margin-top:10px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap}
+.legend span{padding:2px 8px;border-radius:5px;border:1.5px solid}
+
+/* roles */
+.r-msg{border-color:var(--msg-b)!important;background:var(--msg-bg)}
+.r-dg{border-color:var(--dg-b)!important;background:var(--dg-bg)}
+.r-sec{border-color:var(--sec-b)!important;background:var(--sec-bg)}
+.r-bob{border-color:var(--bob)!important;background:var(--bob-bg)}
+.r-alice{border-color:var(--alice)!important;background:var(--alice-bg)}
+.r-eve{border-color:var(--eve)!important;background:var(--eve-bg)}
+.r-mark{border-color:var(--mark-b)!important;background:var(--mark-bg)}
+.r-neu{border-color:var(--const-b)!important;background:var(--const-bg)}
+.who-a{color:var(--alice);font-weight:700} .who-b{color:var(--bob-ink);font-weight:700} .who-m{color:var(--eve-ink);font-weight:700}
+
+/* the black box row */
+.flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0}
+.vbox{border:1.5px solid;border-radius:8px;padding:6px 11px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.vbox small{font-size:12px;color:var(--muted);font-weight:600}
+.vbox .v{font-family:var(--mono);font-size:14px;font-weight:600;word-break:break-all}
+.mech{background:var(--ink);color:var(--surface);border-radius:8px;padding:9px 14px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px;flex:none}
+.arr{font-size:20px;color:var(--muted);flex:none}
+
+/* bit grids */
+.bytes{display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:6px}
+.byte{display:flex;flex-direction:column;align-items:center;gap:2px}
+.byte .ch{font-family:var(--mono);font-size:12.5px;font-weight:600;min-height:18px}
+.byte .bits{display:flex;gap:1px}
+.bc{width:15px;height:20px;border:1px solid var(--msg-b);background:var(--msg-bg);font-family:var(--mono);font-size:11px;line-height:18px;text-align:center;padding:0;border-radius:2px;color:var(--ink)}
+.bc:hover{box-shadow:0 0 0 2px var(--chg)}
+.bc.fl{background:var(--flip);border-color:var(--flip);color:#fff;font-weight:700}
+.dgrid{display:grid;grid-template-columns:repeat(32,16px);gap:2px;margin-top:6px}
+.dgrid span{width:16px;height:16px;border:1px solid var(--dg-b);background:var(--dg-bg);font-family:var(--mono);font-size:10px;line-height:14px;text-align:center;border-radius:2px;color:var(--muted)}
+.dgrid span.d{background:var(--flip);border-color:var(--flip);color:#fff;font-weight:700}
+.count{font-size:22px;font-weight:700;font-family:var(--mono)}
+.count b{color:var(--flip)}
+.hist{display:flex;align-items:flex-end;gap:3px;height:200px;margin-top:30px;border-bottom:1.5px solid var(--const-b);position:relative;max-width:760px}
+.hist .bar{flex:1;background:var(--dg-b);border-radius:3px 3px 0 0;position:relative;min-height:0}
+.hist .bar i{position:absolute;bottom:100%;left:0;right:0;text-align:center;font-style:normal;font-size:10.5px;color:var(--muted)}
+.hlab{display:flex;gap:3px;max-width:760px}
+.hlab span{flex:1;text-align:center;font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.half{position:absolute;top:0;bottom:0;border-left:2px dashed var(--chg)}
+.half em{position:absolute;top:-22px;left:-30px;font-size:11.5px;font-weight:700;color:var(--chg);font-style:normal;white-space:nowrap}
+.stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:14px}
+.stats b{font-family:var(--mono)}
+
+/* padding */
+.padrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.padrow input[type=range]{width:420px}
+.blk{margin-top:10px;display:flex;gap:10px;align-items:flex-start}
+.blk .lbl{width:70px;flex:none;font-size:12.5px;font-weight:700;color:var(--muted);padding-top:3px}
+.cells{display:grid;grid-template-columns:repeat(16,30px);gap:2px}
+.cells span{height:22px;border:1.2px solid var(--const-b);background:var(--surface);font-family:var(--mono);font-size:11.5px;line-height:20px;text-align:center;border-radius:3px}
+.cells span.m{border-color:var(--msg-b);background:var(--msg-bg)}
+.cells span.e{border-color:var(--mark-b);background:var(--mark-bg);font-weight:700}
+.cells span.z{color:var(--muted)}
+.cells span.l{border-color:var(--const-b);background:var(--const-bg);font-weight:600}
+.sum{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:8px}
+.sum .jump{color:var(--chg)}
+.chain{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin-top:6px}
+.st{border:1.5px solid;border-radius:8px;padding:6px 9px;font-family:var(--mono);font-size:12px;line-height:1.35;min-width:96px}
+.st small{display:block;font-family:var(--sans);font-size:11.5px;font-weight:700;color:var(--muted)}
+.st b{font-size:13px}
+.fbox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.fbox .mech{padding:6px 12px}
+.fbox .vbox{padding:3px 8px;font-size:12px}
+
+/* update() */
+.feed{display:flex;height:26px;border:1.5px solid var(--rule);border-radius:6px;overflow:hidden;max-width:760px;margin-top:6px}
+.feed span{height:100%;border-right:1px solid var(--surface)}
+.feed .p0{background:var(--msg-b)} .feed .p1{background:var(--msg-bg)}
+.feed .rest{flex:1;background:var(--sunken)}
+.bufcells{display:grid;grid-template-columns:repeat(32,18px);gap:2px;margin-top:6px}
+.bufcells span{height:18px;border:1px dashed var(--const-b);border-radius:2px}
+.bufcells span.f{border:1px solid var(--msg-b);background:var(--msg-bg)}
+.log{font-family:var(--mono);font-size:13px;line-height:1.6;margin-top:8px;max-height:220px;overflow:auto;background:var(--sunken);border-radius:8px;padding:8px 12px}
+.log .fx{color:var(--chg);font-weight:700}
+.words{font-family:var(--mono);font-size:14px;font-weight:600}
+.words span{display:inline-block;margin-right:8px}
+.words span.new{background:var(--chg-bg);box-shadow:0 0 0 2px var(--chg);border-radius:3px}
+
+/* rounds */
+.two{display:flex;gap:22px;flex-wrap:wrap}
+.run h4{margin:0 0 4px;font-size:13.5px}
+.wrow{display:flex;align-items:center;gap:6px;margin:1px 0}
+.wrow b{width:14px;font-family:var(--mono);font-size:12.5px}
+.wrow .ws{display:grid;grid-template-columns:repeat(32,11px);gap:1px}
+.wrow .ws span{width:11px;height:13px;border-radius:1.5px;background:var(--const-bg);border:1px solid var(--const-b)}
+.wrow .ws span.o{background:var(--ink);border-color:var(--ink)}
+.wrow .ws span.d{background:var(--flip);border-color:var(--flip)}
+.wrow .hx{font-family:var(--mono);font-size:12px;color:var(--muted);width:66px}
+.blockbits{display:grid;grid-template-columns:repeat(64,10px);gap:1px;margin-top:6px}
+.blockbits button{width:10px;height:12px;padding:0;border-radius:1.5px;border:1px solid var(--msg-b);background:var(--msg-bg)}
+.blockbits button.one{background:var(--msg-b)}
+.blockbits button.pad{border-color:var(--const-b);background:var(--const-bg)}
+.blockbits button.pad.one{background:var(--muted)}
+.blockbits button.fl{outline:2.5px solid var(--flip);outline-offset:0;z-index:1}
+.rctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 10px}
+.rctl input[type=range]{width:420px}
+.rlab{font-family:var(--mono);font-weight:700;font-size:16px;min-width:13em}
+svg.chart text{font-family:var(--sans);font-size:11px;fill:var(--muted)}
+
+/* guessing */
+.prog{height:12px;border-radius:6px;background:var(--sunken);overflow:hidden;max-width:560px;margin:8px 0 4px}
+.prog span{display:block;height:100%;background:var(--eve)}
+.big{font-family:var(--mono);font-size:20px;font-weight:700}
+.estrow{font-family:var(--mono);font-size:14.5px;font-weight:600;line-height:1.8}
+
+@media (max-width:900px){
+  .app{height:auto;display:block}
+  .top{flex-wrap:wrap}
+  .body{display:block}
+  .side{border-right:0;border-bottom:1px solid var(--rule)}
+  .main{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><a class="home" id="home" href="../index.html"></a><h1 id="title"></h1><p id="intro"></p></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="pl" aria-pressed="false"><svg viewBox="0 0 16 10" aria-hidden="true"><rect width="16" height="5" fill="#fff"/><rect y="5" width="16" height="5" fill="#DC143C"/></svg>PL</button>
+      <button data-lang="en" aria-pressed="false"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="ukS"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="ukT"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#ukS)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+    </div>
+  </header>
+  <div class="body">
+    <nav class="side" aria-label="Steps">
+      <div id="steps"></div>
+      <div class="sidefoot"><div id="selftest"></div><div id="keys"></div></div>
+    </nav>
+    <main class="main">
+      <div class="modhead"><span id="mhGrp"></span><h2 id="mhTitle"></h2><p id="mhSub"></p></div>
+      <div class="content" id="view"></div>
+      <button id="more" class="more" hidden><span id="moreTxt"></span><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 2v10M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== SHA-256 (FIPS 180-4), 32-bit words with >>> 0 ===================== */
+// CORE-BEGIN
+const K = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+// the start state: the first 32 bits of the fractional parts of the square roots of the first 8 primes
+const IV = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
+function rotr(x, n) { return ((x >>> n) | (x << (32 - n))) >>> 0; }
+
+// the compression function f: state (8 words) + one 64-byte block at data[off] -> new state.
+// trace (optional) gets the 8 words A..H after every one of the 64 rounds, before the old state is added.
+function compress(state, data, off, trace) {
+  const W = new Array(64);
+  for (let t = 0; t < 16; t++) {
+    const i = off + 4 * t;
+    W[t] = ((data[i] << 24) | (data[i + 1] << 16) | (data[i + 2] << 8) | data[i + 3]) >>> 0;
+  }
+  for (let t = 16; t < 64; t++) {
+    const s0 = rotr(W[t - 15], 7) ^ rotr(W[t - 15], 18) ^ (W[t - 15] >>> 3);
+    const s1 = rotr(W[t - 2], 17) ^ rotr(W[t - 2], 19) ^ (W[t - 2] >>> 10);
+    W[t] = (s1 + W[t - 7] + s0 + W[t - 16]) >>> 0;
+  }
+  let a = state[0], b = state[1], c = state[2], d = state[3], e = state[4], f = state[5], g = state[6], h = state[7];
+  for (let t = 0; t < 64; t++) {
+    const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+    const ch = (e & f) ^ (~e & g);
+    const t1 = (h + S1 + ch + K[t] + W[t]) >>> 0;
+    const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+    const maj = (a & b) ^ (a & c) ^ (b & c);
+    const t2 = (S0 + maj) >>> 0;
+    h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    if (trace) trace.push([a, b, c, d, e, f, g, h]);
+  }
+  // feed-forward: add the old state word by word
+  return [(state[0] + a) >>> 0, (state[1] + b) >>> 0, (state[2] + c) >>> 0, (state[3] + d) >>> 0,
+          (state[4] + e) >>> 0, (state[5] + f) >>> 0, (state[6] + g) >>> 0, (state[7] + h) >>> 0];
+}
+// padding: the message, the byte 0x80, zeros, the length in bits as 8 bytes big-endian; a multiple of 64 bytes
+function pad(msg) {
+  const n = msg.length;
+  const total = Math.ceil((n + 9) / 64) * 64;
+  const p = new Uint8Array(total);
+  p.set(msg);
+  p[n] = 0x80;
+  const bits = n * 8;
+  const hi = Math.floor(bits / 4294967296), lo = bits >>> 0;
+  for (let i = 0; i < 4; i++) { p[total - 8 + i] = (hi >>> (24 - 8 * i)) & 255; p[total - 4 + i] = (lo >>> (24 - 8 * i)) & 255; }
+  return p;
+}
+function stateToBytes(s) {
+  const out = new Uint8Array(32);
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++) out[4 * i + j] = (s[i] >>> (24 - 8 * j)) & 255;
+  return out;
+}
+// the states after every block: [IV, s1, s2, ...]; the last one is the digest
+function chainStates(msg) {
+  const p = pad(msg);
+  const states = [IV.slice()];
+  for (let off = 0; off < p.length; off += 64) states.push(compress(states[states.length - 1], p, off));
+  return states;
+}
+function sha256(msg) { const s = chainStates(msg); return stateToBytes(s[s.length - 1]); }
+
+// the streaming object, as hashlib.sha256(): update(piece) then digest()
+class Hasher {
+  constructor() { this.state = IV.slice(); this.buf = new Uint8Array(64); this.bufLen = 0; this.total = 0; }
+  // returns how many times f ran
+  update(piece) {
+    let runs = 0;
+    for (let i = 0; i < piece.length; i++) {
+      this.buf[this.bufLen++] = piece[i];
+      if (this.bufLen === 64) { this.state = compress(this.state, this.buf, 0); this.bufLen = 0; runs++; }
+    }
+    this.total += piece.length;
+    return runs;
+  }
+  // pads what is waiting in the buffer; returns {digest, runs}
+  digest() {
+    const rest = this.buf.slice(0, this.bufLen);
+    const p = pad(rest);
+    // the length field must count the whole message, not only the rest
+    const bits = this.total * 8, total = p.length;
+    const hi = Math.floor(bits / 4294967296), lo = bits >>> 0;
+    for (let i = 0; i < 4; i++) { p[total - 8 + i] = (hi >>> (24 - 8 * i)) & 255; p[total - 4 + i] = (lo >>> (24 - 8 * i)) & 255; }
+    let s = this.state;
+    for (let off = 0; off < p.length; off += 64) s = compress(s, p, off);
+    return { digest: stateToBytes(s), runs: p.length / 64 };
+  }
+}
+// the first k bits (k <= 32) of SHA-256(data), as a number
+function shortHash(data, k) {
+  const d = sha256(data);
+  const first32 = ((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]) >>> 0;
+  return k === 32 ? first32 : first32 >>> (32 - k);
+}
+// CORE-END
+
+const enc = new TextEncoder();
+const utf8 = s => enc.encode(s);
+const hex = b => Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+const w8 = x => (x >>> 0).toString(16).padStart(8, "0");
+function popcount(x) { let c = 0; x >>>= 0; while (x) { c += x & 1; x >>>= 1; } return c; }
+function diffBits(a, b) { let c = 0; for (let i = 0; i < a.length; i++) c += popcount(a[i] ^ b[i]); return c; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const fmt = n => n.toLocaleString(lang === "pl" ? "pl-PL" : "en-GB");
+// a decimal number with d digits after the point; Polish uses a comma
+const dec = (x, d) => { const v = x.toFixed(d); return lang === "pl" ? v.replace(".", ",") : v; };
+
+/* ===================== the data of the examples (the same as on the slides) ===================== */
+const FOX = "The quick brown fox jumps over the lazy dog, then over the lazy cat, then home.";   // 79 bytes, two blocks
+const PHRASE = "Alice: the door code is 0886";
+const MSG3 = (FOX + " " + FOX).slice(0, 150);
+// differing state bits after rounds 1..9, 11, 17, 33, 64 for pad("abc") and the lowest bit of byte 0 flipped
+const ROUND_DIFFS = [[1, 3], [2, 23], [3, 48], [4, 80], [5, 109], [6, 120], [7, 135], [8, 132], [9, 122], [11, 122], [17, 109], [33, 132], [64, 132]];
+
+function roundTrace(block) {
+  const tr = [];
+  const out = compress(IV, block, 0, tr);
+  return { rounds: tr, out: out };
+}
+
+/* ===================== self-test ===================== */
+function selfTest() {
+  const fails = [];
+  const H = s => hex(sha256(typeof s === "string" ? utf8(s) : s));
+  // FIPS 180-4 examples and the empty message
+  if (H("abc") !== "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") fails.push("abc");
+  if (H("") !== "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") fails.push("empty");
+  if (H("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq") !== "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1") fails.push("448 bits");
+  if (H(new Uint8Array(1000000)) !== "d29751f2649b32ff572b5e0a9f541ea660a50f94ff0beedfb0b692b924cc8025") fails.push("10^6 zero bytes");
+  // the slides
+  if (H("Hello, Bob!") !== "2558308eb3f6e132ab8ea8e38267d741ad28d99e5144e5767f4833517caa8d7f") fails.push("Hello, Bob!");
+  const d100 = sha256(utf8("Pay Bob 100 GBP")), d900 = sha256(utf8("Pay Bob 900 GBP"));
+  if (hex(d100) !== "b392dc8944a7f1ef60ccecab976a214021539fc692acc9eccf84ea0484300b24") fails.push("Pay Bob 100");
+  if (hex(d900) !== "8ac91a50448dbe4771331d25a9de9a99d1aabed830e11978dc313aab13b110e0") fails.push("Pay Bob 900");
+  if (diffBits(d100, d900) !== 128) fails.push("100/900: 128 bits");
+  const pb = pad(utf8("abc"));
+  if (pb.length !== 64 || pb[3] !== 0x80 || pb[63] !== 0x18 || pb[62] !== 0) fails.push("pad abc");
+  const lens = [[3, 64], [55, 64], [56, 128], [64, 128], [119, 128], [120, 192]];
+  for (const [n, L] of lens) if (pad(new Uint8Array(n)).length !== L) fails.push("pad " + n);
+  const cs = chainStates(utf8(FOX));
+  if (FOX.length !== 79 || cs.length !== 3 || w8(cs[1][0]) !== "26988411" || w8(cs[2][0]) !== "8c166dba") fails.push("79-byte chain");
+  const block = pad(utf8("abc")), block2 = block.slice(); block2[0] ^= 1;
+  const r1 = roundTrace(block), r2 = roundTrace(block2);
+  for (const [r, d] of ROUND_DIFFS) if (diffBits(r1.rounds[r - 1], r2.rounds[r - 1]) !== d) { fails.push("round " + r); break; }
+  const h = new Hasher(); h.update(utf8(MSG3.slice(0, 7))); h.update(utf8(MSG3.slice(7, 107))); h.update(utf8(MSG3.slice(107)));
+  if (hex(h.digest().digest) !== hex(sha256(utf8(MSG3)))) fails.push("update() in pieces");
+  return fails;
+}
+// the longer checks run after the page is drawn: one million "a" and the short-hash numbers of the slides
+function slowTests(done) {
+  const fails = [];
+  if (hex(sha256(utf8("a".repeat(1000000)))) !== "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0") fails.push("million a");
+  for (const [k, want] of [[12, 3715], [16, 64050]]) {
+    const target = shortHash(utf8(PHRASE), k);
+    let i = 0;
+    while (shortHash(utf8(String(i)), k) !== target) i++;
+    if (i + 1 !== want) fails.push("k = " + k + ": " + (i + 1) + " tries");
+  }
+  done(fails);
+}
+
+/* ===================== texts ===================== */
+const T = {
+  en: {
+    title: "Hash function explorer",
+    intro: "SHA-256 step by step: the avalanche, the padding, the chain of blocks, the rounds, and what an attacker can do.",
+    home: "All simulators",
+    stepOf: n => "Step " + n + " of 6 · SHA-256",
+    steps: [["Black box", "any length in, always 32 bytes out"], ["Avalanche lab", "one bit in, about half of the digest out"], ["Padding and the chain", "0x80, zeros, the length; one f per block"],
+            ["update() in pieces", "a 64-byte buffer and a 32-byte state"], ["One bit through the rounds", "two runs of f side by side"],
+            ["Guessing a short hash", "about 2^k tries for k bits"]],
+    explain: [
+      ["Any length in, always 32 bytes out", "Type a message, or make it longer with the buttons: the message bar grows, the digest stays 32 bytes. Then type the same text in the second field: the same input always gives the same digest, and one different character gives a completely different one."],
+      ["Change one bit, watch the digest", "Type a message. Below it, every byte is shown as 8 bits: click any bit to flip it. The grid shows the 256 bits of the new digest; red bits are the ones that changed. Then let thousands of random pairs run non-stop."],
+      ["How any length becomes 64-byte blocks", "Slide the message length and watch the padding: the message, the end marker 80, zeros, and the length in bits in the last 8 bytes. Then follow the state from block to block: the last state is the digest."],
+      ["The same digest, whatever the pieces", "The hash object keeps a 32-byte state and a buffer for at most 63 waiting bytes. Feed a 150-byte message in pieces of your choice: f runs every time the buffer fills up. digest() pads the rest. The digest never depends on the pieces."],
+      ["Inside f: one bit spreads", "Two runs of the compression function on two blocks that differ in one bit. Each run shows the 8 words A to H as 32 bits; red bits differ between the runs. Move through the 64 rounds, then the final addition of the old state."],
+      ["The generic attack on a k-bit digest", "Keep only the first k bits of SHA-256. Mallory tries the inputs 0, 1, 2, ... until the short code matches. Watch the counter against 2^k, run 100 targets to see the spread, then extrapolate to 256 bits."]],
+    selfOk: "✓ checked against FIPS 180-4 and the slide values", selfBad: f => "✗ self-test failed: " + f, selfWait: "checking the long test values…",
+    moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back",
+    // gates
+    gateBtn: "I have predicted: show it",
+    gate: ["", "Predict first: if one bit of the message changes, how many of the 256 digest bits change? Always the same number?",
+           "Predict first: how many 64-byte blocks does a message of 3, 55, 56 or 64 bytes need after padding?",
+           "", "",
+           "Predict first: 12 bits need about 4096 tries. How many for 16 bits? For 20 bits?"],
+    // black box
+    bbMsg: "message", bbDg: "SHA-256 digest", bbIn: n => "in: " + fmtBytes(n), bbOut: "out: 32 bytes, 64 hex digits",
+    bbX10: "× 10 longer", bbBook: "a 1 MB file", bbReset: "back to the short message", bbTitle: "One box: any message in, 32 bytes out",
+    bbBar: "The length of the message (log scale) and of the digest", bbSame: "Type it again: the same digest?", bbCheck: "the text you type",
+    bbEq: "the same input, the same digest ✓", bbNe: n => "a different input: " + n + " of the 64 hex digits differ",
+    bbBig: "(only the first 200 characters are shown)",
+    // step 1
+    msg: "message", changed: "message with the flipped bits", digestOf: "SHA-256 digest", newDigest: "digest of the changed message",
+    bitsTitle: "The bits of the message: click a bit to flip it", resetFlips: "undo all flips", flipEx: "flip the bit 1 → 9",
+    tooLong: "At most 32 bytes here.", flipped: n => n + (n === 1 ? " bit flipped" : " bits flipped"),
+    gridTitle: "The 256 bits of the new digest (8 rows of 32 bits)",
+    changedOf: (n) => "<b>" + n + "</b> of 256 bits changed",
+    noFlip: "Click a bit of the message to flip it.",
+    histTitle: "Thousands of pairs", histNote: "Each pair: a random 20-byte message and the same message with one random bit flipped. The bars count how many digest bits changed (groups of 4).",
+    run: "▶ non-stop", stop: "■ stop", add1000: "+1000 pairs", reset: "reset",
+    pairs: "pairs", mean: "average", min: "smallest", max: "largest", halfLbl: "128 = half",
+    whyHalf: "Two independent random 256-bit numbers differ in 128 bits on average: each bit differs with chance 1/2. A digest of a changed message looks like such an unrelated number.",
+    // step 2
+    lenLbl: n => "message length: " + n + " bytes", blockLbl: k => "block " + k,
+    padSum: (n, z, B) => n + " + 1 + " + z + " + 8 = " + (64 * B) + " bytes = " + B + (B === 1 ? " block" : " blocks"),
+    jump: "one byte more, one block more: 80 and the 8 length bytes no longer fit",
+    legMsg: "message", legEnd: "80: the end marker", legZero: "zeros", legLen: "length in bits",
+    curveTitle: "Blocks for every length from 0 to 130", useAbc: "\"abc\"", useFox: "the 79-byte message", useSlider: "back to the slider",
+    chainTitle: "The chain: one f per block", chainNote: "Each state is 8 words. The first word is in bold; the same first words appear when you build SHA-256 from its parts.",
+    iv: "IV (fixed start)", after: k => "after block " + k, dgLbl: "= the digest", sameAs: "✓ the same as SHA-256 of the whole message",
+    custom: s => "message: " + s,
+    // step 3
+    feedTitle: "Feed the 150-byte message", piece: n => "update(" + n + " " + (n === 1 ? "byte" : "bytes") + ")", restBtn: "update(the rest)",
+    fed: (a, b) => a + " of " + b + " bytes fed", bufTitle: n => "Buffer: " + n + " of 64 bytes waiting", stTitle: "State (8 words)",
+    digestBtn: "digest()", logTitle: "What happened",
+    logUpd: (n, runs, buf) => "update(" + n + "): " + (runs ? "f ran " + runs + "× · " : "no full block · ") + buf + " bytes wait",
+    logDig: (buf, runs) => "digest(): pads the " + buf + " waiting bytes, f ran " + runs + "×",
+    final: "your digest", oneShot: "SHA-256 of the whole message at once", sameOk: "✓ the same, whatever the pieces",
+    feedAll: "Feed all 150 bytes, then call digest().",
+    // step 4
+    blockTitle: "The block: pad(message), 512 bits; click a bit to choose the one that differs", blockMsg: "message (up to 55 bytes, one block)",
+    run1: "run 1: the block", run2: "run 2: the block with one bit flipped",
+    rLbl: r => r === 0 ? "start: the old state (IV)" : r <= 64 ? "after round " + r : "after round 64 + the old state (= the new state)",
+    differ: n => "<b>" + n + "</b> of 256 bits differ", play: "▶ play", pause: "■ pause", ffNote: "The last step adds the old state word by word (the feed-forward). It is the same in both runs, so it does not undo the spread.",
+    chartTitle: "Differing bits after every round", flipWhich: (b, j) => "flipped: byte " + b + ", bit of value " + (1 << j),
+    // step 5
+    kLbl: k => "k = " + k + " bits", target: "the stored short code (first k bits of SHA-256 of Alice's phrase)", startBtn: "▶ Mallory starts trying",
+    tries: "tries", expected: "2^k", rate: "hashes per second in this browser", found: (inp, n) => "found: the input \"" + inp + "\" after " + n + " tries",
+    hundredTitle: "100 targets", hundredNote: "Each target is the short code of another random phrase. Mallory starts again from 0 for each. The bars count how many targets needed that many tries (in quarters of 2^k).",
+    hundredBtn: k => "▶ 100 targets, k = " + k, avg: "average tries", ratio: "average / 2^k",
+    extraTitle: "From k bits to 256 bits", extraNote: "With the speed measured above (start a search first):",
+    years: (bits, y) => "2^" + bits + " tries: about " + y + " years", universe: "the universe is about 1.4 × 10^10 years old",
+    noRate: "Run a search above to measure the speed of this browser.",
+  },
+  pl: {
+    title: "Funkcja skrótu krok po kroku",
+    intro: "SHA-256 krok po kroku: lawina, dopełnienie, łańcuch bloków, rundy i to, co może zrobić atakujący.",
+    home: "Wszystkie symulatory",
+    stepOf: n => "Krok " + n + " z 6 · SHA-256",
+    steps: [["Czarna skrzynka", "dowolna długość na wejściu, zawsze 32 bajty"], ["Laboratorium lawiny", "jeden bit na wejściu, połowa skrótu na wyjściu"], ["Dopełnienie i łańcuch", "0x80, zera, długość; jedno f na blok"],
+            ["update() kawałkami", "bufor 64 bajtów i stan 32 bajtów"], ["Jeden bit przez rundy", "dwa przebiegi f obok siebie"],
+            ["Zgadywanie krótkiego skrótu", "około 2^k prób dla k bitów"]],
+    explain: [
+      ["Dowolna długość na wejściu, zawsze 32 bajty na wyjściu", "Wpisz wiadomość albo wydłuż ją przyciskami: pasek wiadomości rośnie, skrót ma zawsze 32 bajty. Potem wpisz ten sam tekst w drugim polu: to samo wejście zawsze daje ten sam skrót, a jeden inny znak daje zupełnie inny."],
+      ["Zmień jeden bit, patrz na skrót", "Wpisz wiadomość. Pod nią każdy bajt jako 8 bitów: kliknij dowolny bit, żeby go odwrócić. Siatka pokazuje 256 bitów nowego skrótu; czerwone bity to te, które się zmieniły. Potem puść tysiące losowych par bez przerwy."],
+      ["Jak dowolna długość staje się blokami po 64 bajty", "Przesuwaj długość wiadomości i patrz na dopełnienie: wiadomość, znacznik końca 80, zera i długość w bitach w ostatnich 8 bajtach. Potem prześledź stan od bloku do bloku: ostatni stan to skrót."],
+      ["Ten sam skrót, niezależnie od kawałków", "Obiekt skrótu trzyma stan 32 bajtów i bufor na najwyżej 63 czekające bajty. Podawaj 150-bajtową wiadomość kawałkami, jakimi chcesz: f działa za każdym razem, gdy bufor się zapełni. digest() dopełnia resztę. Skrót nigdy nie zależy od kawałków."],
+      ["Wewnątrz f: jeden bit się rozlewa", "Dwa przebiegi funkcji kompresji na dwóch blokach różniących się jednym bitem. Każdy przebieg pokazuje 8 słów A do H jako 32 bity; czerwone bity różnią się między przebiegami. Przejdź przez 64 rundy, a potem przez końcowe dodanie starego stanu."],
+      ["Atak ogólny na k-bitowy skrót", "Zostaw tylko pierwsze k bitów SHA-256. Mallory próbuje wejść 0, 1, 2, ..., aż krótki kod się zgodzi. Porównaj licznik z 2^k, puść 100 celów, żeby zobaczyć rozrzut, a potem przelicz na 256 bitów."]],
+    selfOk: "✓ sprawdzone z FIPS 180-4 i liczbami ze slajdów", selfBad: f => "✗ autotest nie przeszedł: " + f, selfWait: "sprawdzam długie wartości testowe…",
+    moreBelow: "Niżej jest więcej", keys: "→ / Enter: następny krok · ← / Esc: wstecz",
+    gateBtn: "Przewidziałem(-am): pokaż",
+    gate: ["", "Najpierw przewidź: jeśli zmieni się jeden bit wiadomości, ile z 256 bitów skrótu się zmieni? Zawsze tyle samo?",
+           "Najpierw przewidź: ile bloków po 64 bajty ma po dopełnieniu wiadomość 3, 55, 56 i 64 bajtów?",
+           "", "",
+           "Najpierw przewidź: 12 bitów to ok. 4096 prób. Ile dla 16 bitów? Dla 20?"],
+    // czarna skrzynka
+    bbMsg: "wiadomość", bbDg: "skrót SHA-256", bbIn: n => "wejście: " + fmtBytes(n), bbOut: "wyjście: 32 bajty, 64 cyfry szesnastkowe",
+    bbX10: "× 10 dłuższa", bbBook: "plik 1 MB", bbReset: "z powrotem krótka wiadomość", bbTitle: "Jedna skrzynka: dowolna wiadomość na wejściu, 32 bajty na wyjściu",
+    bbBar: "Długość wiadomości (skala logarytmiczna) i skrótu", bbSame: "Wpisz to jeszcze raz: ten sam skrót?", bbCheck: "tekst, który wpisujesz",
+    bbEq: "to samo wejście, ten sam skrót ✓", bbNe: n => "inne wejście: różni się " + n + " z 64 cyfr szesnastkowych",
+    bbBig: "(widać tylko pierwsze 200 znaków)",
+    msg: "wiadomość", changed: "wiadomość z odwróconymi bitami", digestOf: "skrót SHA-256", newDigest: "skrót zmienionej wiadomości",
+    bitsTitle: "Bity wiadomości: kliknij bit, żeby go odwrócić", resetFlips: "cofnij wszystkie zmiany", flipEx: "odwróć bit 1 → 9",
+    tooLong: "Tutaj najwyżej 32 bajty.", flipped: n => "odwróconych bitów: " + n,
+    gridTitle: "256 bitów nowego skrótu (8 wierszy po 32 bity)",
+    changedOf: (n) => "zmieniło się <b>" + n + "</b> z 256 bitów",
+    noFlip: "Kliknij bit wiadomości, żeby go odwrócić.",
+    histTitle: "Tysiące par", histNote: "Każda para: losowa wiadomość 20 bajtów i ta sama wiadomość z jednym losowym bitem odwróconym. Słupki liczą, ile bitów skrótu się zmieniło (grupy po 4).",
+    run: "▶ bez przerwy", stop: "■ stop", add1000: "+1000 par", reset: "od nowa",
+    pairs: "par", mean: "średnio", min: "najmniej", max: "najwięcej", halfLbl: "128 = połowa",
+    whyHalf: "Dwie niezależne losowe liczby 256-bitowe różnią się średnio w 128 bitach: każdy bit jest inny z prawdopodobieństwem 1/2. Skrót zmienionej wiadomości wygląda jak taka niezwiązana liczba.",
+    lenLbl: n => "długość wiadomości: " + n + " B", blockLbl: k => "blok " + k,
+    padSum: (n, z, B) => n + " + 1 + " + z + " + 8 = " + (64 * B) + " B = " + B + (B === 1 ? " blok" : B < 5 ? " bloki" : " bloków"),
+    jump: "o bajt więcej, o blok więcej: 80 i 8 bajtów długości już się nie mieszczą",
+    legMsg: "wiadomość", legEnd: "80: znacznik końca", legZero: "zera", legLen: "długość w bitach",
+    curveTitle: "Liczba bloków dla każdej długości od 0 do 130", useAbc: "\"abc\"", useFox: "wiadomość 79-bajtowa", useSlider: "z powrotem suwak",
+    chainTitle: "Łańcuch: jedno f na blok", chainNote: "Każdy stan to 8 słów. Pierwsze słowo pogrubione; te same pierwsze słowa wychodzą, gdy składasz SHA-256 z części.",
+    iv: "IV (stały start)", after: k => "po bloku " + k, dgLbl: "= skrót", sameAs: "✓ to samo co SHA-256 całej wiadomości",
+    custom: s => "wiadomość: " + s,
+    feedTitle: "Podawaj 150-bajtową wiadomość", piece: n => "update(" + n + " B)", restBtn: "update(reszta)",
+    fed: (a, b) => "podano " + a + " z " + b + " bajtów", bufTitle: n => "Bufor: czeka " + n + " z 64 bajtów", stTitle: "Stan (8 słów)",
+    digestBtn: "digest()", logTitle: "Co się stało",
+    logUpd: (n, runs, buf) => "update(" + n + "): " + (runs ? "f " + runs + "× · " : "brak pełnego bloku · ") + "czeka " + buf + " B",
+    logDig: (buf, runs) => "digest(): dopełnia " + buf + " czekających bajtów, f " + runs + "×",
+    final: "twój skrót", oneShot: "SHA-256 całej wiadomości naraz", sameOk: "✓ to samo, niezależnie od kawałków",
+    feedAll: "Podaj wszystkie 150 bajtów, potem wywołaj digest().",
+    blockTitle: "Blok: pad(wiadomość), 512 bitów; kliknij bit, który ma się różnić", blockMsg: "wiadomość (do 55 bajtów, jeden blok)",
+    run1: "przebieg 1: blok", run2: "przebieg 2: blok z jednym odwróconym bitem",
+    rLbl: r => r === 0 ? "start: stary stan (IV)" : r <= 64 ? "po rundzie " + r : "po rundzie 64 + stary stan (= nowy stan)",
+    differ: n => "różni się <b>" + n + "</b> z 256 bitów", play: "▶ odtwórz", pause: "■ pauza", ffNote: "Ostatni krok dodaje stary stan słowo po słowie (feed-forward). W obu przebiegach jest ten sam, więc nie cofa rozlania się bitu.",
+    chartTitle: "Różniące się bity po każdej rundzie", flipWhich: (b, j) => "odwrócony: bajt " + b + ", bit o wartości " + (1 << j),
+    kLbl: k => "k = " + k + " bitów", target: "zapisany krótki kod (pierwsze k bitów SHA-256 frazy Alice)", startBtn: "▶ Mallory zaczyna próbować",
+    tries: "prób", expected: "2^k", rate: "skrótów na sekundę w tej przeglądarce", found: (inp, n) => "znalezione: wejście \"" + inp + "\" po " + n + " próbach",
+    hundredTitle: "100 celów", hundredNote: "Każdy cel to krótki kod innej losowej frazy. Mallory dla każdego zaczyna od 0. Słupki liczą, ile celów wymagało tylu prób (w ćwiartkach 2^k).",
+    hundredBtn: k => "▶ 100 celów, k = " + k, avg: "średnio prób", ratio: "średnia / 2^k",
+    extraTitle: "Od k bitów do 256 bitów", extraNote: "Przy szybkości zmierzonej wyżej (najpierw uruchom szukanie):",
+    years: (bits, y) => "2^" + bits + " prób: ok. " + y + " lat", universe: "Wszechświat ma ok. 1,4 × 10^10 lat",
+    noRate: "Uruchom szukanie wyżej, żeby zmierzyć szybkość tej przeglądarki.",
+  },
+};
+
+/* ===================== the app ===================== */
+let lang = "en";
+/* one language setting for all the simulators on the site */
+try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
+const L = () => T[lang];
+const NSTEPS = 6;
+
+const app = {
+  level: 0, card: 1,
+  open: [true, false, false, true, true, false],      // the "predict first" gates
+  // step 1
+  msg: "Pay Bob 100 GBP", flips: new Set(),
+  // black box
+  bbA: "Pay Bob 100 GBP", bbB: "Pay Bob 100 GBP",
+  hist: null, histRun: false,
+  // step 2
+  padLen: 79, padCustom: null,
+  // step 3
+  h3: null, fed3: 0, pieces3: [], log3: [], dig3: null, newWords: [],
+  // step 4
+  msg4: "abc", flipByte: 0, flipBit: 0, round: 0, playing: null,   // flipBit 0: the lowest bit of byte 0, as on the slide
+  // step 5
+  k: 12, search: null, rate: 0, hundred: null, k2: 12,
+};
+let SELF_FAILS = selfTest();
+let SLOW_DONE = false;
+
+function histReset() { app.hist = { bins: new Array(17).fill(0), n: 0, sum: 0, min: 999, max: -1 }; }
+histReset();
+function reset3() { app.h3 = new Hasher(); app.fed3 = 0; app.pieces3 = []; app.log3 = []; app.dig3 = null; app.newWords = []; }
+reset3();
+
+/* ---------- small helpers for drawing ---------- */
+function gateHTML(i) {
+  const t = L();
+  if (app.open[i] || !t.gate[i]) return "";
+  return '<div class="gate"><b>' + t.gate[i] + '</b><button class="dark" data-action="opengate">' + t.gateBtn + "</button></div>";
+}
+function vbox(role, label, value, id) {
+  return '<div class="vbox ' + role + '"><small>' + label + '</small><span class="v"' + (id ? ' id="' + id + '"' : "") + ">" + value + "</span></div>";
+}
+function digestGridHTML(d, ref) {
+  let s = '<div class="dgrid">';
+  for (let i = 0; i < 256; i++) {
+    const bit = (d[i >> 3] >> (7 - (i & 7))) & 1;
+    const diff = ref && (((ref[i >> 3] >> (7 - (i & 7))) & 1) !== bit);
+    s += '<span class="' + (diff ? "d" : "") + '">' + bit + "</span>";
+  }
+  return s + "</div>";
+}
+
+/* ---------- step 1: the black box ---------- */
+function fmtBytes(n) {
+  const sp = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return sp + (lang === "pl" ? " B" : (n === 1 ? " byte" : " bytes"));
+}
+function renderBB() {
+  const t = L();
+  return '<div class="card"><div class="cardhead"><h3>' + t.bbTitle + '</h3><div class="btns" style="margin:0">' +
+    '<button data-action="bbx10">' + t.bbX10 + '</button><button data-action="bbbook">' + t.bbBook + '</button><button data-action="bbreset">' + t.bbReset + "</button></div></div>" +
+    '<div class="flow"><label class="vbox r-msg" style="flex:1 1 300px"><small>' + t.bbMsg + '</small><input type="text" data-field="bbA" id="bbA" style="width:100%"></label>' +
+    '<span class="arr">→</span><div class="mech">⚙ SHA-256</div><span class="arr">→</span><div id="bbDa"></div></div>' +
+    '<div style="margin-top:14px"><b>' + t.bbBar + '</b></div><div id="bbBars"></div>' +
+    '<div style="margin-top:18px"><b>' + t.bbSame + '</b></div>' +
+    '<div class="flow"><label class="vbox r-msg" style="flex:1 1 300px"><small>' + t.bbCheck + '</small><input type="text" data-field="bbB" value="' + esc(app.bbB) + '" style="width:100%"></label>' +
+    '<span class="arr">→</span><div class="mech">⚙ SHA-256</div><span class="arr">→</span><div id="bbDb"></div></div><div class="count" id="bbCmp" style="margin-top:8px"></div></div>';
+}
+function updateBB() {
+  const t = L(), inp = document.getElementById("bbA");
+  if (!inp) return;
+  const big = app.bbA.length > 200;
+  if (document.activeElement !== inp || big) { inp.value = big ? app.bbA.slice(0, 200) + "…" : app.bbA; inp.readOnly = big; }
+  const mA = utf8(app.bbA), dA = hex(sha256(mA)), dB = hex(sha256(utf8(app.bbB)));
+  document.getElementById("bbDa").innerHTML = vbox("r-dg", t.bbDg, dA.slice(0, 32) + "<br>" + dA.slice(32));
+  // two bars: the message on a log scale (1 byte .. 10 MB), the digest always 32 bytes
+  const W = 640, lw = n => Math.max(6, Math.round(W * Math.log10(Math.max(1, n)) / 7));
+  const bar = (w, cls, txt) => '<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><div class="vbox ' + cls +
+    '" style="width:' + w + 'px;height:22px;padding:0;transition:width .5s"></div><span class="note">' + txt + "</span></div>";
+  document.getElementById("bbBars").innerHTML = bar(lw(mA.length), "r-msg", t.bbIn(mA.length) + (big ? " " + t.bbBig : "")) +
+    bar(lw(32), "r-dg", t.bbOut);
+  document.getElementById("bbDb").innerHTML = vbox("r-dg", t.bbDg, dB.slice(0, 32) + "<br>" + dB.slice(32));
+  let nd = 0; for (let i = 0; i < 64; i++) if (dA[i] !== dB[i]) nd++;
+  document.getElementById("bbCmp").innerHTML = nd === 0 ? '<span style="color:var(--ok)">' + t.bbEq + "</span>" : t.bbNe(nd);
+}
+
+/* ---------- step 2: avalanche ---------- */
+function msgBytes1() { return utf8(app.msg); }
+function flipped1() {
+  const b = msgBytes1().slice();
+  for (const k of app.flips) if ((k >> 3) < b.length) b[k >> 3] ^= 0x80 >> (k & 7);
+  return b;
+}
+function render0() {
+  const t = L();
+  if (!app.open[1]) return gateHTML(1);
+  return '<div class="card"><div class="cardhead"><h3>' + t.bitsTitle + '</h3><div class="btns" style="margin:0">' +
+    '<button data-action="flipex">' + t.flipEx + '</button><button data-action="unflip">' + t.resetFlips + "</button></div></div>" +
+    '<div class="flow"><label class="vbox r-msg"><small>' + t.msg + '</small><input type="text" data-field="msg1" maxlength="32" size="30" value="' + esc(app.msg) + '"></label>' +
+    '<span class="arr">→</span><div class="mech">⚙ SHA-256</div><span class="arr">→</span><div id="d1a"></div></div>' +
+    '<div id="bytes1"></div>' +
+    '<div class="flow" style="margin-top:12px"><div id="m1b"></div><span class="arr">→</span><div class="mech">⚙ SHA-256</div><span class="arr">→</span><div id="d1b"></div></div>' +
+    '<div style="margin-top:10px"><b>' + t.gridTitle + '</b></div><div id="grid1"></div><div class="count" id="cnt1" style="margin-top:8px"></div></div>' +
+    '<div class="card"><div class="cardhead"><h3>' + t.histTitle + '</h3><div class="btns" style="margin:0">' +
+    '<button class="dark" data-action="histrun" id="histbtn"></button><button data-action="hist1000">' + t.add1000 + '</button><button data-action="histreset">' + t.reset + "</button></div></div>" +
+    '<p class="note" style="margin:0">' + t.histNote + '</p><div id="hist1"></div><div class="why">' + t.whyHalf + "</div></div>";
+}
+function update0() {
+  if (!app.open[1]) return;
+  const t = L();
+  const m = msgBytes1();
+  const el = document.getElementById("bytes1");
+  if (!el) return;
+  let s = '<div class="bytes">';
+  for (let i = 0; i < m.length; i++) {
+    const c = m[i] >= 32 && m[i] < 127 ? esc(String.fromCharCode(m[i])) : "·";
+    s += '<div class="byte"><span class="ch">' + (c === " " ? "␣" : c) + '</span><span class="bits">';
+    for (let j = 0; j < 8; j++) {
+      const k = 8 * i + j, bit = (m[i] >> (7 - j)) & 1, fl = app.flips.has(k);
+      s += '<button class="bc' + (fl ? " fl" : "") + '" data-action="flip" data-k="' + k + '" title="byte ' + i + ', bit ' + (7 - j) + '">' + (fl ? 1 - bit : bit) + "</button>";
+    }
+    s += "</span></div>";
+  }
+  s += "</div>";
+  el.innerHTML = s + '<div class="note" style="margin-top:4px">' + t.flipped(app.flips.size) + "</div>";
+  const m2 = flipped1();
+  const d1 = sha256(m), d2 = sha256(m2);
+  const txt2 = new TextDecoder("utf-8", { fatal: false }).decode(m2);
+  document.getElementById("d1a").innerHTML = vbox("r-dg", t.digestOf, hex(d1).slice(0, 32) + "<br>" + hex(d1).slice(32));
+  document.getElementById("m1b").innerHTML = vbox("r-msg", t.changed, esc(txt2));
+  document.getElementById("d1b").innerHTML = vbox("r-dg", t.newDigest, hex(d2).slice(0, 32) + "<br>" + hex(d2).slice(32));
+  document.getElementById("grid1").innerHTML = digestGridHTML(d2, d1);
+  document.getElementById("cnt1").innerHTML = app.flips.size ? t.changedOf(diffBits(d1, d2)) : '<span class="note">' + t.noFlip + "</span>";
+  drawHist();
+}
+function histAdd(n) {
+  const H = app.hist, buf = new Uint8Array(20);
+  for (let i = 0; i < n; i++) {
+    crypto.getRandomValues(buf);
+    const d1 = sha256(buf), k = Math.floor(Math.random() * 160);
+    const b2 = buf.slice(); b2[k >> 3] ^= 0x80 >> (k & 7);
+    const c = diffBits(d1, sha256(b2));
+    const bin = Math.max(0, Math.min(16, Math.floor((c - 96) / 4)));
+    H.bins[bin]++; H.n++; H.sum += c; if (c < H.min) H.min = c; if (c > H.max) H.max = c;
+  }
+}
+function drawHist() {
+  const el = document.getElementById("hist1");
+  if (!el) return;
+  const t = L(), H = app.hist;
+  const top = Math.max(1, ...H.bins);
+  let bars = "";
+  for (let i = 0; i < 17; i++) bars += '<div class="bar" style="height:' + (86 * H.bins[i] / top) + '%"><i>' + (H.bins[i] || "") + "</i></div>";
+  let labs = "";
+  for (let i = 0; i < 17; i++) labs += "<span>" + (i % 2 === 0 ? 96 + 4 * i : "") + "</span>";
+  el.innerHTML = '<div class="hist">' + bars + '<div class="half" style="left:' + (100 * 8 / 17) + '%"><em>' + t.halfLbl + "</em></div></div>" +
+    '<div class="hlab">' + labs + "</div>" +
+    '<div class="stats"><span>' + t.pairs + ": <b>" + fmt(H.n) + "</b></span>" +
+    (H.n ? "<span>" + t.mean + ": <b>" + dec(H.sum / H.n, 1) + "</b></span><span>" + t.min + ": <b>" + H.min + "</b></span><span>" + t.max + ": <b>" + H.max + "</b></span>" : "") + "</div>";
+  const b = document.getElementById("histbtn");
+  if (b) b.textContent = app.histRun ? t.stop : t.run;
+}
+function histLoop() {
+  if (!app.histRun) return;
+  const end = performance.now() + 30;
+  while (performance.now() < end) histAdd(20);
+  if (app.level === 1) drawHist();
+  if (app.hist.n >= 200000) app.histRun = false;
+  setTimeout(histLoop, 16);
+}
+
+/* ---------- step 2: padding and the chain ---------- */
+function msg2() {
+  if (app.padCustom !== null) return utf8(app.padCustom);
+  let s = "";
+  while (s.length < app.padLen) s += FOX + " ";
+  return utf8(s.slice(0, app.padLen));
+}
+function render1() {
+  const t = L();
+  if (!app.open[2]) return gateHTML(2);
+  return '<div class="card"><div class="padrow"><b id="lenlbl"></b><input type="range" min="0" max="130" data-field="len" value="' + app.padLen + '">' +
+    '<div class="btns" style="margin:0"><button data-action="pabc">' + t.useAbc + '</button><button data-action="pfox">' + t.useFox + "</button></div></div>" +
+    '<div class="note mono" id="ptext" style="margin-top:6px;word-break:break-all"></div>' +
+    '<div class="sum" id="psum"></div><div id="pblocks"></div>' +
+    '<div class="legend"><span class="r-msg">' + t.legMsg + '</span><span class="r-mark">' + t.legEnd + '</span><span class="r-neu" style="background:var(--surface)">' + t.legZero + '</span><span class="r-neu">' + t.legLen + "</span></div>" +
+    '<div style="margin-top:14px"><b>' + t.curveTitle + '</b></div><div id="pcurve"></div></div>' +
+    '<div class="card"><h3>' + t.chainTitle + '</h3><p class="note" style="margin:0 0 6px">' + t.chainNote + '</p><div id="pchain"></div></div>';
+}
+function update1() {
+  if (!app.open[2] || !document.getElementById("psum")) return;
+  const t = L(), m = msg2(), n = m.length, p = pad(m), B = p.length / 64, z = p.length - n - 9;
+  document.getElementById("lenlbl").textContent = t.lenLbl(n);
+  document.getElementById("ptext").textContent = app.padCustom !== null ? t.custom("\"" + app.padCustom + "\"") : "\"" + new TextDecoder().decode(m) + "\"";
+  const jump = n > 0 && pad(new Uint8Array(n - 1)).length < p.length;
+  document.getElementById("psum").innerHTML = esc(t.padSum(n, z, B)) + (jump ? ' <span class="jump">⚑ ' + t.jump + "</span>" : "");
+  let s = "";
+  for (let b = 0; b < B; b++) {
+    s += '<div class="blk"><span class="lbl">' + t.blockLbl(b + 1) + '</span><div class="cells">';
+    for (let i = 64 * b; i < 64 * b + 64; i++) {
+      const cls = i < n ? "m" : i === n ? "e" : i >= p.length - 8 ? "l" : "z";
+      s += '<span class="' + cls + '">' + p[i].toString(16).padStart(2, "0") + "</span>";
+    }
+    s += "</div></div>";
+  }
+  document.getElementById("pblocks").innerHTML = s;
+  // the step curve: blocks against length
+  const W = 760, Hh = 120, x = v => 30 + v * (W - 50) / 130, y = b => Hh - 20 - b * 30;
+  let path = "";
+  for (let v = 0; v <= 130; v++) { const bb = Math.ceil((v + 9) / 64); path += (v ? "L" : "M") + x(v).toFixed(1) + " " + y(bb) + (v < 130 ? " L" + x(v + 1).toFixed(1) + " " + y(bb) : ""); }
+  let svg = '<svg class="chart" width="' + W + '" height="' + Hh + '" viewBox="0 0 ' + W + " " + Hh + '">';
+  for (let b = 1; b <= 3; b++) svg += '<text x="4" y="' + (y(b) + 4) + '">' + b + "</text>";
+  for (const v of [0, 56, 120, 130]) svg += '<text x="' + (x(v) - 6) + '" y="' + (Hh - 4) + '">' + v + "</text>";
+  svg += '<path d="' + path + '" fill="none" stroke="var(--dg-b)" stroke-width="2.5"/>';
+  svg += '<circle cx="' + x(Math.min(n, 130)) + '" cy="' + y(B) + '" r="6" fill="var(--chg)"/></svg>';
+  document.getElementById("pcurve").innerHTML = svg;
+  // the chain
+  const st = chainStates(m);
+  let c = '<div class="chain">';
+  for (let i = 0; i < st.length; i++) {
+    if (i > 0) c += '<div class="fbox"><div class="vbox r-msg"><span>' + t.blockLbl(i) + '</span></div><div class="mech">f</div><span class="arr">→</span></div>';
+    const last = i === st.length - 1;
+    c += '<div class="st ' + (i === 0 ? "r-neu" : last ? "r-dg" : "r-neu") + '"><small>' + (i === 0 ? t.iv : t.after(i)) + (last && i > 0 ? " " + t.dgLbl : "") + "</small>" +
+      st[i].map((w, j) => j === 0 ? "<b>" + w8(w) + "</b>" : w8(w)).join("<br>") + "</div>";
+  }
+  c += "</div>";
+  const ok = hex(stateToBytes(st[st.length - 1])) === hex(sha256(m));
+  c += '<div class="' + (ok ? "okline" : "badline") + '" style="margin-top:8px">' + (ok ? t.sameAs : "✗") + "</div>";
+  document.getElementById("pchain").innerHTML = c;
+}
+
+/* ---------- step 3: update() in pieces ---------- */
+function render2() {
+  const t = L();
+  const sizes = [1, 7, 30, 64, 100];
+  return '<div class="card"><h3>' + t.feedTitle + '</h3><div class="note mono" style="word-break:break-all">"' + esc(MSG3) + '"</div>' +
+    '<div class="btns">' + sizes.map(n => '<button data-action="piece" data-n="' + n + '">' + t.piece(n) + "</button>").join("") +
+    '<button data-action="piece" data-n="rest">' + t.restBtn + '</button><button class="dark" data-action="dig3">' + t.digestBtn + '</button><button data-action="reset3">' + t.reset + "</button></div>" +
+    '<div id="feed3"></div><div class="two" style="margin-top:12px"><div><b id="buf3t"></b><div id="buf3"></div></div>' +
+    '<div><b>' + t.stTitle + '</b><div class="words" id="st3"></div></div></div>' +
+    '<div style="margin-top:12px"><b>' + t.logTitle + '</b></div><div class="log" id="log3"></div><div id="res3"></div></div>';
+}
+function update2() {
+  const t = L();
+  if (!document.getElementById("feed3")) return;
+  let f = '<div class="note">' + t.fed(app.fed3, MSG3.length) + '</div><div class="feed">';
+  app.pieces3.forEach((n, i) => { f += '<span class="p' + (i % 2) + '" style="width:' + (100 * n / MSG3.length) + '%"></span>'; });
+  f += '<span class="rest"></span></div>';
+  document.getElementById("feed3").innerHTML = f;
+  document.getElementById("buf3t").textContent = t.bufTitle(app.h3.bufLen);
+  let b = '<div class="bufcells">';
+  for (let i = 0; i < 64; i++) b += '<span class="' + (i < app.h3.bufLen ? "f" : "") + '"></span>';
+  document.getElementById("buf3").innerHTML = b + "</div>";
+  document.getElementById("st3").innerHTML = app.h3.state.map((w, i) => '<span class="' + (app.newWords.length ? "new" : "") + '">' + w8(w) + "</span>" + (i === 3 ? "<br>" : "")).join("");
+  document.getElementById("log3").innerHTML = app.log3.length ? app.log3.join("<br>") : '<span class="note">' + t.feedAll + "</span>";
+  const r = document.getElementById("res3");
+  if (app.dig3) {
+    const one = hex(sha256(utf8(MSG3)));
+    r.innerHTML = '<div class="flow" style="margin-top:10px">' + vbox("r-dg", t.final, app.dig3) + vbox("r-dg", t.oneShot, one) + "</div>" +
+      '<div class="' + (one === app.dig3 ? "okline" : "badline") + '">' + (one === app.dig3 ? t.sameOk : "✗") + "</div>";
+  } else r.innerHTML = "";
+  view.querySelectorAll('[data-action="piece"]').forEach(btn => { btn.disabled = app.dig3 !== null || app.fed3 >= MSG3.length; });
+  const db = view.querySelector('[data-action="dig3"]'); if (db) db.disabled = app.dig3 !== null || app.fed3 < MSG3.length;
+}
+function piece3(nn) {
+  const left = MSG3.length - app.fed3;
+  const n = nn === "rest" ? left : Math.min(+nn, left);
+  if (n <= 0) return;
+  const before = app.h3.state.slice();
+  const runs = app.h3.update(utf8(MSG3.slice(app.fed3, app.fed3 + n)));
+  app.fed3 += n; app.pieces3.push(n);
+  app.newWords = runs ? [1] : [];
+  app.log3.push((runs ? '<span class="fx">' : "") + esc(L().logUpd(n, runs, app.h3.bufLen)) + (runs ? "</span>" : ""));
+  void before;
+  update2();
+}
+
+/* ---------- step 4: one bit through the rounds ---------- */
+function block4() {
+  let m = utf8(app.msg4);
+  if (m.length > 55) m = m.slice(0, 55);
+  return pad(m);
+}
+function runs4() {
+  const b1 = block4(), b2 = b1.slice();
+  b2[app.flipByte] ^= 1 << app.flipBit;
+  return [roundTrace(b1), roundTrace(b2), b1];
+}
+function stateAt(run, r) { return r === 0 ? IV : r <= 64 ? run.rounds[r - 1] : run.out; }
+function render3() {
+  const t = L();
+  return '<div class="card"><div class="flow"><label class="vbox r-msg"><small>' + t.blockMsg + '</small><input type="text" data-field="msg4" maxlength="55" size="40" value="' + esc(app.msg4) + '"></label></div>' +
+    '<div style="margin-top:6px"><b>' + t.blockTitle + '</b> <span class="note" id="flipw"></span></div><div id="blk4"></div></div>' +
+    '<div class="card"><div class="rctl"><button class="dark" data-action="play4" id="play4"></button><input type="range" min="0" max="65" data-field="round" value="' + app.round + '"><span class="rlab" id="rlab"></span><span class="count" id="cnt4"></span></div>' +
+    '<div class="two" id="runs4"></div><div class="why" id="ff4" hidden>' + t.ffNote + '</div>' +
+    '<div style="margin-top:12px"><b>' + t.chartTitle + '</b></div><div id="chart4"></div></div>';
+}
+function update3() {
+  const t = L();
+  if (!document.getElementById("runs4")) return;
+  const [A, B, b1] = runs4();
+  let bb = '<div class="blockbits">';
+  const n = Math.min(utf8(app.msg4).length, 55);
+  for (let i = 0; i < 64; i++) for (let j = 7; j >= 0; j--) {
+    const one = (b1[i] >> j) & 1, fl = i === app.flipByte && j === app.flipBit;
+    bb += '<button class="' + (i >= n ? "pad " : "") + (one ? "one " : "") + (fl ? "fl" : "") + '" data-action="pick" data-b="' + i + '" data-j="' + j + '" title="byte ' + i + '"></button>';
+  }
+  document.getElementById("blk4").innerHTML = bb + "</div>";
+  document.getElementById("flipw").textContent = "· " + t.flipWhich(app.flipByte, app.flipBit);
+  const r = app.round, s1 = stateAt(A, r), s2 = stateAt(B, r);
+  const runHTML = (title, s, other, cls) => {
+    let h = '<div class="run"><h4 class="' + cls + '">' + title + "</h4>";
+    "ABCDEFGH".split("").forEach((nm, i) => {
+      h += '<div class="wrow"><b>' + nm + '</b><div class="ws">';
+      for (let j = 31; j >= 0; j--) {
+        const bit = (s[i] >>> j) & 1, d = ((s[i] ^ other[i]) >>> j) & 1;
+        h += '<span class="' + (d ? "d" : bit ? "o" : "") + '"></span>';
+      }
+      h += '</div><span class="hx">' + w8(s[i]) + "</span></div>";
+    });
+    return h + "</div>";
+  };
+  document.getElementById("runs4").innerHTML = runHTML(t.run1, s1, s2, "") + runHTML(t.run2, s2, s1, "");
+  document.getElementById("rlab").textContent = t.rLbl(r);
+  document.getElementById("cnt4").innerHTML = t.differ(diffBits(s1, s2));
+  document.getElementById("ff4").hidden = r !== 65;
+  document.getElementById("play4").textContent = app.playing ? t.pause : t.play;
+  // chart
+  const W = 760, Hh = 150, bw = (W - 40) / 66;
+  let svg = '<svg class="chart" width="' + W + '" height="' + Hh + '" viewBox="0 0 ' + W + " " + Hh + '">';
+  const yy = v => Hh - 20 - v * (Hh - 34) / 256;
+  svg += '<line x1="30" x2="' + W + '" y1="' + yy(128) + '" y2="' + yy(128) + '" stroke="var(--chg)" stroke-dasharray="5 4" stroke-width="1.5"/><text x="0" y="' + (yy(128) + 4) + '">128</text><text x="0" y="' + (yy(256) + 8) + '">256</text>';
+  for (let q = 0; q <= 65; q++) {
+    const d = diffBits(stateAt(A, q), stateAt(B, q));
+    svg += '<rect data-r="' + q + '" x="' + (32 + q * bw).toFixed(1) + '" y="' + yy(d).toFixed(1) + '" width="' + (bw - 1.5).toFixed(1) + '" height="' + (yy(0) - yy(d)).toFixed(1) + '" fill="' + (q === r ? "var(--chg)" : q === 65 ? "var(--dg-b)" : "var(--const-b)") + '"/>';
+  }
+  for (const q of [0, 1, 8, 16, 32, 48, 64]) svg += '<text x="' + (32 + q * bw).toFixed(1) + '" y="' + (Hh - 4) + '">' + q + "</text>";
+  svg += '<text x="' + (32 + 65 * bw + 1).toFixed(1) + '" y="' + (Hh - 4) + '">+</text></svg>';
+  document.getElementById("chart4").innerHTML = svg;
+}
+function setRound(r) {
+  app.round = Math.max(0, Math.min(65, r));
+  const inp = view.querySelector('input[data-field="round"]'); if (inp) inp.value = app.round;
+  update3();
+}
+function play4() {
+  if (app.playing) { clearInterval(app.playing); app.playing = null; update3(); return; }
+  if (app.round >= 65) app.round = 0;
+  app.playing = setInterval(() => {
+    if (app.level !== 4 || app.round >= 65) { clearInterval(app.playing); app.playing = null; if (app.level === 4) update3(); return; }
+    setRound(app.round + 1);
+  }, 160);
+  update3();
+}
+
+/* ---------- step 5: guessing a short hash ---------- */
+function render4() {
+  const t = L();
+  if (!app.open[5]) return gateHTML(5);
+  return '<div class="card"><div class="rctl"><b id="klbl"></b><input type="range" min="4" max="24" data-field="k" value="' + app.k + '"><button class="dark" data-action="search">' + t.startBtn + "</button></div>" +
+    '<div class="flow"><div class="vbox r-msg"><small>Alice</small><span class="v">' + esc(PHRASE) + '</span></div><span class="arr">→</span><div class="mech">⚙ SHA-256</div><span class="arr">→</span><div id="tgt5"></div></div>' +
+    '<div id="srch5"></div></div>' +
+    '<div class="card"><div class="cardhead"><h3>' + t.hundredTitle + '</h3><div class="btns" style="margin:0">' +
+    [8, 10, 12, 14, 16].map(k => '<button data-action="k2" data-k="' + k + '" class="' + (k === app.k2 ? "on" : "") + '">k = ' + k + "</button>").join("") +
+    '<button class="dark" data-action="hundred" id="hbtn"></button></div></div><p class="note" style="margin:0">' + t.hundredNote + '</p><div id="hund5"></div></div>' +
+    '<div class="card"><h3>' + t.extraTitle + '</h3><div id="extra5"></div></div>';
+}
+function update4() {
+  if (!app.open[5] || !document.getElementById("srch5")) return;
+  const t = L(), k = app.k, target = shortHash(utf8(PHRASE), k);
+  document.getElementById("klbl").textContent = t.kLbl(k);
+  document.getElementById("tgt5").innerHTML = vbox("r-dg", t.target, target.toString(2).padStart(k, "0") + " <span class='note'>(" + fmt(target) + ")</span>");
+  const S = app.search;
+  let s = "";
+  if (S && S.k === k) {
+    const exp = Math.pow(2, k);
+    s += '<div class="flow" style="margin-top:8px"><div class="vbox r-eve"><small class="who-m">Mallory</small><span class="big">' + fmt(S.tries) + " " + t.tries + '</span></div><div class="vbox r-neu"><small>' + t.expected + '</small><span class="big">' + fmt(exp) + "</span></div>" +
+      (S.rate ? '<div class="vbox r-neu"><small>' + t.rate + '</small><span class="big">' + fmt(Math.round(S.rate)) + "</span></div>" : "") + "</div>" +
+      '<div class="prog"><span style="width:' + Math.min(100, 100 * S.tries / exp / 2) + '%"></span></div><div class="note">0 · 2^k · 2 × 2^k</div>';
+    if (S.found !== null) s += '<div class="okline" style="margin-top:6px">' + esc(t.found(S.found, fmt(S.tries))) + "</div>";
+  }
+  document.getElementById("srch5").innerHTML = s;
+  drawHundred();
+  drawExtra();
+}
+let searchRun = 0;
+function startSearch() {
+  const run = ++searchRun, k = app.k, target = shortHash(utf8(PHRASE), k);
+  app.search = { k: k, tries: 0, found: null, rate: 0 };
+  const t0 = performance.now();
+  let i = 0;
+  function chunk() {
+    if (run !== searchRun) return;
+    const end = performance.now() + 30;
+    while (performance.now() < end) {
+      const inp = String(i);
+      app.search.tries++;
+      if (shortHash(utf8(inp), k) === target) { app.search.found = inp; break; }
+      i++;
+    }
+    const sec = (performance.now() - t0) / 1000;
+    if (sec > 0.05) { app.search.rate = app.search.tries / sec; app.rate = app.search.rate; }
+    if (app.level === 5) update4();
+    if (app.search.found === null) setTimeout(chunk, 0);
+  }
+  update4();
+  setTimeout(chunk, 0);
+}
+function startHundred() {
+  const run = ++searchRun, k = app.k2;
+  app.hundred = { k: k, done: 0, list: [], total: 0, running: true };
+  let target = null, i = 0, tries = 0;
+  const t0 = performance.now(), rnd = new Uint8Array(16);
+  function next() { crypto.getRandomValues(rnd); target = shortHash(rnd, k); i = 0; tries = 0; }
+  next();
+  function chunk() {
+    if (run !== searchRun) return;
+    const end = performance.now() + 30;
+    while (performance.now() < end && app.hundred.done < 100) {
+      tries++; app.hundred.total++;
+      if (shortHash(utf8(String(i)), k) === target) { app.hundred.list.push(tries); app.hundred.done++; next(); }
+      else i++;
+    }
+    const sec = (performance.now() - t0) / 1000;
+    if (sec > 0.05) app.rate = app.hundred.total / sec;
+    if (app.hundred.done >= 100) app.hundred.running = false;
+    if (app.level === 5) { drawHundred(); drawExtra(); }
+    if (app.hundred.running) setTimeout(chunk, 0);
+  }
+  drawHundred();
+  setTimeout(chunk, 0);
+}
+function drawHundred() {
+  const el = document.getElementById("hund5");
+  if (!el) return;
+  const t = L(), Hd = app.hundred;
+  const b = document.getElementById("hbtn"); if (b) b.textContent = t.hundredBtn(app.k2);
+  if (!Hd) { el.innerHTML = ""; return; }
+  const exp = Math.pow(2, Hd.k), bins = new Array(17).fill(0);
+  for (const n of Hd.list) bins[Math.min(16, Math.floor(4 * n / exp))]++;
+  const top = Math.max(1, ...bins);
+  let bars = "";
+  for (let i = 0; i < 17; i++) bars += '<div class="bar" style="height:' + (86 * bins[i] / top) + '%;background:var(--eve)"><i>' + (bins[i] || "") + "</i></div>";
+  let labs = "";
+  for (let i = 0; i < 17; i++) labs += "<span>" + (i % 4 === 0 ? (i / 4) + "×" : "") + "</span>";
+  const avg = Hd.list.length ? Hd.list.reduce((a, c) => a + c, 0) / Hd.list.length : 0;
+  el.innerHTML = '<div class="hist">' + bars + '<div class="half" style="left:' + (100 * 4 / 17) + '%"><em>2^k</em></div></div><div class="hlab">' + labs + "</div>" +
+    '<div class="stats"><span>' + Hd.done + " / 100</span>" + (Hd.done ? "<span>" + t.avg + ": <b>" + fmt(Math.round(avg)) + "</b></span><span>2^k = <b>" + fmt(exp) + "</b></span><span>" + t.ratio + ": <b>" + dec(avg / exp, 2) + "</b></span>" : "") + "</div>";
+}
+function sci(x) { const e = Math.floor(Math.log10(x)); return dec(x / Math.pow(10, e), 1) + " × 10^" + e; }
+function drawExtra() {
+  const el = document.getElementById("extra5");
+  if (!el) return;
+  const t = L();
+  if (!app.rate) { el.innerHTML = '<p class="note">' + t.noRate + "</p>"; return; }
+  const yr = 365.25 * 24 * 3600;
+  el.innerHTML = '<p class="note" style="margin:0">' + t.extraNote + " <b>" + fmt(Math.round(app.rate)) + "</b> " + t.rate + "</p>" +
+    [64, 128, 256].map(bits => '<div class="estrow">' + t.years(bits, sci(Math.pow(2, bits) / app.rate / yr)) + "</div>").join("") +
+    '<p class="note">' + t.universe + "</p>";
+}
+
+/* ---------- frame, navigation ---------- */
+const RENDER = [renderBB, render0, render1, render2, render3, render4];
+const UPDATE = [updateBB, update0, update1, update2, update3, update4];
+function buildSide() {
+  const t = L();
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+    '<button class="step" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
+    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+}
+function hashStr() { return "#" + (app.level + 1) + (app.card > 1 ? "." + app.card : ""); }
+function scrollToCard() {
+  if (app.card < 2) return;
+  const c = view.querySelectorAll(".fade > .card")[app.card - 1];
+  if (c) c.scrollIntoView({ block: "start" });
+}
+function selfLine() {
+  const t = L(), st = document.getElementById("selftest");
+  st.textContent = SELF_FAILS.length ? t.selfBad(SELF_FAILS.join(", ")) : SLOW_DONE ? t.selfOk : t.selfWait;
+  st.className = SELF_FAILS.length ? "badt" : SLOW_DONE ? "okt" : "";
+}
+function render() {
+  const t = L();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("intro").textContent = t.intro;
+  document.getElementById("home").textContent = "← " + t.home;
+  document.getElementById("keys").textContent = t.keys;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  selfLine();
+  buildSide();
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhTitle").textContent = t.steps[app.level][0];
+  document.getElementById("mhSub").textContent = t.steps[app.level][1];
+  const ex = t.explain[app.level];
+  view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" + RENDER[app.level]() + "</div>";
+  UPDATE[app.level]();
+  document.getElementById("moreTxt").textContent = t.moreBelow;
+  updateMore();
+  try { history.replaceState(null, "", hashStr()); } catch (e) {}
+}
+function goTo(level) {
+  app.level = level; app.card = 1;
+  render();
+  view.scrollTop = 0;
+}
+
+/* ---------- events ---------- */
+const view = document.getElementById("view");
+function scroller() { return view.scrollHeight > view.clientHeight + 1 ? view : document.scrollingElement; }
+function updateMore() {
+  const b = document.getElementById("more");
+  if (!b) return;
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  b.hidden = sc.scrollHeight - sc.scrollTop - h < 40;
+}
+document.getElementById("more").addEventListener("click", () => {
+  const sc = scroller();
+  const h = sc === view ? view.clientHeight : window.innerHeight;
+  sc.scrollBy({ top: Math.round(h * 0.8), behavior: "smooth" });
+});
+view.addEventListener("scroll", updateMore);
+window.addEventListener("scroll", updateMore);
+window.addEventListener("resize", updateMore);
+new MutationObserver(() => requestAnimationFrame(updateMore)).observe(view, { childList: true, subtree: true });
+view.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "bbx10") { if (app.bbA.length * 10 <= 1e7) app.bbA = app.bbA.repeat(10); updateBB(); }
+  else if (a === "bbbook") { app.bbA = "All work and no play. ".repeat(47663).slice(0, 1048576); updateBB(); }
+  else if (a === "bbreset") { app.bbA = "Pay Bob 100 GBP"; updateBB(); }
+  else if (a === "opengate") { app.open[app.level] = true; render(); }
+  else if (a === "flip") { const k = +el.dataset.k; if (app.flips.has(k)) app.flips.delete(k); else app.flips.add(k); update0(); }
+  else if (a === "unflip") { app.flips.clear(); update0(); }
+  else if (a === "flipex") {
+    app.msg = "Pay Bob 100 GBP"; app.flips = new Set([8 * 8 + 4]);
+    const inp = view.querySelector('input[data-field="msg1"]'); if (inp) inp.value = app.msg; update0();
+  }
+  else if (a === "histrun") { app.histRun = !app.histRun; drawHist(); if (app.histRun) histLoop(); }
+  else if (a === "hist1000") { histAdd(1000); drawHist(); }
+  else if (a === "histreset") { app.histRun = false; histReset(); drawHist(); }
+  else if (a === "pabc") { app.padCustom = "abc"; update1(); }
+  else if (a === "pfox") { app.padCustom = null; app.padLen = 79; const inp = view.querySelector('input[data-field="len"]'); if (inp) inp.value = 79; update1(); }
+  else if (a === "piece") piece3(el.dataset.n);
+  else if (a === "dig3") {
+    const buf = app.h3.bufLen, r = app.h3.digest();
+    app.dig3 = hex(r.digest);
+    app.log3.push('<span class="fx">' + esc(L().logDig(buf, r.runs)) + "</span>");
+    update2();
+  }
+  else if (a === "reset3") { reset3(); update2(); }
+  else if (a === "pick") { app.flipByte = +el.dataset.b; app.flipBit = +el.dataset.j; update3(); }
+  else if (a === "play4") play4();
+  else if (a === "search") startSearch();
+  else if (a === "k2") { app.k2 = +el.dataset.k; view.querySelectorAll('[data-action="k2"]').forEach(b => b.classList.toggle("on", +b.dataset.k === app.k2)); drawHundred(); }
+  else if (a === "hundred") startHundred();
+  else if (a === "reset6") { app.stored = 100; app.heard = []; app.wire = []; app.backShown = false; update5(); }
+});
+view.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  const v = e.target.value;
+  if (f === "bbA") { if (!e.target.readOnly) { app.bbA = v; updateBB(); } }
+  else if (f === "bbB") { app.bbB = v; updateBB(); }
+  else if (f === "msg1") { if (utf8(v).length <= 32) { app.msg = v; app.flips.clear(); update0(); } }
+  else if (f === "len") { app.padCustom = null; app.padLen = +v; update1(); }
+  else if (f === "msg4") { app.msg4 = v; if (app.flipByte > 63) app.flipByte = 0; update3(); }
+  else if (f === "round") { app.round = +v; update3(); }
+  else if (f === "k") { app.k = +v; searchRun++; app.search = null; update4(); }
+});
+document.getElementById("steps").addEventListener("click", e => {
+  const b = e.target.closest("[data-step]");
+  if (b) goTo(+b.dataset.step);
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem("cryptoSimLang", lang); } catch (e) {}
+  render();
+}));
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") { if (e.key === "Escape") e.target.blur(); return; }
+  if ((e.key === "Enter" || e.key === " ") && tag === "BUTTON") return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); if (app.level < NSTEPS - 1) goTo(app.level + 1); }
+  else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); if (app.level > 0) goTo(app.level - 1); }
+});
+
+/* ---------- start ---------- */
+// #4 opens step 4; #5.2 opens step 5 scrolled to its 2nd card
+function readHash() {
+  const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
+  if (hm && +hm[1] >= 1 && +hm[1] <= NSTEPS) { app.level = +hm[1] - 1; app.card = hm[2] ? Math.max(1, +hm[2]) : 1; }
+}
+// a link from a slide opens the right step even in a tab that is already open
+window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { readHash(); render(); view.scrollTop = 0; scrollToCard(); } });
+readHash();
+render();
+requestAnimationFrame(scrollToCard);
+setTimeout(() => slowTests(f => { SELF_FAILS = SELF_FAILS.concat(f); SLOW_DONE = true; selfLine(); }), 300);
+</script>
+</body>
+</html>
