@@ -214,7 +214,7 @@ input,textarea,select{font-family:var(--mono);color:var(--ink);background:var(--
 .opline{margin:10px 0 0;font-size:14px}
 .sm-in{width:8em;font-size:15px}
 
-/* step 4: the formulas */
+/* step 5: the formulas */
 .formbox{display:inline-grid;grid-template-columns:auto auto;gap:4px 18px;font-family:var(--mono);font-size:15px;padding:10px 16px;border:1.5px solid var(--rule);border-radius:8px;background:var(--sunken)}
 .formbox .hl{background:var(--chg-bg);outline:2px solid var(--chg);border-radius:4px;padding:0 4px}
 .formbox .lb{font-family:var(--sans);font-weight:600;font-size:13.5px}
@@ -235,12 +235,31 @@ input,textarea,select{font-family:var(--mono);color:var(--ink);background:var(--
 .calcwrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .calcwrap .left{flex:1 1 460px;min-width:0}
 
+/* step 3: from real numbers to modulo 17 */
+.tgrid{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);gap:8px 18px;font-family:var(--mono);font-size:13.5px;align-items:start;margin-top:6px;line-height:1.7}
+.tgrid>span{min-width:0;overflow-wrap:anywhere}
+.tgrid .lb{font-family:var(--sans);font-weight:600;font-size:13px;color:var(--muted)}
+.tgrid .hd{font-family:var(--sans);font-weight:700;font-size:14.5px;border-bottom:2px solid var(--rule)}
+.dif{background:var(--chg-bg);outline:2px solid var(--chg);border-radius:4px;padding:0 3px}
+.tsl{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:13.5px;margin:2px 0}
+.tsl input[type=range]{flex:1 1 auto;min-width:80px}
+.tsl button{padding:2px 8px;font-size:12.5px}
+.side2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.rline{font-family:var(--mono);font-size:14px;margin-top:4px;overflow-wrap:anywhere}
+.digits b{color:var(--bad);background:var(--eve-bg);border-radius:3px}
+.xt{border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin:0 0 8px}
+.xt td{border:1px solid var(--rule);padding:2px 5px;text-align:center;min-width:2.2em}
+.xt td.h{font-family:var(--sans);font-weight:600;color:var(--muted);text-align:right;border:0;padding-right:8px;white-space:nowrap}
+.xt td.todo{color:var(--muted);opacity:.45}
+.xt td.cur{background:var(--chg-bg);outline:2px solid var(--chg);outline-offset:-2px;font-weight:700}
+
 @media (max-width:900px){
   .app{height:auto;display:block}
   .top{flex-wrap:wrap}
   .body{display:block}
   .side{border-right:0;border-bottom:1px solid var(--rule)}
   .main{display:block}
+  .side2,.tgrid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -403,6 +422,34 @@ function realAdd(P, Q) {
   return { kind: "chord", s: s, third: { x: x3, y: -y3 }, R: { x: x3, y: y3 } };
 }
 
+// step 3: the real curve with the floating-point numbers of a computer (about 16 digits, rounded after every step).
+// The same operations in the same order as the Python check of the slide "Rounding breaks the agreement".
+function realAddF(P, Q) {
+  if (P === null) return Q;
+  if (Q === null) return P;
+  if (P.x === Q.x && P.y === -Q.y) return null;
+  let s;
+  if (P.x === Q.x && P.y === Q.y) s = (3 * P.x * P.x + 2) / (2 * P.y);
+  else s = (Q.y - P.y) / (Q.x - P.x);
+  const x3 = s * s - P.x - Q.x, y3 = s * (P.x - x3) - P.y;
+  return { x: x3, y: y3 };
+}
+function realMulSlow(k, P) { let R = null; for (let i = 0; i < k; i++) R = realAddF(R, P); return R; }
+const REAL_P = { x: 1, y: Math.sqrt(5) };
+
+// the points of y^2 = x^3 + a x + b mod p column by column: for each x the right side and the y that fit (small p only)
+function pointsByX(a, b, p) {
+  const sq = [];
+  for (let y = 0; y < p; y++) sq.push(y * y % p);
+  const cols = [];
+  for (let x = 0; x < p; x++) {
+    const full = x * x * x + a * x + b, r = full % p, ys = [];
+    for (let y = 0; y < p; y++) if (sq[y] === r) ys.push(y);
+    cols.push({ x: x, full: full, r: r, ys: ys });
+  }
+  return { sq: sq, cols: cols };
+}
+
 /* Test values and their sources.
    Slides (Lecture05-Elliptic-Curves/main.tex, % CHECKED lines) and Paar and Pelzl, "Understanding Cryptography" (2010),
    chapter 9.2, the same example curve y^2 = x^3 + 2x + 2 mod 17 with G = (5, 1), 19 points, 2G = (6, 3).
@@ -481,6 +528,17 @@ function selfTest() {
   if (!samePoint(gi, { x: RFC5903.gix, y: RFC5903.giy }) || !samePoint(gr, { x: RFC5903.grx, y: RFC5903.gry })) fails.push("RFC 5903 public keys");
   const gir = { x: RFC5903.girx, y: RFC5903.giry };
   if (!samePoint(mul(P, RFC5903.i, gr), gir) || !samePoint(mul(P, RFC5903.r, gi), gir)) fails.push("RFC 5903 shared point");
+  // step 3: rounding on the real curve, P = (1, sqrt 5), a = 3, b = 10 (slide "Rounding breaks the agreement", Python 3.12 floats)
+  const ra3 = realMulSlow(3, realMulSlow(10, REAL_P)), rb3 = realMulSlow(10, realMulSlow(3, REAL_P));
+  if (String(ra3.x) !== "3.944496434337069" || String(rb3.x) !== "3.9444964343303237") fails.push("rounding a = 3, b = 10");
+  // step 3: one division both ways (slide "Only the arithmetic changes"): 3^-1 = 6, 2 / 3 = 12 mod 17; (0, 6) + (3, 1): s = 4
+  if (inv(3n, 17n) !== 6n || mod(2n * inv(3n, 17n), 17n) !== 12n) fails.push("2 / 3 mod 17");
+  const tr3 = addInfo(C, pt(0, 6), pt(3, 1));
+  if (tr3.denInv !== 6n || tr3.s !== 4n || !samePoint(tr3.R, pt(13, 10))) fails.push("(0, 6) + (3, 1)");
+  // step 3: the table column by column gives the same 18 points; x = 5: 137 = 8 * 17 + 1, y = 1 and 16
+  const tb = pointsByX(2, 2, 17), tpts = [];
+  for (const c of tb.cols) for (const y of c.ys) tpts.push(c.x + "," + y);
+  if (tpts.join(" ") !== SLIDE_POINTS || tb.cols[5].full !== 137 || tb.cols[5].r !== 1 || tb.cols[5].ys.join() !== "1,16") fails.push("the table of x");
   return fails;
 }
 // CORE-END
@@ -496,15 +554,17 @@ const T = {
   en: {
     title: "Elliptic-curve explorer", home: "All simulators",
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
-    stepOf: n => "Step " + n + " of 4 · ECC",
+    stepOf: n => "Step " + n + " of 5 · ECC",
     steps: [["Black box", "two secrets in, one shared point out"], ["Adding points", "chord and tangent on the real curve"],
+            ["Real to modulo 17", "the same formulas, exact numbers"],
             ["Modulo 17", "dots, multiples of G, double and add"], ["One addition", "slope s, x₃ and y₃ modulo 17"]],
     explain: {
       ecdh: ["Diffie-Hellman with points", "Alice and Bob each pick a secret number and publish a point: A = aG and B = bG. Each multiplies the other's point by their own secret, and both get the same point abG. Eve sees the curve, G, A and B. Change the secrets. Click an a × G box to see what multiplying a point means."],
       elg: ["ElGamal with points", "Bob publishes Q = dG. Alice's message is a point M. She picks a random k and sends C₁ = kG and C₂ = M + kQ. Bob subtracts dC₁ = kQ and gets M back. Eve sees Q, C₁ and C₂. Click a box to see how points are added."],
       add: ["P + Q: draw a line, find the third point, reflect it", "Over the real numbers the curve y² = x³ + 2x + 2 is one smooth line. The line through P and Q meets the curve in exactly one more point. Its mirror image in the x-axis is P + Q. For P + P the line is the tangent. Why exactly one more point: put the line into the curve and you get a cubic in x with three roots; two are known, so the third is forced. Why reflect: so that O works as zero (P + O = P). Drag P and Q."],
-      mod: ["The same curve modulo 17", "Computers need exact numbers, so x and y are whole numbers from 0 to 16 and every result is taken mod 17. The line becomes 18 dots, plus the point at infinity O. Click any square to check whether it is a point of the curve. Then add G again and again (G, 2G, 3G, …), or get to kG fast with double and add."],
-      one: ["One addition, number by number", "The picture of step 2 becomes three formulas: the slope s, then x₃ and y₃, all mod 17. Dividing means multiplying by the modular inverse. Pick two points, or come here from step 3."],
+      trans: ["From real numbers to modulo 17: only the arithmetic changes", "The formulas of step 2 work in any arithmetic where you can add, multiply and divide. Over the real numbers every result has endless decimals and the computer rounds it; modulo 17 every result is a whole number from 0 to 16, and dividing by v means multiplying by its inverse v⁻¹. Below: the same addition both ways, what rounding does to Alice and Bob, and where the 18 dots of the curve come from."],
+      mod: ["The same curve modulo 17", "The curve of step 3, dot by dot: its 18 points, plus the point at infinity O. Click any square to check whether it is a point of the curve. Then add G again and again (G, 2G, 3G, …), or get to kG fast with double and add."],
+      one: ["One addition, number by number", "The picture of step 2 becomes three formulas: the slope s, then x₃ and y₃, all mod 17. Dividing means multiplying by the modular inverse. Pick two points, or come here from step 4."],
     },
     selfOk: "✓ checked against the slides, Paar and Pelzl (ch. 9) and RFC 5903 (P-256)", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
@@ -518,7 +578,7 @@ const T = {
     eveShow: "show Eve's attack", eveHidden: "Eve tries G, 2G, 3G, … until she reaches A. The list shows the multiples of G: work them out yourself first, then click to compare.",
     eveTry: (n, a) => "Eve adds G again and again until she reaches A. After " + n + " " + (n === 1 ? "try" : "tries") + " she knows a = " + a + ", and a × B gives her the shared point.",
     eveReal: "Here there are only 19 multiples. On P-256 there are about 2²⁵⁶, and the best known attack needs about 2¹²⁸ steps. Small numbers are only for learning.",
-    cardBig: "The same on a real curve: P-256",
+    cardBig: "The same on a curve used in practice: P-256",
     bigNote: "The same steps with 256-bit numbers. The starting secrets are the test vector of RFC 5903, section 8.1; the dice picks new ones.",
     bigSecA: "Alice's secret a (hex)", bigSecB: "Bob's secret b (hex)",
     bigErr: "A secret must be a hex number from 1 to n − 1 (at most 64 hex digits).",
@@ -538,8 +598,8 @@ const T = {
     rdTitle: "The numbers", slope: "slope s", tangentS: "slope s of the tangent", thirdPt: "third point", sumPt: "P + Q", dblPt: "2P = P + P",
     oNote: "P + (−P) = O, and P + O = P: O works like zero.", offPic: "The third point is outside the picture: drag P or Q closer.",
     decimals: "These coordinates have endless decimals: at x = 1, y = √5 = 2.2360679774997896964… Computers need exact numbers, so the next step works modulo 17.",
-    goMod: "The same rules modulo 17", checkRow: "check on the curve",
-    // step 3
+    goMod: "From real numbers to modulo 17", checkRow: "check on the curve",
+    // step 4
     cardGrid: "y² = x³ + 2x + 2 mod 17: 18 dots and O", gridNote: "Click any square: is it a point of the curve?",
     mirror: "dashed line y = 8.5: (x, y) and (x, 17 − y) are mirror images",
     isOn: (x, y, l, lr, r, rr, on) => "(" + x + ", " + y + "): left side y² = " + l + " → " + lr + " mod 17; right side x³ + 2x + 2 = " + r + " → " + rr + " mod 17. " + (on ? "Both are " + lr + ": on the curve ✓" : "Different: not on the curve ✗"),
@@ -548,7 +608,7 @@ const T = {
     multNote: "Each next point is the previous one plus G. Click a point to jump there.",
     multO: "19G = O: back to the start. The order of G is 19: G visited all 18 dots, then O.",
     multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
-    seeAdd: "see this addition in step 4 →",
+    seeAdd: "see this addition in step 5 →",
     bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bAll: "show all",
     kLbl: "k (1 to 1 048 575)", inBin: "in binary", sumPow: (k, parts) => k + " = " + parts.join(" + "),
     colI: "i", colD: "2ⁱG (doubling)", colBit: "bit", colR: "R: the sum so far",
@@ -559,7 +619,7 @@ const T = {
     opsCount: (d, a, k) => d + " " + (d === 1 ? "doubling" : "doublings") + " and " + a + " " + (a === 1 ? "addition" : "additions") + " instead of " + (k - 1) + " " + (k - 1 === 1 ? "addition" : "additions") + ". For a 256-bit k: about 256 doublings, not 2²⁵⁶ additions.",
     reduce: (k, q, r) => "19G = O, so only k mod 19 matters: " + k + " = " + q + " × 19 + " + r + ", so " + k + "G = " + r + "G.",
     resultIs: (k, pt) => k + "G = " + pt,
-    // step 4
+    // step 5
     cardPick: "Pick two points", presets: "examples:", prDbl: "G + G (slides)", prNeg: "G + (−G)",
     cardForm: "The formulas (mod 17)", fChord: "for P + Q:", fDbl: "for P + P:", fRes: "result:",
     divNote: "“/ v mod 17” means: multiply by v⁻¹, the number with v × v⁻¹ = 1 mod 17.",
@@ -569,21 +629,40 @@ const T = {
     invQ: v => "Which number times " + v + " gives 1 mod 17?",
     leftO: "P is O: O + Q = Q. O works like zero.", rightO: "Q is O: P + O = P. O works like zero.",
     opp: (y1, y2) => "x₁ = x₂ and y₁ + y₂ = " + y1 + " + " + y2 + " = 17 = 0 mod 17: Q = −P. The line is vertical, so P + Q = O.",
-    origin: (txt) => "From step 3: " + txt + ".",
+    origin: (txt) => "From step 4: " + txt + ".",
+    // step 3
+    cardSide: "The same addition, two kinds of arithmetic", sideNote: "Left: the real curve, with the numbers a computer keeps (about 16 digits); move P and Q with the sliders, the small picture shows them on the curve. Right: modulo 17; pick two dots from the menus. The formulas are the same; only the marked parts differ.",
+    colReal: "real numbers", colMod: "modulo 17", rowIn: "pick", rowPts: "points", upper: "upper half", lower: "lower half",
+    vertical: "x₁ = x₂ and y₂ = −y₁: the line is vertical, P + Q = O",
+    sameDigits: "the same digits this time", offBy: d => "off by " + d + ": rounded, not exact", exact: "both sides equal, exactly ✓",
+    cardRound: "Alice and Bob, with rounding", roundNote: "Diffie-Hellman needs both sides to end with exactly the same value. On the real curve each side rounds at different moments. Change a and b.",
+    roundSame: "The same digits: here both sides did exactly the same steps (a = b, or a or b is 1).", roundDiff: "Different digits (in red): keys made from them would be completely different.",
+    roundMod: "Modulo 17: always the same point ✓",
+    cardTable: "Where the 18 dots come from", tableNote: "For each x from 0 to 16: compute x³ + 2x + 2 mod 17, then look in the first table for the y whose square is that number. Press next.",
+    tableStart: "Press next to take x = 0.",
+    tableLine: (x, full, ml, r, ys) => "x = " + x + ": " + x + "³ + 2 × " + x + " + 2 = " + ml + ", so the right side is " + r + ". " +
+      (ys.length === 0 ? "No y has y² = " + r + " mod 17: no point with x = " + x + "." : "y² = " + r + " for y = " + ys.join(" and ") + ": " + ys.map(y => "(" + x + ", " + y + ")").join(" and ") + "."),
+    tableDone: n => "All 17 columns: " + n + " dots, plus O.",
+    cardWhy: "Why the dots look random", whyText: "The equation is the same as on the real curve, but modulo 17 every value wraps around a clock of 17 numbers. x³ + 2x + 2 grows fast, so the next x goes around the clock many more times and stops somewhere unrelated. Only one pattern survives: y and 17 − y have the same square, so the dots are mirror images in the dashed line.",
+    lapsN: n => n + " laps", clockLine: (x, full, laps, r) => "x = " + x + ": " + full + " = " + laps + " × 17 + " + r + ": " + laps + " times around the clock, then it stops at " + r + ".",
+    barsFull: "x³ + 2x + 2: grows smoothly", barsMod: "the same mod 17: jumps", bigP: "The same equation for a bigger p",
+    pLine: (p, n) => "y² = x³ + 2x + 2 mod " + p + ": " + n + " dots. The bigger p, the more scattered.", goGrid: "The curve modulo 17",
     bothSides: v => "both sides are " + v,
   },
   pl: {
     title: "Eksplorator krzywych eliptycznych", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
-    stepOf: n => "Krok " + n + " z 4 · ECC",
+    stepOf: n => "Krok " + n + " z 5 · ECC",
     steps: [["Czarna skrzynka", "dwa sekrety na wejściu, jeden wspólny punkt"], ["Dodawanie punktów", "sieczna i styczna na krzywej rzeczywistej"],
+            ["Od liczb rzeczywistych do modulo 17", "te same wzory, dokładne liczby"],
             ["Modulo 17", "kropki, wielokrotności G, podwajanie i dodawanie"], ["Jedno dodawanie", "nachylenie s, x₃ i y₃ modulo 17"]],
     explain: {
       ecdh: ["Diffie-Hellman na punktach", "Alice i Bob wybierają po tajnej liczbie i publikują punkt: A = aG oraz B = bG. Każde mnoży punkt drugiej strony przez swój sekret i oboje dostają ten sam punkt abG. Eve widzi krzywą, G, A i B. Zmień sekrety. Kliknij pole a × G, żeby zobaczyć, co znaczy mnożenie punktu."],
       elg: ["ElGamal na punktach", "Bob publikuje Q = dG. Wiadomość Alice to punkt M. Alice losuje k i wysyła C₁ = kG oraz C₂ = M + kQ. Bob odejmuje dC₁ = kQ i odzyskuje M. Eve widzi Q, C₁ i C₂. Kliknij pole, żeby zobaczyć, jak dodaje się punkty."],
       add: ["P + Q: prosta, trzeci punkt, odbicie", "Nad liczbami rzeczywistymi krzywa y² = x³ + 2x + 2 to jedna gładka linia. Prosta przez P i Q przecina krzywą w dokładnie jednym kolejnym punkcie. Jego odbicie względem osi x to P + Q. Dla P + P prosta jest styczną. Dlaczego dokładnie jeden punkt: prosta wstawiona do równania krzywej daje równanie trzeciego stopnia w x z trzema pierwiastkami; dwa znamy, więc trzeci jest wyznaczony. Dlaczego odbicie: żeby O działał jak zero (P + O = P). Przeciągnij P i Q."],
-      mod: ["Ta sama krzywa modulo 17", "Komputer potrzebuje dokładnych liczb, więc x i y to liczby całkowite od 0 do 16, a każdy wynik bierzemy mod 17. Linia zmienia się w 18 kropek i punkt w nieskończoności O. Kliknij dowolne pole, żeby sprawdzić, czy to punkt krzywej. Potem dodawaj G raz za razem (G, 2G, 3G, …) albo szybko dojdź do kG podwajaniem i dodawaniem."],
-      one: ["Jedno dodawanie, liczba po liczbie", "Rysunek z kroku 2 zamienia się w trzy wzory: nachylenie s, potem x₃ i y₃, wszystko mod 17. Dzielenie to mnożenie przez odwrotność modularną. Wybierz dwa punkty albo przyjdź tu z kroku 3."],
+      trans: ["Od liczb rzeczywistych do modulo 17: zmienia się tylko arytmetyka", "Wzory z kroku 2 działają w każdej arytmetyce, w której można dodawać, mnożyć i dzielić. Na liczbach rzeczywistych każdy wynik ma nieskończone rozwinięcie i komputer go zaokrągla; modulo 17 każdy wynik to liczba całkowita od 0 do 16, a dzielenie przez v to mnożenie przez odwrotność v⁻¹. Niżej: to samo dodawanie na dwa sposoby, co zaokrąglenia robią z Alice i Bobem i skąd biorą się 18 kropek krzywej."],
+      mod: ["Ta sama krzywa modulo 17", "Krzywa z kroku 3, kropka po kropce: jej 18 punktów i punkt w nieskończoności O. Kliknij dowolne pole, żeby sprawdzić, czy to punkt krzywej. Potem dodawaj G raz za razem (G, 2G, 3G, …) albo szybko dojdź do kG podwajaniem i dodawaniem."],
+      one: ["Jedno dodawanie, liczba po liczbie", "Rysunek z kroku 2 zamienia się w trzy wzory: nachylenie s, potem x₃ i y₃, wszystko mod 17. Dzielenie to mnożenie przez odwrotność modularną. Wybierz dwa punkty albo przyjdź tu z kroku 4."],
     },
     selfOk: "✓ sprawdzone ze slajdami, z Paarem i Pelzlem (rozdz. 9) i z RFC 5903 (P-256)", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
@@ -597,7 +676,7 @@ const T = {
     eveShow: "pokaż atak Eve", eveHidden: "Eve próbuje G, 2G, 3G, …, aż dojdzie do A. Lista pokazuje wielokrotności G: najpierw policz je sam, potem kliknij i porównaj.",
     eveTry: (n, a) => "Eve dodaje G raz za razem, aż dojdzie do A. Po " + n + " " + plN(n, "próbie", "próbach", "próbach") + " zna a = " + a + ", a a × B daje jej wspólny punkt.",
     eveReal: "Tutaj jest tylko 19 wielokrotności. Na P-256 jest ich około 2²⁵⁶, a najlepszy znany atak potrzebuje około 2¹²⁸ kroków. Małe liczby służą tylko do nauki.",
-    cardBig: "To samo na prawdziwej krzywej: P-256",
+    cardBig: "To samo na krzywej używanej w praktyce: P-256",
     bigNote: "Te same kroki na liczbach 256-bitowych. Początkowe sekrety to wektor testowy z RFC 5903, punkt 8.1; kostka losuje nowe.",
     bigSecA: "sekret Alice a (hex)", bigSecB: "sekret Boba b (hex)",
     bigErr: "Sekret musi być liczbą szesnastkową od 1 do n − 1 (najwyżej 64 cyfry hex).",
@@ -616,7 +695,7 @@ const T = {
     rdTitle: "Liczby", slope: "nachylenie s", tangentS: "nachylenie s stycznej", thirdPt: "trzeci punkt", sumPt: "P + Q", dblPt: "2P = P + P",
     oNote: "P + (−P) = O oraz P + O = P: O działa jak zero.", offPic: "Trzeci punkt jest poza rysunkiem: przysuń P albo Q.",
     decimals: "Te współrzędne mają nieskończone rozwinięcia: dla x = 1 mamy y = √5 = 2,2360679774997896964… Komputer potrzebuje dokładnych liczb, więc następny krok liczy modulo 17.",
-    goMod: "Te same zasady modulo 17", checkRow: "sprawdzenie na krzywej",
+    goMod: "Od liczb rzeczywistych do modulo 17", checkRow: "sprawdzenie na krzywej",
     cardGrid: "y² = x³ + 2x + 2 mod 17: 18 kropek i O", gridNote: "Kliknij dowolne pole: czy to punkt krzywej?",
     mirror: "przerywana linia y = 8,5: (x, y) i (x, 17 − y) to odbicia",
     isOn: (x, y, l, lr, r, rr, on) => "(" + x + ", " + y + "): lewa strona y² = " + l + " → " + lr + " mod 17; prawa strona x³ + 2x + 2 = " + r + " → " + rr + " mod 17. " + (on ? "Obie to " + lr + ": punkt leży na krzywej ✓" : "Różne: punkt nie leży na krzywej ✗"),
@@ -625,7 +704,7 @@ const T = {
     multNote: "Każdy kolejny punkt to poprzedni plus G. Kliknij punkt, żeby do niego przejść.",
     multO: "19G = O: powrót do początku. Rząd G to 19: G odwiedził wszystkie 18 kropek, a potem O.",
     multLine: k => k === 1 ? "1G = G" : k + "G = " + (k - 1) + "G + G",
-    seeAdd: "zobacz to dodawanie w kroku 4 →",
+    seeAdd: "zobacz to dodawanie w kroku 5 →",
     bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bAll: "pokaż wszystko",
     kLbl: "k (od 1 do 1 048 575)", inBin: "dwójkowo", sumPow: (k, parts) => k + " = " + parts.join(" + "),
     colI: "i", colD: "2ⁱG (podwajanie)", colBit: "bit", colR: "R: dotychczasowa suma",
@@ -645,7 +724,23 @@ const T = {
     invQ: v => "Przez co pomnożyć " + v + ", żeby dostać 1 mod 17?",
     leftO: "P to O: O + Q = Q. O działa jak zero.", rightO: "Q to O: P + O = P. O działa jak zero.",
     opp: (y1, y2) => "x₁ = x₂ oraz y₁ + y₂ = " + y1 + " + " + y2 + " = 17 = 0 mod 17: Q = −P. Prosta jest pionowa, więc P + Q = O.",
-    origin: (txt) => "Z kroku 3: " + txt + ".",
+    origin: (txt) => "Z kroku 4: " + txt + ".",
+    cardSide: "To samo dodawanie w dwóch arytmetykach", sideNote: "Po lewej krzywa rzeczywista, z liczbami, jakie trzyma komputer (około 16 cyfr); przesuwaj P i Q suwakami, mały rysunek pokazuje je na krzywej. Po prawej modulo 17; wybierz dwie kropki z menu. Wzory są te same; różnią się tylko zaznaczone miejsca.",
+    colReal: "liczby rzeczywiste", colMod: "modulo 17", rowIn: "wybierz", rowPts: "punkty", upper: "górna połowa", lower: "dolna połowa",
+    vertical: "x₁ = x₂ oraz y₂ = −y₁: prosta jest pionowa, P + Q = O",
+    sameDigits: "tym razem te same cyfry", offBy: d => "różnica " + d + ": zaokrąglone, nie dokładne", exact: "obie strony równe, dokładnie ✓",
+    cardRound: "Alice i Bob z zaokrągleniami", roundNote: "Diffie-Hellman wymaga, żeby obie strony skończyły z dokładnie tą samą wartością. Na krzywej rzeczywistej każda strona zaokrągla w innych momentach. Zmień a i b.",
+    roundSame: "Te same cyfry: tu obie strony wykonały dokładnie te same kroki (a = b albo a lub b to 1).", roundDiff: "Różne cyfry (na czerwono): klucze zrobione z nich byłyby zupełnie różne.",
+    roundMod: "Modulo 17: zawsze ten sam punkt ✓",
+    cardTable: "Skąd się bierze 18 kropek", tableNote: "Dla każdego x od 0 do 16: policz x³ + 2x + 2 mod 17, potem znajdź w pierwszej tabeli y, którego kwadrat to ta liczba. Naciśnij „następny”.",
+    tableStart: "Naciśnij „następny”, żeby wziąć x = 0.",
+    tableLine: (x, full, ml, r, ys) => "x = " + x + ": " + x + "³ + 2 × " + x + " + 2 = " + ml + ", więc prawa strona to " + r + ". " +
+      (ys.length === 0 ? "Żadne y nie ma y² = " + r + " mod 17: nie ma punktu z x = " + x + "." : "y² = " + r + " dla y = " + ys.join(" i ") + ": " + ys.map(y => "(" + x + ", " + y + ")").join(" i ") + "."),
+    tableDone: n => "Wszystkie 17 kolumn: " + n + " kropek i O.",
+    cardWhy: "Dlaczego kropki wyglądają na losowe", whyText: "Równanie jest to samo co na krzywej rzeczywistej, ale modulo 17 każda wartość zawija się na tarczy z 17 liczbami. x³ + 2x + 2 rośnie szybko, więc następne x obiega tarczę dużo więcej razy i zatrzymuje się gdzieś bez związku. Zostaje tylko jeden wzór: y i 17 − y mają ten sam kwadrat, więc kropki są odbiciami względem przerywanej linii.",
+    lapsN: n => n + " okrążeń", clockLine: (x, full, laps, r) => "x = " + x + ": " + full + " = " + laps + " × 17 + " + r + ": " + laps + " razy dookoła tarczy, potem zatrzymuje się na " + r + ".",
+    barsFull: "x³ + 2x + 2: rośnie gładko", barsMod: "to samo mod 17: skacze", bigP: "To samo równanie dla większego p",
+    pLine: (p, n) => "y² = x³ + 2x + 2 mod " + p + ": " + n + " kropek. Im większe p, tym bardziej rozrzucone.", goGrid: "Krzywa modulo 17",
     bothSides: v => "obie strony to " + v,
   },
 };
@@ -670,6 +765,7 @@ const app = {
   rmode: "add", rP: { x: -0.7, up: true }, rQ: { x: 0.2, up: true },
   mode3: "pts", mk: 1, dk: 100, dstep: 0, cell: { x: 5, y: 1 },
   p4: 1, q4: 1, s4: 1, origin4: null,
+  tmode: "add", tP: { x: -0.7, up: true }, tQ: { x: 0.2, up: true }, tp: 7, tq: 4, ta: 3, tb: 10, tx: 0, tpp: 17,
 };
 
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -718,7 +814,7 @@ function gridSVG(o) {
       s += '<line x1="' + gx(A.x) + '" y1="' + gy(A.y) + '" x2="' + gx(B.x) + '" y2="' + gy(B.y) + '" stroke="var(--chg)" stroke-width="' + (last ? 2.6 : 1.4) + '" opacity="' + (last ? 1 : 0.55) + '"' + (last ? ' marker-end="url(#gm_chg)"' : "") + ' pointer-events="none"/>';
     }
   }
-  for (const P of curvePoints(TOY)) s += '<circle class="pt" cx="' + gx(P.x) + '" cy="' + gy(P.y) + '" r="' + (c * 0.24) + '" pointer-events="none"/>';
+  for (const P of (o.only || curvePoints(TOY))) s += '<circle class="pt" cx="' + gx(P.x) + '" cy="' + gy(P.y) + '" r="' + (c * 0.24) + '" pointer-events="none"/>';
   for (const m of (o.marks || [])) {
     if (m.P === null) continue;
     const r = c * (m.big ? 0.42 : 0.34);
@@ -975,7 +1071,209 @@ function hookReal() {
   svg.addEventListener("pointercancel", stop);
 }
 
-/* ---------- step 3: modulo 17 ---------- */
+/* ---------- step 3: from real numbers to modulo 17 ---------- */
+const fx = v => (v < 0 ? MINUS : "") + String(Math.abs(v));                 // a float with all the digits the computer keeps
+const fxp = v => v < 0 ? "(" + fx(v) + ")" : fx(v);
+const dif = s => '<span class="dif">' + s + "</span>";
+const T_MENU = BY_XY.filter(k => k !== 2);
+function renderT() {
+  const t = L();
+  const pr = on => ' aria-pressed="' + on + '"';
+  // 2G = (6, 3) is left out, so that G + 2G (the paper exercise of the slides) cannot be picked here
+  const opts = sel => T_MENU.map(k => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + ps(MULT[k]) + "</option>").join("");
+  const slider = (f, name) => '<label class="tsl"><b>' + name + '</b> x <input type="range" min="' + (ROOT + 0.02).toFixed(3) + '" max="3" step="0.01" data-field="' + f + '" value="' + app[f].x + '">' +
+    '<button data-action="tflip" data-f="' + f + '">' + (app[f].up ? t.upper : t.lower) + "</button></label>";
+  const dbl = app.tmode === "double";
+  return '<div class="card"><h3>' + t.cardSide + '</h3><p class="note" style="margin:0 0 8px">' + t.sideNote + "</p>" +
+      '<span class="tabs"><button data-action="tmode" data-m="add"' + pr(!dbl) + ">" + t.modeAdd + '</button><button data-action="tmode" data-m="double"' + pr(dbl) + ">" + t.modeDbl + "</button></span>" +
+      '<div class="tgrid" style="margin-top:10px"><span></span><span class="hd">' + t.colReal + '</span><span class="hd">' + t.colMod + "</span>" +
+      '<span class="lb">' + t.rowIn + "</span><span>" + slider("tP", "P") + (dbl ? "" : slider("tQ", "Q")) + "</span>" +
+      '<span><label class="tsl"><b>P</b> <select data-field="tp">' + opts(app.tp) + "</select></label>" + (dbl ? "" : '<label class="tsl"><b>Q</b> <select data-field="tq">' + opts(app.tq) + "</select></label>") + "</span>" +
+      '</div><div class="tgrid" id="sideRows"></div></div>' +
+    '<div class="card"><h3>' + t.cardRound + '</h3><p class="note" style="margin:0 0 8px">' + t.roundNote + "</p>" +
+      '<div class="pick" style="margin-bottom:8px"><span class="chip role-priv" style="position:static">' + t.secA + numCtl("ta") + '</span><span class="chip role-priv" style="position:static">' + t.secB + numCtl("tb") + "</span></div>" +
+      '<div class="side2" id="roundBody"></div></div>' +
+    '<div class="card"><h3>' + t.cardTable + '</h3><p class="note" style="margin:0 0 8px">' + t.tableNote + "</p>" +
+      '<div class="btns" style="margin:0 0 8px"><button data-action="tx-reset">' + t.bReset + '</button><button data-action="tx-prev">' + t.bPrev + "</button>" +
+      '<button class="dark" data-action="tx-next">' + t.bNext + '</button><button data-action="tx-all">' + t.bAll + "</button></div>" +
+      '<div class="calcwrap"><div class="left" style="min-width:0"><div class="schwrap" id="sqTable"></div><div class="schwrap" id="xTable"></div><p class="opline" id="xLine"></p></div><div id="gT"></div></div></div>' +
+    '<div class="card"><h3>' + t.cardWhy + '</h3><p style="margin:0 0 8px">' + t.whyText + "</p>" +
+      '<div class="calcwrap"><div id="clock"></div><div class="left" style="min-width:0"><div id="bars"></div><p class="note" id="clockLine"></p></div></div>' +
+      '<h3 style="margin:14px 0 6px">' + t.bigP + '</h3><span class="tabs">' + [17, 41, 97].map(p => '<button data-action="tpp" data-p="' + p + '"' + pr(app.tpp === p) + ">p = " + p + "</button>").join("") + "</span>" +
+      '<div id="gP" style="margin-top:8px"></div><p class="note" id="pLine"></p>' +
+      '<div class="btns"><button class="dark" data-action="zoom">' + t.goGrid + " →</button></div></div>";
+}
+// a small picture of the real curve for the side by side card: P, Q, the line, the third point and its reflection
+function smallReal(P, Q, r, dbl) {
+  const W = 300, H = 230, x0 = -1.6, x1 = 3.2, y0 = -7, y1 = 7;
+  const X = x => (x - x0) / (x1 - x0) * W, Y = y => H - (y - y0) / (y1 - y0) * H;
+  let s = '<svg class="plot" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="real curve">' +
+    "<defs>" + mk("sm_chg", "var(--chg)") + '<clipPath id="smclip"><rect x="0" y="0" width="' + W + '" height="' + H + '"/></clipPath></defs>';
+  s += '<line class="axis" x1="0" y1="' + Y(0) + '" x2="' + W + '" y2="' + Y(0) + '"/><line class="axis" x1="' + X(0) + '" y1="0" x2="' + X(0) + '" y2="' + H + '"/>';
+  const N = 160, up = [], lo = [];
+  for (let i = 0; i <= N; i++) { const x = ROOT + (i / N) * (i / N) * (x1 - ROOT), y = Math.sqrt(Math.max(0, realF(x))); up.push(X(x).toFixed(1) + "," + Y(y).toFixed(1)); lo.push(X(x).toFixed(1) + "," + Y(-y).toFixed(1)); }
+  s += '<polyline class="curve" style="stroke-width:2" points="' + lo.reverse().concat(up).join(" ") + '" clip-path="url(#smclip)"/>';
+  if (r.kind === "opposite") s += '<line class="ln" x1="' + X(P.x) + '" y1="0" x2="' + X(P.x) + '" y2="' + H + '"/>';
+  else {
+    const yAt = x => P.y + r.s * (x - P.x);
+    s += '<line class="ln" x1="' + X(x0) + '" y1="' + Y(yAt(x0)) + '" x2="' + X(x1) + '" y2="' + Y(yAt(x1)) + '" clip-path="url(#smclip)"/>';
+    if (r.third.x <= x1 && Math.abs(r.third.y) <= y1) {
+      s += '<line class="refl" x1="' + X(r.third.x) + '" y1="' + Y(r.third.y) + '" x2="' + X(r.R.x) + '" y2="' + (Y(r.R.y) + (r.R.y > 0 ? 8 : -8)) + '" marker-end="url(#sm_chg)"/>';
+      s += '<circle cx="' + X(r.third.x) + '" cy="' + Y(r.third.y) + '" r="4.5" fill="var(--chg)"/>';
+      s += '<circle cx="' + X(r.R.x) + '" cy="' + Y(r.R.y) + '" r="6" fill="var(--ct-b)"/><text class="lblr" style="font-size:13px" x="' + (X(r.R.x) - 9) + '" y="' + (Y(r.R.y) + 5) + '" text-anchor="end">' + (dbl ? "2P" : "P + Q") + "</text>";
+    }
+  }
+  const dot = (A, n, below) => '<circle cx="' + X(A.x) + '" cy="' + Y(A.y) + '" r="5.5" fill="var(--ink)"/><text class="lbl halo" style="font-size:13px;stroke:var(--surface);stroke-width:4;paint-order:stroke" x="' + (X(A.x) - 8) + '" y="' + (Y(A.y) + (below ? 16 : -8)) + '" text-anchor="end">' + n + "</text>";
+  if (!dbl) s += dot(Q, "Q", true);
+  s += dot(P, "P", false);
+  return s + "</svg>";
+}
+function sideRows() {
+  const t = L(), dbl = app.tmode === "double";
+  // the real side
+  const P = rpt(app.tP), Q = dbl ? P : rpt(app.tQ), r = realAdd(P, Q);
+  // the mod 17 side
+  const mP = MULT[app.tp], mQ = dbl ? mP : MULT[app.tq], I = addInfo(TOY, mP, mQ);
+  const ptR = A => "(" + fx(A.x) + ", " + fx(A.y) + ")";
+  const row = (lb, a, b) => '<span class="lb">' + lb + "</span><span>" + a + "</span><span>" + b + "</span>";
+  let h = row(t.rowPts, "P = " + ptR(P) + (dbl ? "" : "<br>Q = " + ptR(Q)), "P = " + ps(mP) + (dbl ? "" : "<br>Q = " + ps(mQ)));
+  const mm = [{ P: mP, col: "var(--ink)", label: "P", up: true }];
+  if (!dbl) mm.push({ P: mQ, col: "var(--ink)", label: "Q", up: false });
+  if (I.R !== null) mm.push({ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: dbl ? "2P" : "P + Q", big: true });
+  h += row("", smallReal(P, Q, r, dbl), gridSVG({ c: 11, marks: mm }));
+  // slope: the formula, then the numbers
+  const fR = dbl ? "s = (3x₁² + 2) " + dif("/") + " (2y₁)" : "s = (y₂ − y₁) " + dif("/") + " (x₂ − x₁)";
+  const fM = dbl ? "s = (3x₁² + 2) " + dif("× (2y₁)⁻¹") + " " + dif("mod 17") : "s = (y₂ − y₁) " + dif("× (x₂ − x₁)⁻¹") + " " + dif("mod 17");
+  h += row(t.stSlope, fR, fM);
+  let nR, nM;
+  if (r.kind === "opposite") nR = t.vertical;
+  else {
+    const num = dbl ? 3 * P.x * P.x + 2 : Q.y - P.y, den = dbl ? 2 * P.y : Q.x - P.x;
+    nR = "= " + fx(num) + " " + dif("/") + " " + fx(den) + "<br>= <b>" + fx(r.s) + "</b>";
+  }
+  if (I.kind === "opposite") nM = t.vertical;
+  else {
+    const prod = I.denM * I.denInv;
+    nM = "= " + fmt(I.num) + " " + dif("× " + (I.den < 0n ? "(" + fmt(I.den) + ")" : String(I.den)) + "⁻¹") + "<br>" +
+      (I.num !== I.numM ? fmt(I.num) + " mod 17 = " + I.numM + ", " : "") + (I.den !== I.denM ? fmt(I.den) + " mod 17 = " + I.denM + ", " : "") +
+      I.denM + "⁻¹ = " + I.denInv + ' <span class="note">(' + I.denM + " × " + I.denInv + " = " + prod + (prod >= 17n ? " = " + modLine(prod, 17n).split(" = ")[1] : "") + ")</span><br>" +
+      "= " + I.numM + " × " + I.denInv + " = " + I.sRaw + " " + dif("mod 17") + " = <b>" + I.s + "</b>";
+  }
+  h += row("", nR, nM);
+  if (r.kind !== "opposite" || I.kind !== "opposite") {
+    const x3R = r.kind === "opposite" ? "" : "x₃ = " + fx(r.s) + "² − " + fxp(P.x) + " − " + fxp(Q.x) + "<br>= <b>" + fx(r.R.x) + "</b>";
+    const x3M = I.kind === "opposite" ? "" : "x₃ = " + I.s + "² − " + mP.x + " − " + mQ.x + " = " + fmt(I.x3Raw) + " " + dif("mod 17") + " = <b>" + I.x3 + "</b>";
+    h += row(t.stX, x3R, x3M);
+    const y3R = r.kind === "opposite" ? "" : "y₃ = " + fx(r.s) + " × (" + fx(P.x) + " − " + fxp(r.R.x) + ") − " + fxp(P.y) + "<br>= <b>" + fx(r.R.y) + "</b>";
+    const y3M = I.kind === "opposite" ? "" : "y₃ = " + I.s + " × (" + mP.x + " − " + I.x3 + ") − " + mP.y + " = " + fmt(I.y3Raw) + " " + dif("mod 17") + " = <b>" + I.y3 + "</b>";
+    h += row(t.stY, y3R, y3M);
+  }
+  // the result and the check: equal digits on the real side are luck, modulo 17 they are exact
+  let cR = "P + Q = <b>O</b>", cM = "P + Q = <b>O</b>";
+  if (r.kind !== "opposite") {
+    const l = r.R.y * r.R.y, rr = realF(r.R.x);
+    cR = (dbl ? "2P" : "P + Q") + " = " + ptR(r.R) + "<br>y₃² = " + fx(l) + "<br>x₃³ + 2x₃ + 2 = " + fx(rr) + "<br>" +
+      (l === rr ? '<span class="okline">' + t.sameDigits + "</span>" : '<span class="badline">' + t.offBy(fx(Math.abs(l - rr))) + "</span>");
+  }
+  if (I.kind !== "opposite") {
+    const l = I.y3 * I.y3, rr = I.x3 ** 3n + 2n * I.x3 + 2n;
+    cM = (dbl ? "2P" : "P + Q") + " = <b>" + ps(I.R) + "</b><br>y₃² = " + l + " = " + mod(l, 17n) + " mod 17<br>x₃³ + 2x₃ + 2 = " + rr + " = " + mod(rr, 17n) + " mod 17<br>" +
+      '<span class="okline">' + t.exact + "</span>";
+  }
+  h += row(t.stCheck, cR, cM);
+  document.getElementById("sideRows").innerHTML = h;
+}
+function roundBody() {
+  const t = L(), a = app.ta, b = app.tb;
+  const A = realMulSlow(a, REAL_P), B = realMulSlow(b, REAL_P), SA = realMulSlow(a, B), SB = realMulSlow(b, A);
+  const sa = SA === null ? "O" : fx(SA.x), sb = SB === null ? "O" : fx(SB.x);
+  let i = 0;
+  while (i < sa.length && i < sb.length && sa[i] === sb[i]) i++;
+  const show = s => '<span class="digits">' + esc(s.slice(0, i)) + "<b>" + esc(s.slice(i)) + "</b></span>";
+  const e = ecdh(TOY, BigInt(a), BigInt(b));
+  document.getElementById("roundBody").innerHTML =
+    '<div><b>' + t.colReal + "</b>: P = (1, √5)" +
+      '<div class="rline"><span style="color:var(--non-b);font-weight:700">' + t.alice + "</span> " + a + " × (" + b + "P): x = " + show(sa) + "</div>" +
+      '<div class="rline"><span style="color:var(--ctr-b);font-weight:700">' + t.bob + "</span> " + b + " × (" + a + "P): x = " + show(sb) + "</div>" +
+      (sa === sb ? '<p class="note" style="margin:4px 0 0">' + t.roundSame + "</p>" : '<p class="badline" style="margin:4px 0 0">' + t.roundDiff + "</p>") + "</div>" +
+    '<div><b>' + t.colMod + "</b>: G = (5, 1)" +
+      '<div class="rline"><span style="color:var(--non-b);font-weight:700">' + t.alice + "</span> " + a + " × (" + b + "G) = " + psH(e.SA) + "</div>" +
+      '<div class="rline"><span style="color:var(--ctr-b);font-weight:700">' + t.bob + "</span> " + b + " × (" + a + "G) = " + psH(e.SB) + "</div>" +
+      '<p class="okline" style="margin:4px 0 0">' + t.roundMod + "</p></div>";
+}
+const TB = pointsByX(2, 2, 17);
+function tableBody() {
+  const t = L(), n = app.tx;
+  let sq = '<table class="xt"><tr><td class="h">y</td>';
+  for (let y = 0; y < 17; y++) sq += "<td>" + y + "</td>";
+  sq += '</tr><tr><td class="h">y² mod 17</td>';
+  for (let y = 0; y < 17; y++) sq += "<td>" + TB.sq[y] + "</td>";
+  document.getElementById("sqTable").innerHTML = sq + "</tr></table>";
+  const cls = x => x < n - 1 ? "" : x === n - 1 ? ' class="cur"' : ' class="todo"';
+  let h = '<table class="xt"><tr><td class="h">x</td>';
+  for (const c of TB.cols) h += "<td" + cls(c.x) + ">" + c.x + "</td>";
+  const r = (lb, f) => { let s = '<tr><td class="h">' + lb + "</td>"; for (const c of TB.cols) s += "<td" + cls(c.x) + ">" + (c.x < n ? f(c) : "?") + "</td>"; return s + "</tr>"; };
+  h += "</tr>" + r("x³ + 2x + 2", c => c.full) + r("mod 17", c => c.r) + r("y", c => c.ys.length ? c.ys.join(", ") : "–");
+  document.getElementById("xTable").innerHTML = h + "</table>";
+  const shown = [];
+  for (const c of TB.cols) if (c.x < n) for (const y of c.ys) shown.push({ x: BigInt(c.x), y: BigInt(y) });
+  let line = t.tableStart;
+  if (n > 0) {
+    const c = TB.cols[n - 1];
+    line = t.tableLine(c.x, c.full, modLine(BigInt(c.full), 17n), c.r, c.ys) + (n === 17 ? " " + t.tableDone(shown.length) : "");
+  }
+  document.getElementById("xLine").innerHTML = line;
+  const marks = [];
+  if (n > 0) for (const y of TB.cols[n - 1].ys) marks.push({ P: { x: BigInt(n - 1), y: BigInt(y) }, col: "var(--chg)", fill: "var(--chg-bg)", big: true });
+  document.getElementById("gT").innerHTML = gridSVG({ c: 17, only: shown, marks: marks, vline: n > 0 ? n - 1 : undefined, mirror: n === 17 });
+  whyBody();
+}
+// the clock of 17: x^3 + 2x + 2 goes around it many times and stops at the remainder
+function whyBody() {
+  const t = L(), x = app.tx > 0 ? app.tx - 1 : 5, c = TB.cols[x];
+  const W = 230, cx = 115, cy = 115, R = 98;
+  let s = '<svg width="' + W + '" height="' + W + '" viewBox="0 0 ' + W + " " + W + '" role="img" aria-label="clock of 17">';
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="var(--rule)" stroke-width="2"/>';
+  const ang = v => -Math.PI / 2 + 2 * Math.PI * v / 17;
+  for (let v = 0; v < 17; v++) {
+    const a = ang(v), on = v === c.r;
+    s += '<circle cx="' + (cx + R * Math.cos(a)) + '" cy="' + (cy + R * Math.sin(a)) + '" r="' + (on ? 11 : 9) + '" fill="' + (on ? "var(--chg)" : "var(--surface)") + '" stroke="' + (on ? "var(--chg)" : "var(--rule)") + '" stroke-width="1.5"/>' +
+      '<text x="' + (cx + R * Math.cos(a)) + '" y="' + (cy + R * Math.sin(a) + 4) + '" text-anchor="middle" font-family="var(--mono)" font-size="11" fill="' + (on ? "#fff" : "var(--muted)") + '">' + v + "</text>";
+  }
+  const laps = Math.floor(c.full / 17);
+  if (laps <= 12) {   // the path of the value: one turn per 17, from the middle outwards
+    const pts = [];
+    for (let i = 0; i <= c.full * 4; i++) { const v = i / 4, rr = 14 + (R - 26) * v / Math.max(1, c.full), a = ang(v); pts.push((cx + rr * Math.cos(a)).toFixed(1) + "," + (cy + rr * Math.sin(a)).toFixed(1)); }
+    s += '<polyline points="' + pts.join(" ") + '" fill="none" stroke="var(--chg)" stroke-width="1.6" opacity="0.8"/>';
+  } else s += '<text x="' + cx + '" y="' + (cy + 5) + '" text-anchor="middle" font-family="var(--sans)" font-size="13" font-weight="700" fill="var(--chg)">' + esc(t.lapsN(laps)) + "</text>";
+  document.getElementById("clock").innerHTML = s + "</svg>";
+  document.getElementById("clockLine").textContent = t.clockLine(x, c.full, laps, c.r);
+  // the values grow smoothly; the remainders jump
+  const BW = 22, BH = 70, bw = 17 * BW + 40;
+  let b = '<svg width="' + bw + '" height="' + (2 * BH + 64) + '" role="img" aria-label="values and remainders">';
+  const maxF = TB.cols[16].full;
+  for (let k = 0; k < 2; k++) {
+    const top = 16 + k * (BH + 30);
+    b += '<text x="0" y="' + (top - 4) + '" font-family="var(--sans)" font-size="12" font-weight="600" fill="var(--muted)">' + esc(k === 0 ? t.barsFull : t.barsMod) + "</text>";
+    for (const cc of TB.cols) {
+      const h = k === 0 ? BH * cc.full / maxF : BH * cc.r / 16, X = 10 + cc.x * BW;
+      b += '<rect x="' + X + '" y="' + (top + BH - h) + '" width="' + (BW - 5) + '" height="' + Math.max(1, h) + '" rx="2" fill="' + (cc.x === x ? "var(--chg)" : k === 0 ? "var(--muted)" : "var(--ink)") + '"/>';
+      if (k === 1) b += '<text x="' + (X + (BW - 5) / 2) + '" y="' + (top + BH + 13) + '" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="var(--muted)">' + cc.x + "</text>";
+    }
+  }
+  document.getElementById("bars").innerHTML = b + "</svg>";
+  // the same equation for a bigger p
+  const p = app.tpp, PB = pointsByX(2, 2, p), cs = p === 17 ? 14 : p === 41 ? 8 : 4.2, M = 6, G = M * 2 + (p - 1) * cs;
+  let g = '<svg width="' + G + '" height="' + G + '" role="img" aria-label="y^2 = x^3 + 2x + 2 mod ' + p + '"><rect x="0" y="0" width="' + G + '" height="' + G + '" fill="var(--sunken)" rx="4"/>';
+  g += '<line x1="0" y1="' + (M + (p - 1 - p / 2) * cs) + '" x2="' + G + '" y2="' + (M + (p - 1 - p / 2) * cs) + '" stroke="var(--chg)" stroke-width="1.4" stroke-dasharray="5 4"/>';
+  let cnt = 0;
+  for (const cc of PB.cols) for (const y of cc.ys) { cnt++; g += '<circle cx="' + (M + cc.x * cs) + '" cy="' + (M + (p - 1 - y) * cs) + '" r="' + Math.max(1.8, cs * 0.3) + '" fill="var(--ink)"/>'; }
+  document.getElementById("gP").innerHTML = g + "</svg>";
+  document.getElementById("pLine").textContent = t.pLine(p, cnt);
+}
+function renderTBody() { sideRows(); roundBody(); tableBody(); }
+
+/* ---------- step 4: modulo 17 ---------- */
 function render2() {
   const t = L();
   const pr = on => ' aria-pressed="' + on + '"';
@@ -1088,7 +1386,7 @@ function setDk(v) {
   renderL2Body();
 }
 
-/* ---------- step 4: one addition ---------- */
+/* ---------- step 5: one addition ---------- */
 function render3() {
   const t = L();
   // the points sorted by x and y, then O; only G is named, so the menu is not the list of multiples
@@ -1165,6 +1463,7 @@ function renderL3Body() {
   if (s4 >= 3) marks.push({ P: I.R, col: "var(--chg)", fill: "var(--chg-bg)", label: kind === "double" ? "2P" : "P + Q", big: true });
   g4.innerHTML = gridSVG({ c: 16, marks: marks, vline: s4 === 2 ? I.x3 : undefined });
 }
+function setTx(v) { app.tx = clampInt(v, 0, 17); tableBody(); }
 function setS4(v) { app.s4 = clampInt(v, 1, 4); renderL3Body(); }
 
 /* ---------- frame, navigation ---------- */
@@ -1190,13 +1489,14 @@ function render() {
   document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
   document.getElementById("mhSub").textContent = t.steps[app.level][1];
-  const ex = t.explain[[app.tab1, "add", "mod", "one"][app.level]];
+  const ex = t.explain[[app.tab1, "add", "trans", "mod", "one"][app.level]];
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
-    [render0, render1, render2, render3][app.level]() + "</div>";
+    [render0, render1, renderT, render2, render3][app.level]() + "</div>";
   if (app.level === 0) updateL0();
   if (app.level === 1) { drawReal(); hookReal(); }
-  if (app.level === 2) renderL2Body();
-  if (app.level === 3) renderL3Body();
+  if (app.level === 2) renderTBody();
+  if (app.level === 3) renderL2Body();
+  if (app.level === 4) renderL3Body();
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
   try { if (location.hash !== hashStr()) history.replaceState(null, "", hashStr()); } catch (e) {}
@@ -1204,26 +1504,27 @@ function render() {
 }
 /* the address: #N is a step, #N.M a tab or a card of the step
    #1 (#1.1) ECDH, #1.2 ElGamal, #1.3 ECDH with Eve's attack open, #1.4 ECDH, scrolled to P-256
-   #3 (#3.1) the points, #3.2 kG: double and add, #3.3 the multiples of G */
+   #3 from real numbers to modulo 17
+   #4 (#4.1) the points, #4.2 kG: double and add, #4.3 the multiples of G */
 function hashStr() {
   let h = "#" + (app.level + 1);
   if (app.level === 0 && app.tab1 === "elg") h += ".2";
-  if (app.level === 2 && app.mode3 === "dbl") h += ".2";
-  if (app.level === 2 && app.mode3 === "mult") h += ".3";
+  if (app.level === 3 && app.mode3 === "dbl") h += ".2";
+  if (app.level === 3 && app.mode3 === "mult") h += ".3";
   return h;
 }
 function readHash() {
   const m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash);
   if (!m) return;
   const n = +m[1], sub = m[2] ? +m[2] : 1;
-  if (n < 1 || n > 4) return;
+  if (n < 1 || n > 5) return;
   app.level = n - 1;
   if (n === 1) {
     app.tab1 = sub === 2 ? "elg" : "ecdh";
     if (sub === 3) { app.eveOpen = true; app.scrollTo = "eveCard"; }
     if (sub === 4) app.scrollTo = "bigCard";
   }
-  if (n === 3) {
+  if (n === 4) {
     app.mode3 = sub === 2 ? "dbl" : sub === 3 ? "mult" : "pts";
     if (sub === 3 && app.mk < 1) app.mk = 1;
   }
@@ -1233,8 +1534,8 @@ function goTo(level) {
   render();
   view.scrollTop = 0;
 }
-// from step 3 to step 4: take the addition that is on the screen
-function originFromStep3() {
+// from step 4 to step 5: take the addition that is on the screen
+function originFromStep4() {
   const lab = i => (2n ** BigInt(i)).toString() + "G";
   if (app.mode3 === "pts") return;
   if (app.mode3 === "mult") {
@@ -1252,8 +1553,8 @@ function originFromStep3() {
   app.s4 = 1;
 }
 function zoomIn() {
-  if (app.level === 2) originFromStep3();
-  if (app.level < 3) goTo(app.level + 1);
+  if (app.level === 3) originFromStep4();
+  if (app.level < 4) goTo(app.level + 1);
 }
 function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
 
@@ -1283,7 +1584,7 @@ function setSmall(f, v) {
   app[f] = clampInt(Math.round(v), 1, 18);
   const inp = view.querySelector('input[data-field="' + f + '"]');
   if (inp && +inp.value !== app[f]) inp.value = app[f];
-  updateL0();
+  if (f === "ta" || f === "tb") roundBody(); else updateL0();
 }
 view.addEventListener("click", e => {
   const el = e.target.closest("[data-action]");
@@ -1318,18 +1619,27 @@ view.addEventListener("click", e => {
     const n = mulTrace(TOY, BigInt(app.dk), TOY.G).ops.length;
     app.dstep = a === "ds-all" ? n : Math.min(n, app.dstep + 1); renderL2Body();
   }
-  else if (a === "dop") { app.dstep = +el.dataset.q + 1; originFromStep3(); goTo(3); }
+  else if (a === "dop") { app.dstep = +el.dataset.q + 1; originFromStep4(); goTo(4); }
   else if (a === "pre") { app.p4 = +el.dataset.p; app.q4 = +el.dataset.q; app.s4 = 1; app.origin4 = null; render(); }
   else if (a === "s4-reset") setS4(1);
   else if (a === "s4-prev") setS4(app.s4 - 1);
   else if (a === "s4-next") setS4(app.s4 + 1);
   else if (a === "s4-all") setS4(4);
+  else if (a === "tmode") { app.tmode = el.dataset.m; render(); }
+  else if (a === "tflip") { app[el.dataset.f] = { x: app[el.dataset.f].x, up: !app[el.dataset.f].up }; render(); }
+  else if (a === "tx-reset") setTx(0);
+  else if (a === "tx-prev") setTx(app.tx - 1);
+  else if (a === "tx-next") setTx(app.tx + 1);
+  else if (a === "tx-all") setTx(17);
+  else if (a === "tpp") { app.tpp = +el.dataset.p; render(); }
 });
 view.addEventListener("input", e => {
   const f = e.target.dataset.field;
   if (!f) return;
   const v = e.target.value;
   if (f === "a" || f === "b" || f === "d" || f === "k") { const n = parseInt(v, 10); if (n >= 1 && n <= 18) { app[f] = n; updateL0(); } }
+  else if (f === "ta" || f === "tb") { const n = parseInt(v, 10); if (n >= 1 && n <= 18) { app[f] = n; roundBody(); } }
+  else if (f === "tP" || f === "tQ") { app[f] = { x: parseFloat(v), up: app[f].up }; sideRows(); }
   else if (f === "bigA" || f === "bigB") { app[f] = v; updateBig(); }
   else if (f === "dk") { const n = parseInt(v, 10); if (n >= 1 && n <= 1048575) setDk(n); }
 });
@@ -1337,7 +1647,8 @@ view.addEventListener("change", e => {
   const f = e.target.dataset.field;
   if (f === "m") { app.m = +e.target.value; updateL0(); }
   else if (f === "p4" || f === "q4") { app[f] = +e.target.value; app.s4 = 1; app.origin4 = null; render(); }
-  else if (f === "a" || f === "b" || f === "d" || f === "k") setSmall(f, parseInt(e.target.value, 10));
+  else if (f === "a" || f === "b" || f === "d" || f === "k" || f === "ta" || f === "tb") setSmall(f, parseInt(e.target.value, 10));
+  else if (f === "tp" || f === "tq") { app[f] = +e.target.value; sideRows(); }
   else if (f === "dk") { setDk(parseInt(e.target.value, 10)); e.target.value = app.dk; }
 });
 document.getElementById("steps").addEventListener("click", e => {
@@ -1356,24 +1667,28 @@ document.addEventListener("keydown", e => {
   if (e.key === "Enter" && tag === "BUTTON") return;
   if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
   else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
-  else if (app.level === 2 && app.mode3 !== "pts" && (e.key === "n" || e.key === " ")) {
+  else if (app.level === 3 && app.mode3 !== "pts" && (e.key === "n" || e.key === " ")) {
     e.preventDefault();
     if (app.mode3 === "mult") app.mk = Math.min(19, app.mk + 1);
     else app.dstep = Math.min(mulTrace(TOY, BigInt(app.dk), TOY.G).ops.length, app.dstep + 1);
     renderL2Body();
   }
-  else if (app.level === 2 && app.mode3 !== "pts" && e.key === "p") {
+  else if (app.level === 3 && app.mode3 !== "pts" && e.key === "p") {
     if (app.mode3 === "mult") app.mk = Math.max(1, app.mk - 1); else app.dstep = Math.max(0, app.dstep - 1);
     renderL2Body();
   }
-  else if (app.level === 3 && (e.key === "n" || e.key === " ")) { e.preventDefault(); setS4(app.s4 + 1); }
-  else if (app.level === 3 && e.key === "p") setS4(app.s4 - 1);
+  else if (app.level === 4 && (e.key === "n" || e.key === " ")) { e.preventDefault(); setS4(app.s4 + 1); }
+  else if (app.level === 4 && e.key === "p") setS4(app.s4 - 1);
+  else if (app.level === 2 && (e.key === "n" || e.key === " ")) { e.preventDefault(); setTx(app.tx + 1); }
+  else if (app.level === 2 && e.key === "p") setTx(app.tx - 1);
 });
 
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-// the menus of steps 1 and 4: each of the 18 points once, sorted by x and y
+// the menus of steps 1, 3 and 5: each of the 18 points once, sorted by x and y
 if (BY_XY.length !== 18 || new Set(BY_XY).size !== 18 || BY_XY.indexOf(-1) >= 0) SELF_FAILS.push("the point menus");
+// step 3 opens with (0, 6) + (3, 1) and has no 2G in its menus, so G + 2G is left for the paper exercise
+if (T_MENU.length !== 17 || T_MENU.indexOf(2) >= 0 || !samePoint(MULT[app.tp], { x: 0n, y: 6n }) || !samePoint(MULT[app.tq], { x: 3n, y: 1n })) SELF_FAILS.push("the menus of step 3");
 readHash();
 render();
 window.addEventListener("hashchange", () => { if (location.hash !== hashStr() || app.scrollTo) { readHash(); render(); } });
