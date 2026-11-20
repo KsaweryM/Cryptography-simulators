@@ -276,6 +276,14 @@ h4.sub:first-of-type{margin-top:0}
 .hbar{display:flex;gap:2px;max-width:860px}
 .hbar span{border:1.5px solid;border-radius:5px;padding:4px 6px;font-size:12px;font-weight:600;white-space:nowrap}
 
+/* step 5: one part at a time */
+.partbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.partbar button{font-size:13px;padding:4px 10px}
+.partbar button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.emrow{display:flex;gap:2px;flex-wrap:nowrap;margin:6px 0 2px;max-width:860px}
+.emrow span{border:1.5px solid;border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.emchk{font-size:13px;color:var(--chg);font-weight:600;margin:2px 0 10px}
+.primes{font-family:var(--mono);font-size:12.5px;line-height:1.5;margin-top:8px;max-height:150px;overflow:auto}
 /* step 4 */
 .evebar{height:10px;border-radius:5px;background:var(--sunken);overflow:hidden;margin:8px 0 4px;max-width:520px}
 .evebar span{display:block;height:100%;background:var(--g2);width:0}
@@ -526,13 +534,13 @@ function numsToText(a) { return a.map(x => (x < 0x110000n ? String.fromCodePoint
       q = 58606630333925820283, e = 65537, d = 1367151349159148221410861819858768950381,
       2026 -> C = 736246060401132335090489988934276767570.
    6. Lecture 3, Task 4 "does it always work": with n = 187, e = 7, d = 23 every P from 0 to 186 comes back; 17 -> 85 -> 17.
-   7. Lecture 3, Task 6 (Task6/pin.py; the constants keep their old name TASK7_): the bank's 2048-bit n, e = 65537,
+   7. Lecture 3, Task 6 (Task6/pin.py): the bank's 2048-bit n, e = 65537,
       and C; PIN 4821 gives C.
    8. Invariant: decrypt(encrypt(m)) = m for every m < n with the preset keys of this page.
    9. to 12. Euler's theorem on n = 187, Eve's trial division (187 = 11 * 17 after 6 divisions, 1022117 = 1009 * 1013),
       Miller-Rabin (561 is a Carmichael number, 2^31 - 1 is prime), the integer cube root and the e = 3 attack on the fixed
       2048-bit key E3_P * E3_Q ("PIN 4821" -> m = 5785241096556130865, c = m^3 checked with Python 3.12), m >= n wrapping. */
-const TASK7_N = BigInt(
+const TASK6_N = BigInt(
   "1872841195117846544841412217848882016914999669618551874656442540592245157199172284036666" +
   "4133819670868121337628024215357371088011677213618179225491492308522638260766784577579056" +
   "2503833714947149399785696726501129650715798554202938177179190554594601904751852083122215" +
@@ -541,7 +549,7 @@ const TASK7_N = BigInt(
   "3007444251582916339284117927636160928694447560172861239100470527351501529873947354944785" +
   "6512761663278694200484166169777618275780233631406978635015286934781219895694598917365383" +
   "3");
-const TASK7_C = BigInt(
+const TASK6_C = BigInt(
   "7332072385529698190639629753233484374256896745430252412164314970011183931212726541097741" +
   "8517601857555236271280372126699069139375204601624878637979013676460224617842168808286379" +
   "5857214264834240122145254830440949565363086589962516854173388760424190608057515512132795" +
@@ -549,7 +557,7 @@ const TASK7_C = BigInt(
   "0903607216716755528169246962615220088320071217812749942469660037831165985056493785539608" +
   "3503439207009097456414061872740443999816367937732652442509322860944524988225405526067258" +
   "9811720959928951502493599386072038265358314787833313330898379884238139910309050126307341");
-const TASK7_E = 65537n;
+const TASK6_E = 65537n;
 const PRESETS = [   // [p, q, e]
   [17n, 11n, 7n],          // the slides (Stallings)
   [11n, 13n, 23n],         // phi = 120: the inverse 47 (an earlier Lecture 3 exercise)
@@ -591,7 +599,7 @@ function selfTest() {
   for (let m = 0n; m < 187n; m++) if (decrypt(encrypt(m, { n: 187n, e: 7n }), { n: 187n, d: 23n }) !== m) { fails.push("always: " + m); break; }
   if (encrypt(17n, { n: 187n, e: 7n }) !== 85n) fails.push("always: 17 -> 85");
   // 7. the bank PIN (2048 bits)
-  if (modPow(4821n, TASK7_E, TASK7_N) !== TASK7_C) fails.push("bank PIN 4821");
+  if (modPow(4821n, TASK6_E, TASK6_N) !== TASK6_C) fails.push("bank PIN 4821");
   // 8. invariants: every preset, every m (or 400 spread values), and the trace equals modPow
   for (const [p, q, e] of PRESETS) {
     const k = makeKeys(p, q, e);
@@ -617,6 +625,8 @@ function selfTest() {
   const n3 = E3_P * E3_Q, d3 = modInverse(3n, (E3_P - 1n) * (E3_Q - 1n));
   const m3 = textToInt("PIN 4821"), c3 = modPow(m3, 3n, n3);
   if (bitLen(n3) !== 2048 || d3 === null || c3 !== m3 ** 3n || icbrt(c3) !== m3 || modPow(c3, d3, n3) !== m3 || intToText(icbrt(c3)) !== "PIN 4821") fails.push("e = 3");
+  // 13. malleability: C(40) * 2^7 mod 187 decrypts to 80 (step 5, part 6)
+  if (decrypt((encrypt(40n, { n: 187n, e: 7n }) * encrypt(2n, { n: 187n, e: 7n })) % 187n, { n: 187n, d: 23n }) !== 80n) fails.push("malleability");
   // 12. m >= n wraps: 88 + 187 encrypts like 88
   if (encrypt(275n, { n: 187n, e: 7n }) !== 11n) fails.push("m >= n");
   // primality and errors
@@ -640,13 +650,22 @@ const T = {
     stepOf: n => "Step " + n + " of 5 · RSA",
     steps: [["Black box", "Alice encrypts, Bob decrypts, Eve listens"], ["Making the keys", "p, q, n, phi, e, and d, the inverse of e"],
             ["Why decryption works", "(Pᵉ)ᵈ mod n = P, for every P"], ["Eve tries to break it", "factor n, then phi, d and P"],
-            ["Textbook RSA is not enough", "the same P gives the same C, e = 3, hybrid encryption"]],
+            ["Textbook RSA is not enough", "eight parts: hybrid encryption, guesses, e = 3, changing C, padding, a leak"]],
     explain: [
       ["A padlock anyone can close", "Bob has a key pair. Alice encrypts her message P with Bob's public key, Bob decrypts with his private key. Eve sees n, e and C, and that does not help her. Change the message and watch C. Click a key to see how Bob made it, or a box to see the power inside."],
       ["Five steps from two primes", "Bob picks two secret primes p and q. n and e become public; phi and d stay secret. d is the inverse of e modulo phi; the extended Euclidean algorithm finds it. Try the presets or your own primes. Click a key at the bottom to use it."],
       ["Why Bob gets P back", "Alice computes C = P<sup>e</sup> mod n, Bob computes C<sup>d</sup> mod n. Because e × d = 1 + k × phi, Bob's power is P<sup>1 + k × phi</sup>, and Euler's theorem turns it back into P. Below: the two powers, the reason with your numbers, and a check of every P."],
       ["Everything Eve needs is hidden in n", "Eve has n, e and C. If she finds p and q, she computes phi and d exactly as Bob did, and then reads P. For a tiny n this takes a moment. Make n bigger and watch the time grow, then see what that means for a 2048-bit n."],
       ["The same P always gives the same C", "Textbook RSA has no randomness. Anyone can encrypt with the public key, so Eve encrypts her guesses and compares them with C. If the message comes from a small set (a PIN, yes or no), she finds it without d. A short message with e = 3 falls even faster. Real RSA adds random padding and carries only a symmetric key."]],
+    parts: [["Hybrid encryption", "RSA is slow and its P must be smaller than n, so in practice it carries only a fresh symmetric key; a fast cipher carries the data."],
+            ["The same P, the same C", "Textbook RSA has no randomness: equal messages give equal ciphertexts, and anyone can see which ones repeat."],
+            ["Eve guesses and checks", "Anyone can encrypt with the public key. If the message comes from a small set (a PIN, yes or no), Eve encrypts every guess and compares it with C."],
+            ["e = 3 and a short message", "With a small e and a short P, P<sup>e</sup> is smaller than n: the mod does nothing, and the ordinary root gives P back."],
+            ["Two common mistakes", "P must be smaller than n, and e must be coprime to phi."],
+            ["Mallory changes C", "Multiplying ciphertexts multiplies the messages: Mallory changes what Bob reads without reading it and without d."],
+            ["What real RSA does", "Real RSA pads the message with random bytes in a fixed structure, which Bob checks after decrypting."],
+            ["A leaked private key", "One stolen private key opens every recorded message to its owner."]],
+    partOf: (k, N) => "part " + k + " of " + N,
     selfOk: "✓ checked against Stallings, Wikipedia and the worked examples", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back",
     fixKeys: "Bob's keys are not valid. Fix p, q or e in step 2.", goKeys: "go to step 2",
@@ -708,6 +727,12 @@ const T = {
     linkEuclid: "How the extended Euclidean algorithm works ▶",
     cardTwo: "The two keys", twoNote: "Click a key to use it: one power modulo n.",
     trash: "p, q and phi: not needed any more; keep them secret or delete them. Whoever knows p and q can compute d.",
+    cardPrime: "Where p and q come from",
+    primeIntro: "A real key needs two random primes of 1024 bits. The computer draws a random odd number and tests it (Miller-Rabin); if it is not prime, it draws the next one. About 1 odd number in 355 of this size is prime.",
+    bPrime: "draw a random 1024-bit prime", primeBits: "bits:",
+    primeTried: (k) => k + " odd " + (k === 1 ? "number" : "numbers") + " tried",
+    primeFound: (k, ms) => "Prime found after " + k + " " + (k === 1 ? "try" : "tries") + " (" + ms + " ms). Testing is fast; only factoring a product is hard.",
+    primeNote: "p and q must be random, independent and different, from a good random generator: two keys with the same p fall to one gcd.",
     // step 3
     cardPow: "The two powers", baseM: "Alice's P",
     powAlice: "Alice encrypts", powBob: "Bob decrypts",
@@ -757,7 +782,6 @@ const T = {
     thBits: "bits", thN: "n", thDiv: "divisions", thTime: "time", thRes: "result", resFound: "p found", resStop: "stopped",
     nfs: "Real attackers do not use trial division: the general number field sieve is far faster. The public record is RSA-896 (896 bits, factored in September 2026 on up to 2048 graphics cards). In 2020, RSA-250 (829 bits) took about 2700 years of one processor core. A 2048-bit n is still far out of reach.",
     // step 5
-    // step 4
     cardSame: "The same message, the same ciphertext",
     sameNote: "Alice's text from step 1, encrypted letter by letter with Bob's public key. Equal letters give equal ciphertexts (framed), every time. Eve does not need d to see which letters repeat.",
     sameNone: "No letter repeats in this text. Type one with a repeated letter in step 1, for example HELLO BOB.",
@@ -797,15 +821,25 @@ const T = {
     hybBob: "Bob decrypts K with his private key (one RSA operation), then the message with K. A 5 MB photo needs the same single RSA operation; only the symmetric part grows.",
     bNewKey: "new K",
     cardReal: "What real RSA does",
-    real: ["<b>Random padding (OAEP).</b> Before encrypting, random bytes are added to the message in a fixed way. The same PIN then gives a different C every time, and Eve's guesses no longer match. Bob removes the padding after decrypting. Every library does this for you.",
+    real: ["<b>Random padding (OAEP).</b> Before encrypting, random bytes are added to the message in a fixed structure. The same PIN then gives a different C every time, and Eve's guesses no longer match. Bob checks the structure and removes the padding after decrypting.",
            "<b>Big keys.</b> n has at least 2048 bits (617 digits), so nobody can factor it to find p, q and d. The small numbers on this page are only for learning.",
            "<b>Only a key.</b> RSA is slow, so in practice it carries only a random symmetric key (hybrid encryption), and ChaCha20 or AES encrypts the data."],
-    realNote: "This page shows textbook RSA only. It does not show OAEP.",
+    realNote: "The two byte layouts are drawn, not computed: this page computes only textbook RSA.",
+    cardMal: "Mallory changes C: the message is multiplied",
+    malIntro: "Alice sends Bob an amount P, encrypted with Bob's public key. Mallory cannot read C, but she multiplies it by s<sup>e</sup> mod n, which anyone can compute. Because s<sup>e</sup> × P<sup>e</sup> = (s × P)<sup>e</sup>, Bob decrypts s × P mod n.",
+    malP: "Alice's amount P", malS: "Mallory's multiplier s",
+    malC: "C = P<sup>e</sup> mod n", malC2: "C' = C × s<sup>e</sup> mod n", malBob: "Bob decrypts C'",
+    malRes: (b) => "Bob reads " + b + ", a valid number. Nothing tells him that C was changed.",
+    malNote: "Padding breaks this trick: s × (padded P) no longer has the structure Bob checks, so he rejects it. But a server that says whether the padding was good gives Mallory a new tool (Bleichenbacher's attack, on the slides).",
+    emTitle15: "PKCS#1 v1.5 (256 bytes for RSA-2048)", emTitleO: "OAEP with SHA-256 (256 bytes)",
+    em15: ["00", "02", "random non-zero bytes (at least 8)", "00", "message"], emO: ["00", "masked seed (32 B)", "masked: hash of a label, zeros, 01, message"],
+    emChk15: "Bob checks after decrypting: does it start with 00 02, and is there a 00 before the message?",
+    emChkO: "Bob checks after decrypting: the first byte, the hash of the label and the 01. Every byte depends on the random seed.",
     cardLeak: "What if Bob's private key leaks?",
     leakIntro: "Eve recorded every ciphertext Alice sent (here: the letters of her text from step 1). Years later she steals Bob's private key d.",
     bLeak: "Eve steals d", bUnleak: "undo",
     leakRec: "recorded", leakOpen: "opened with d",
-    leakNote: "A leaked private key opens all recorded messages, from everybody who wrote to Bob, and all new ones until Bob changes his key. The fix is keys that live for one session only (forward secrecy).",
+    leakNote: "A leaked private key opens all recorded messages, from everybody who wrote to Bob, and all new ones until Bob changes his key. The fix is a new key pair for every session, thrown away after it (forward secrecy, the next lecture).",
   },
   pl: {
     title: "Eksplorator RSA", home: "Wszystkie symulatory",
@@ -813,13 +847,22 @@ const T = {
     stepOf: n => "Krok " + n + " z 5 · RSA",
     steps: [["Czarna skrzynka", "Alice szyfruje, Bob odszyfrowuje, Eve podsłuchuje"], ["Tworzenie kluczy", "p, q, n, phi, e oraz d, odwrotność e"],
             ["Dlaczego odszyfrowanie działa", "(Pᵉ)ᵈ mod n = P dla każdego P"], ["Eve próbuje złamać RSA", "rozkłada n, potem liczy phi, d i P"],
-            ["Podręcznikowe RSA nie wystarcza", "to samo P daje to samo C, e = 3, szyfrowanie hybrydowe"]],
+            ["Podręcznikowe RSA nie wystarcza", "osiem części: hybryda, zgadywanie, e = 3, zmiana C, dopełnienie, wyciek"]],
     explain: [
       ["Kłódka, którą każdy może zamknąć", "Bob ma parę kluczy. Alice szyfruje wiadomość P kluczem publicznym Boba, a Bob odszyfrowuje ją swoim kluczem prywatnym. Eve widzi n, e i C, i nic jej to nie daje. Zmień wiadomość i patrz na C. Kliknij klucz, żeby zobaczyć, jak Bob go zrobił, albo pole, żeby zajrzeć do potęgi."],
       ["Pięć kroków od dwóch liczb pierwszych", "Bob wybiera dwie tajne liczby pierwsze p i q. n i e są jawne, phi i d zostają tajne. d to odwrotność e modulo phi; znajduje ją rozszerzony algorytm Euklidesa. Wypróbuj przykłady albo własne liczby. Kliknij klucz na dole, żeby go użyć."],
       ["Dlaczego Bob odzyskuje P", "Alice liczy C = P<sup>e</sup> mod n, a Bob liczy C<sup>d</sup> mod n. Ponieważ e × d = 1 + k × phi, potęga Boba to P<sup>1 + k × phi</sup>, a twierdzenie Eulera zamienia ją z powrotem w P. Niżej: obie potęgi, uzasadnienie na Twoich liczbach i sprawdzenie każdego P."],
       ["Wszystko, czego Eve potrzebuje, jest ukryte w n", "Eve ma n, e i C. Jeśli znajdzie p i q, policzy phi i d dokładnie tak jak Bob, a potem odczyta P. Dla malutkiego n to chwila. Zwiększ n i patrz, jak rośnie czas, a potem zobacz, co to znaczy dla 2048-bitowego n."],
       ["To samo P zawsze daje to samo C", "Podręcznikowe RSA nie ma losowości. Każdy może szyfrować kluczem publicznym, więc Eve szyfruje swoje strzały i porównuje je z C. Jeśli wiadomość pochodzi z małego zbioru (PIN, tak lub nie), Eve znajdzie ją bez d. Krótka wiadomość przy e = 3 pada jeszcze szybciej. Prawdziwe RSA dodaje losowe dopełnienie i przenosi tylko klucz symetryczny."]],
+    parts: [["Szyfrowanie hybrydowe", "RSA jest wolne, a jego P musi być mniejsze od n, więc w praktyce przenosi tylko świeży klucz symetryczny; dane przenosi szybki szyfr."],
+            ["To samo P, to samo C", "Podręcznikowe RSA nie ma losowości: takie same wiadomości dają takie same szyfrogramy i każdy widzi, które się powtarzają."],
+            ["Eve zgaduje i sprawdza", "Każdy może szyfrować kluczem publicznym. Jeśli wiadomość pochodzi z małego zbioru (PIN, tak lub nie), Eve szyfruje każdy strzał i porównuje z C."],
+            ["e = 3 i krótka wiadomość", "Przy małym e i krótkim P potęga P<sup>e</sup> jest mniejsza od n: modulo nic nie zmienia, a zwykły pierwiastek oddaje P."],
+            ["Dwa częste błędy", "P musi być mniejsze od n, a e względnie pierwsze z phi."],
+            ["Mallory zmienia C", "Mnożenie szyfrogramów mnoży wiadomości: Mallory zmienia to, co odczyta Bob, choć nie zna wiadomości ani d."],
+            ["Co robi prawdziwe RSA", "Prawdziwe RSA dopełnia wiadomość losowymi bajtami o stałej strukturze, którą Bob sprawdza po odszyfrowaniu."],
+            ["Wyciek klucza prywatnego", "Jeden skradziony klucz prywatny otwiera każdą nagraną wiadomość do jego właściciela."]],
+    partOf: (k, N) => "część " + k + " z " + N,
     selfOk: "✓ sprawdzone z przykładami Stallingsa, Wikipedii i ćwiczeń", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej",
     fixKeys: "Klucze Boba są niepoprawne. Popraw p, q albo e w kroku 2.", goKeys: "przejdź do kroku 2",
@@ -880,6 +923,12 @@ const T = {
     linkEuclid: "Jak działa rozszerzony algorytm Euklidesa ▶",
     cardTwo: "Dwa klucze", twoNote: "Kliknij klucz, żeby go użyć: jedna potęga modulo n.",
     trash: "p, q i phi: już niepotrzebne; trzymaj je w tajemnicy albo usuń. Kto zna p i q, ten policzy d.",
+    cardPrime: "Skąd biorą się p i q",
+    primeIntro: "Prawdziwy klucz potrzebuje dwóch losowych liczb pierwszych po 1024 bity. Komputer losuje nieparzystą liczbę i ją testuje (Miller-Rabin); jeśli nie jest pierwsza, losuje następną. Mniej więcej co 355. nieparzysta liczba tej wielkości jest pierwsza.",
+    bPrime: "wylosuj 1024-bitową liczbę pierwszą", primeBits: "bity:",
+    primeTried: (k) => "sprawdzono " + k + " " + plN(k, "liczbę nieparzystą", "liczby nieparzyste", "liczb nieparzystych"),
+    primeFound: (k, ms) => "Liczba pierwsza znaleziona po " + k + " " + plN(k, "próbie", "próbach", "próbach") + " (" + ms + " ms). Test jest szybki; trudne jest tylko rozłożenie iloczynu.",
+    primeNote: "p i q muszą być losowe, niezależne i różne, z dobrego generatora losowego: dwa klucze z tym samym p padają po jednym gcd.",
     cardPow: "Dwie potęgi", baseM: "P od Alice",
     powAlice: "Alice szyfruje", powBob: "Bob odszyfrowuje",
     sumTitle: "Potęgami dwójki:",
@@ -965,15 +1014,25 @@ const T = {
     hybBob: "Bob odszyfrowuje K kluczem prywatnym (jedna operacja RSA), a potem wiadomość kluczem K. Zdjęcie 5 MB wymaga tej samej jednej operacji RSA; rośnie tylko część symetryczna.",
     bNewKey: "nowy K",
     cardReal: "Co robi prawdziwe RSA",
-    real: ["<b>Losowe dopełnienie (OAEP).</b> Przed szyfrowaniem do wiadomości dokleja się w ustalony sposób losowe bajty. Ten sam PIN daje wtedy za każdym razem inne C i strzały Eve przestają pasować. Bob usuwa dopełnienie po odszyfrowaniu. Każda biblioteka robi to za nas.",
+    real: ["<b>Losowe dopełnienie (OAEP).</b> Przed szyfrowaniem do wiadomości dokleja się losowe bajty o stałej strukturze. Ten sam PIN daje wtedy za każdym razem inne C i strzały Eve przestają pasować. Bob sprawdza strukturę i usuwa dopełnienie po odszyfrowaniu.",
            "<b>Duże klucze.</b> n ma co najmniej 2048 bitów (617 cyfr), więc nikt nie rozłoży go na p i q, żeby policzyć d. Małe liczby na tej stronie służą tylko do nauki.",
            "<b>Tylko klucz.</b> RSA jest wolne, więc w praktyce przenosi tylko losowy klucz symetryczny (szyfrowanie hybrydowe), a dane szyfruje ChaCha20 albo AES."],
-    realNote: "Ta strona pokazuje tylko podręcznikowe RSA. Nie pokazuje OAEP.",
+    realNote: "Oba układy bajtów są narysowane, nie policzone: ta strona liczy tylko podręcznikowe RSA.",
+    cardMal: "Mallory zmienia C: wiadomość się mnoży",
+    malIntro: "Alice wysyła Bobowi kwotę P zaszyfrowaną kluczem publicznym Boba. Mallory nie umie odczytać C, ale mnoży je przez s<sup>e</sup> mod n, co każdy może policzyć. Ponieważ s<sup>e</sup> × P<sup>e</sup> = (s × P)<sup>e</sup>, Bob odszyfruje s × P mod n.",
+    malP: "kwota P od Alice", malS: "mnożnik s od Mallory",
+    malC: "C = P<sup>e</sup> mod n", malC2: "C' = C × s<sup>e</sup> mod n", malBob: "Bob odszyfrowuje C'",
+    malRes: (b) => "Bob odczytuje " + b + ", poprawną liczbę. Nic mu nie mówi, że C zostało zmienione.",
+    malNote: "Dopełnienie psuje tę sztuczkę: s × (dopełnione P) nie ma już struktury, którą sprawdza Bob, więc ją odrzuca. Ale serwer, który mówi, czy dopełnienie było poprawne, daje Mallory nowe narzędzie (atak Bleichenbachera, na slajdach).",
+    emTitle15: "PKCS#1 v1.5 (256 bajtów przy RSA-2048)", emTitleO: "OAEP z SHA-256 (256 bajtów)",
+    em15: ["00", "02", "losowe niezerowe bajty (co najmniej 8)", "00", "wiadomość"], emO: ["00", "maskowane ziarno (32 B)", "maskowane: skrót etykiety, zera, 01, wiadomość"],
+    emChk15: "Bob sprawdza po odszyfrowaniu: czy zaczyna się od 00 02 i czy przed wiadomością jest bajt 00?",
+    emChkO: "Bob sprawdza po odszyfrowaniu: pierwszy bajt, skrót etykiety i bajt 01. Każdy bajt zależy od losowego ziarna.",
     cardLeak: "A jeśli klucz prywatny Boba wycieknie?",
     leakIntro: "Eve nagrywała każdy szyfrogram od Alice (tutaj: litery jej tekstu z kroku 1). Po latach kradnie klucz prywatny Boba d.",
     bLeak: "Eve kradnie d", bUnleak: "cofnij",
     leakRec: "nagrane", leakOpen: "otwarte przez d",
-    leakNote: "Wyciek klucza prywatnego otwiera wszystkie nagrane wiadomości od wszystkich, którzy pisali do Boba, i wszystkie nowe, dopóki Bob nie zmieni klucza. Rozwiązanie to klucze, które żyją tylko przez jedną sesję (forward secrecy).",
+    leakNote: "Wyciek klucza prywatnego otwiera wszystkie nagrane wiadomości od wszystkich, którzy pisali do Boba, i wszystkie nowe, dopóki Bob nie zmieni klucza. Rozwiązanie to nowa para kluczy na każdą sesję, wyrzucana zaraz po niej (forward secrecy, następny wykład).",
   },
 };
 
@@ -995,6 +1054,7 @@ const app = {
   card: 1,                                      // steps 2 to 5: #N.M opens step N scrolled to its M-th card
   grid: null, fac: null, size: null, bits: 32, sizeHist: [], rate: 0,
   e3msg: "PIN 4821", e3key: null, mBigText: null, hybKey: null,
+  prime: null, malP: "40", malS: "2",
 };
 app.K = makeKeys(17n, 11n, 7n);
 
@@ -1199,7 +1259,40 @@ function render1() {
       '<span class="note" style="align-self:flex-end">' + t.inLimit + "</span></div>" +
       '<div class="tablewrap" id="s2tab"></div></div>' +
     '<div class="card" id="s2d"></div>' +
-    '<div class="card" id="s2two"></div>';
+    '<div class="card" id="s2two"></div>' +
+    '<div class="card"><h3>' + t.cardPrime + '</h3><p style="margin:0 0 8px">' + t.primeIntro + '</p>' +
+      '<div class="btns" style="margin-top:0"><button class="dark" data-action="prime">' + t.bPrime + '</button></div><div id="s2prime"></div>' +
+      '<p class="note" style="margin:8px 0 0">' + t.primeNote + "</p></div>";
+}
+// a random 1024-bit prime as a real key needs it: random odd numbers, each tested with Miller-Rabin, in chunks
+function startPrime() {
+  const run = (app.primeRun = (app.primeRun || 0) + 1);
+  const P = app.prime = { tried: [], found: null, ms: 0 };
+  function chunk() {
+    if (run !== app.primeRun) return;
+    const t0 = performance.now(), end = t0 + 25;
+    while (performance.now() < end && P.found === null) {
+      const x = randBits(1024) | 1n;
+      P.tried.push(x);
+      if (isProbPrime(x)) P.found = x;
+    }
+    P.ms += performance.now() - t0;
+    updatePrime();
+    if (P.found === null) setTimeout(chunk, 0);
+  }
+  updatePrime();
+  setTimeout(chunk, 0);
+}
+function updatePrime() {
+  const el = document.getElementById("s2prime");
+  if (!el || !app.prime) return;
+  const t = L(), P = app.prime, k = P.tried.length;
+  const last = P.tried.slice(-6).map(x => {
+    const s = String(x), ok = x === P.found;
+    return '<div class="' + (ok ? "okline" : "") + '">' + (ok ? "✓ " : "✗ ") + s.slice(0, 24) + "…" + s.slice(-6) + " (" + s.length + (lang === "pl" ? " cyfr" : " digits") + ")</div>";
+  }).join("");
+  el.innerHTML = '<div class="primes">' + last + '</div><p class="note" style="margin:4px 0 0">' + t.primeTried(k) + "</p>" +
+    (P.found !== null ? '<p class="okline" style="margin:4px 0 0">' + t.primeFound(k, Math.round(P.ms)) + "</p>" : "");
 }
 function updateL1() {
   const tabEl = document.getElementById("s2tab");
@@ -1238,6 +1331,7 @@ function updateL1() {
   const dc = document.getElementById("s2d"), two = document.getElementById("s2two");
   if (!keyOK()) { dc.style.display = "none"; }
   else { dc.style.display = ""; dc.innerHTML = dCardHTML(K); }
+  updatePrime();
   if (keyOK()) {
     two.style.display = "";
     two.innerHTML = '<h3>' + t.cardTwo + '</h3><div class="twokeys">' +
@@ -1454,30 +1548,63 @@ function updateL3() {
 }
 
 /* ---------- step 5: textbook RSA is not enough ---------- */
+const PARTS5 = 8;
 function render4() {
   const t = L();
   if (!keyOK()) return errCard();
-  return '<div class="card"><h3>' + t.cardSame + '</h3><div id="s4same"></div></div>' +
-    '<div class="card"><h3>' + t.cardGuess + '</h3><label class="chip role-msg" style="display:inline-flex">' + t.baseM +
+  const k = Math.max(1, Math.min(PARTS5, app.card));
+  let bar = '<div class="partbar">';
+  for (let i = 1; i <= PARTS5; i++) bar += '<button data-action="part" data-k="' + i + '" aria-pressed="' + (i === k) + '">' + "5." + i + " " + t.parts[i - 1][0] + "</button>";
+  bar += "</div>";
+  const cards = [
+    () => '<div class="card"><div class="cardhead"><h3>' + t.cardHyb + '</h3><button data-action="newkey">' + t.bNewKey + '</button></div><p style="margin:0 0 10px">' + t.hybIntro + '</p><div id="s5hyb"></div></div>',
+    () => '<div class="card"><h3>' + t.cardSame + '</h3><div id="s4same"></div></div>',
+    () => '<div class="card"><h3>' + t.cardGuess + '</h3><label class="chip role-msg" style="display:inline-flex">' + t.baseM +
       '<input data-field="m" inputmode="numeric" spellcheck="false" value="' + esc(app.mText) + '"></label><div id="s4guess"></div>' +
       '<hr style="border:0;border-top:1px solid var(--rule);margin:14px 0"><p style="margin:0 0 6px">' + t.bigIntro + "</p>" +
-      '<details><summary class="note" style="cursor:pointer">' + t.showN + '</summary><div class="bign">' + TASK7_N + "</div></details>" +
-      '<div class="btns"><button class="dark" data-action="guess-big" id="bigBtn">' + t.bGuessBig + '</button></div><div id="s4big"></div></div>' +
-    '<div class="card"><h3>' + t.cardE3 + '</h3><p style="margin:0 0 8px">' + t.e3Intro + '</p><label class="chip role-msg" style="display:inline-flex">' + t.e3Lbl +
-      '<input data-field="e3" spellcheck="false" maxlength="120" style="width:22em" value="' + esc(app.e3msg) + '"></label><div id="s5e3"></div></div>' +
-    '<div class="card"><h3>' + t.cardMist + '</h3><h4 class="sub">' + t.mistA + '</h4><label class="chip role-msg" style="display:inline-flex">' + t.mistAIn +
-      '<input data-field="mbig" inputmode="numeric" spellcheck="false" value="' + esc(mBigText()) + '"></label><div id="s5ma"></div><h4 class="sub">' + t.mistB + '</h4><div id="s5mb"></div></div>' +
-    '<div class="card"><div class="cardhead"><h3>' + t.cardHyb + '</h3><button data-action="newkey">' + t.bNewKey + '</button></div><p style="margin:0 0 10px">' + t.hybIntro + '</p><div id="s5hyb"></div></div>' +
-    '<div class="card"><h3>' + t.cardReal + '</h3><ul class="ul">' + t.real.map(x => "<li>" + x + "</li>").join("") + '</ul><p class="note" style="margin:8px 0 0">' + t.realNote + "</p></div>" +
-    '<div class="card"><h3>' + t.cardLeak + '</h3><p style="margin:0 0 6px">' + t.leakIntro + '</p><div id="s4leak"></div></div>';
+      '<details><summary class="note" style="cursor:pointer">' + t.showN + '</summary><div class="bign">' + TASK6_N + "</div></details>" +
+      '<div class="btns"><button class="dark" data-action="guess-big" id="bigBtn">' + t.bGuessBig + '</button></div><div id="s4big"></div></div>',
+    () => '<div class="card"><h3>' + t.cardE3 + '</h3><p style="margin:0 0 8px">' + t.e3Intro + '</p><label class="chip role-msg" style="display:inline-flex">' + t.e3Lbl +
+      '<input data-field="e3" spellcheck="false" maxlength="120" style="width:22em" value="' + esc(app.e3msg) + '"></label><div id="s5e3"></div></div>',
+    () => '<div class="card"><h3>' + t.cardMist + '</h3><h4 class="sub">' + t.mistA + '</h4><label class="chip role-msg" style="display:inline-flex">' + t.mistAIn +
+      '<input data-field="mbig" inputmode="numeric" spellcheck="false" value="' + esc(mBigText()) + '"></label><div id="s5ma"></div><h4 class="sub">' + t.mistB + '</h4><div id="s5mb"></div></div>',
+    () => '<div class="card"><h3>' + t.cardMal + '</h3><p style="margin:0 0 8px">' + t.malIntro + '</p><div class="inrow">' +
+      '<label class="chip role-msg">' + t.malP + '<input data-field="malp" inputmode="numeric" spellcheck="false" value="' + esc(app.malP) + '"></label>' +
+      '<label class="chip role-eve">' + t.malS + '<input data-field="mals" inputmode="numeric" spellcheck="false" value="' + esc(app.malS) + '"></label></div><div id="s5mal"></div></div>',
+    () => '<div class="card"><h3>' + t.cardReal + '</h3><ul class="ul">' + t.real.map(x => "<li>" + x + "</li>").join("") + "</ul>" + emHTML() + '<p class="note" style="margin:8px 0 0">' + t.realNote + "</p></div>",
+    () => '<div class="card"><h3>' + t.cardLeak + '</h3><p style="margin:0 0 6px">' + t.leakIntro + '</p><div id="s4leak"></div></div>'];
+  return bar + cards[k - 1]();
+}
+// the two padding layouts, drawn with their sizes for RSA-2048
+function emHTML() {
+  const t = L(), cell = (txt, cls, flex) => '<span class="' + cls + '" style="flex:' + flex + ' 1 0">' + txt + "</span>";
+  return '<h4 class="sub">' + t.emTitle15 + '</h4><div class="emrow">' + cell(t.em15[0], "role-neu", 6) + cell(t.em15[1], "role-neu", 6) +
+      cell(t.em15[2], "role-sym", 60) + cell(t.em15[3], "role-neu", 6) + cell(t.em15[4], "role-msg", 22) + '</div><div class="emchk">' + t.emChk15 + "</div>" +
+    '<h4 class="sub">' + t.emTitleO + '</h4><div class="emrow">' + cell(t.emO[0], "role-neu", 6) + cell(t.emO[1], "role-sym", 24) +
+      cell(t.emO[2], "role-msg", 70) + '</div><div class="emchk">' + t.emChkO + "</div>";
+}
+// Mallory multiplies C by s^e: Bob decrypts s * P mod n
+function updateMal() {
+  const el = document.getElementById("s5mal");
+  if (!el) return;
+  const t = L(), K = app.K;
+  const ps = app.malP.trim(), ss = app.malS.trim();
+  if (!/^\d{1,40}$/.test(ps) || !/^\d{1,40}$/.test(ss) || BigInt(ps) >= K.n || BigInt(ss) >= K.n) { el.innerHTML = '<p class="err">' + t.errM(K.n - 1n) + "</p>"; return; }
+  const P = BigInt(ps), sv = BigInt(ss), c = encrypt(P, K), f = encrypt(sv, K), c2 = (c * f) % K.n, back = decrypt(c2, K);
+  const row = (a, b, cls) => '<tr><td class="lbl">' + a + '</td><td class="' + (cls || "") + '">' + b + "</td></tr>";
+  el.innerHTML = '<table class="ftab">' + row(t.malC, sup(P, K.e) + " mod " + K.n + " = <b>" + c + "</b>") +
+    row("s<sup>e</sup> mod n", sup(sv, K.e) + " mod " + K.n + " = " + f) +
+    row(t.malC2, c + " × " + f + " mod " + K.n + " = <b>" + c2 + "</b>") +
+    row(t.malBob, sup(c2, K.d) + " mod " + K.n + " = <b>" + back + "</b> = " + sv + " × " + P + " mod " + K.n, "badline") + "</table>" +
+    '<p style="margin:8px 0 0">' + t.malRes(back) + '</p><div class="why">' + t.malNote + "</div>";
 }
 function updateL4() {
+  if (app.level !== 4 || !keyOK()) return;
   const same = document.getElementById("s4same");
-  if (!same) return;
   const t = L(), K = app.K;
   // same message, same ciphertext
   const er = textErr();
-  if (er) same.innerHTML = '<p class="err">' + er + "</p>";
+  if (!same) {} else if (er) same.innerHTML = '<p class="err">' + er + "</p>";
   else {
     const ms = textNums(), cs = ms.map(m => encrypt(m, K));
     const rep = new Set(ms.map(String)).size < ms.length;
@@ -1486,7 +1613,7 @@ function updateL4() {
   }
   // guess and check
   const g = document.getElementById("s4guess");
-  if (!mOK()) g.innerHTML = '<p class="err">' + t.errM(K.n - 1n) + "</p>";
+  if (!g) {} else if (!mOK()) g.innerHTML = '<p class="err">' + t.errM(K.n - 1n) + "</p>";
   else {
     const c = encrypt(app.m, K);
     const lim = K.n < 10000n ? K.n : 10000n;
@@ -1511,7 +1638,7 @@ function updateL4() {
   }
   // a leaked key
   const lk = document.getElementById("s4leak");
-  if (er) lk.innerHTML = '<p class="err">' + er + "</p>";
+  if (!lk) {} else if (er) lk.innerHTML = '<p class="err">' + er + "</p>";
   else {
     const cs = textNums().map(m => encrypt(m, K));
     let h = '<table class="ltab"><tr class="rc"><td class="lbl">' + t.leakRec + "</td>" + cs.map(c => "<td>" + c + "</td>").join("") + "</tr>";
@@ -1524,7 +1651,7 @@ function updateL4() {
     lk.innerHTML = '<div class="tablewrap">' + h + '</div><div class="btns"><button class="' + (app.leaked ? "" : "dark") + '" data-action="leak">' + (app.leaked ? t.bUnleak : t.bLeak) + "</button></div>" +
       (app.leaked ? '<div class="why">' + t.leakNote + "</div>" : "");
   }
-  updateE3(); updateMist(); updateHyb();
+  updateE3(); updateMist(); updateHyb(); updateMal();
 }
 // e = 3 and a short message: Eve's cube root, on the fixed 2048-bit test key
 function updateE3() {
@@ -1595,13 +1722,13 @@ function runBig() {
   app.big = { tries: 0, found: null, ms: 0 };
   const t0 = performance.now();
   let g = 0n;
-  const pub = { n: TASK7_N, e: TASK7_E };
+  const pub = { n: TASK6_N, e: TASK6_E };
   function chunk() {
     if (run !== app.bigRun) return;
     const end = performance.now() + 25;
     while (performance.now() < end && g < 10000n) {
       app.big.tries++;
-      if (encrypt(g, pub) === TASK7_C) { app.big.found = g; break; }
+      if (encrypt(g, pub) === TASK6_C) { app.big.found = g; break; }
       g++;
     }
     app.big.ms = performance.now() - t0;
@@ -1624,9 +1751,9 @@ function updateAll() {
   [updateL0, updateL1, updateL2, updateL3, updateL4][app.level]();
 }
 function hashStr() { return "#" + (app.level + 1) + (app.level === 0 && app.story > 1 ? "." + app.story : app.level > 0 && app.card > 1 ? "." + app.card : ""); }
-// #5.5 scrolls step 5 to its 5th card (hybrid encryption), #4.2 step 4 to its 2nd card (a bigger n)
+// #4.2 scrolls step 4 to its 2nd card (a bigger n), #2.4 step 2 to its 4th card (random primes); #5.1 to #5.8 open one part of step 5
 function scrollToCard() {
-  if (app.level === 0 || app.card < 2) return;
+  if (app.level === 0 || app.level === 4 || app.card < 2) return;
   const c = view.querySelectorAll(".fade > .card")[app.card - 1];
   if (c) c.scrollIntoView({ block: "start" });
 }
@@ -1647,7 +1774,7 @@ function render() {
   document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
   document.getElementById("mhSub").textContent = t.steps[app.level][1];
-  const ex = t.explain[app.level];
+  const ex = app.level === 4 ? t.parts[Math.max(1, Math.min(PARTS5, app.card)) - 1] : t.explain[app.level];
   const head = app.level === 0 && keyOK() ? storyBarHTML() : '<div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>";
   view.innerHTML = '<div class="fade">' + head + [render0, render1, render2, render3, render4][app.level]() + "</div>";
   updateAll();
@@ -1725,6 +1852,8 @@ view.addEventListener("click", e => {
   }
   else if (a === "sete") { app.eText = el.dataset.e; const inp = view.querySelector('input[data-field="e"]'); if (inp) inp.value = app.eText; keysChanged(); }
   else if (a === "guess") runGuess();
+  else if (a === "part") { app.card = +el.dataset.k; render(); view.scrollTop = 0; }
+  else if (a === "prime") startPrime();
   else if (a === "guess-big") runBig();
   else if (a === "leak") { app.leaked = !app.leaked; updateL4(); }
 });
@@ -1737,6 +1866,8 @@ view.addEventListener("input", e => {
   else if (f === "bits") { app.bits = +v; updateL3(); }
   else if (f === "e3") { app.e3msg = v; updateE3(); }
   else if (f === "mbig") { app.mBigText = v; updateMist(); }
+  else if (f === "malp") { app.malP = v; updateMal(); }
+  else if (f === "mals") { app.malS = v; updateMal(); }
   else if (f === "p" || f === "q" || f === "e") { app[f + "Text"] = v; keysChanged(); }
 });
 document.getElementById("steps").addEventListener("click", e => {
@@ -1762,12 +1893,13 @@ document.addEventListener("keydown", e => {
 
 /* ---------- start ---------- */
 const SELF_FAILS = selfTest();
-// #3 opens step 3; #1.5 opens step 1 at story step 5; #5.5 opens step 5 at its 5th card
+// #3 opens step 3; #1.5 opens step 1 at story step 5; #5.3 opens part 3 of step 5
 function readHash() {
   const hm = /^#(\d)(?:\.(\d+))?$/.exec(location.hash);
   if (hm && +hm[1] >= 1 && +hm[1] <= 5) app.level = +hm[1] - 1;
   if (hm && app.level === 0) app.story = hm[2] ? Math.max(1, Math.min(STORY_N, +hm[2])) : 1;
   if (hm && app.level > 0) app.card = hm[2] ? Math.max(1, +hm[2]) : 1;
+  if (hm && app.level === 4) app.card = Math.min(PARTS5, app.card);
 }
 // a link from a slide opens the right step even in a tab that is already open
 window.addEventListener("hashchange", () => { if (location.hash !== hashStr()) { readHash(); render(); view.scrollTop = 0; scrollToCard(); } });
