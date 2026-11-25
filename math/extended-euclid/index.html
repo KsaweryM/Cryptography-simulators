@@ -205,7 +205,8 @@ function gcdSlow(a, b) {   // the greatest number that divides both, by trying a
    2. The earlier Lecture 3 exercise: the inverse of 23 mod 120 is 47, 1 = -9*120 + 47*23, 5 rows.
    3. Wikipedia "RSA (cryptosystem)", the worked example with Euler's phi: phi = 3120, e = 17, d = 2753.
    4. Lecture 3, the task with two 20-digit primes (Task 5): p = 37908704904578413183, q = 58606630333925820283, e = 65537,
-      phi = 2221701454780507748434219819189271757324, d = 1367151349159148221410861819858768950381.
+      phi = 2221701454780507748434219819189271757324, d = 1367151349159148221410861819858768950381 (self-test only);
+      the preset uses e = 65539: its inverse mod phi is 542111562044734889347717288156286088331.
    5. gcd(18, 12) = 6: no inverse. Fibonacci numbers 89 and 55: 9 rows, the slowest case for their size.
    6. For every 2 <= a <= 100 and 0 <= b < a: the gcd equals the slow gcd, s*a + t*b = gcd, and the inverse
       equals the one found by trying every d (or both say there is none). */
@@ -215,7 +216,7 @@ const PRESETS = [   // [a, b]
   [160n, 7n],        // the RSA slides
   [120n, 23n],       // inverse 47
   [3120n, 17n],      // Wikipedia: d = 2753
-  [T4_PHI, 65537n],  // Lecture 3, the 20-digit key (not the default: it would show the task's d)
+  [T4_PHI, 65539n],  // Lecture 3, phi of Task 5 but e = 65539: the task's d (e = 65537) stays hidden
   [89n, 55n],        // Fibonacci: the most rows
   [18n, 12n],        // gcd 6: no inverse
 ];
@@ -234,6 +235,7 @@ function selfTest() {
   if (modInverse(17n, 3120n) !== 2753n) fails.push("17 mod 3120");
   // 4. the 20-digit key
   if ((37908704904578413183n - 1n) * (58606630333925820283n - 1n) !== T4_PHI || modInverse(65537n, T4_PHI) !== T4_D) fails.push("20-digit key: d");
+  if (modInverse(65539n, T4_PHI) !== 542111562044734889347717288156286088331n) fails.push("20-digit key: preset 65539");
   // 5. no inverse; Fibonacci
   const x5 = extEuclid(18n, 12n);
   if (x5.g !== 6n || x5.d !== null || x5.s * 18n + x5.t * 12n !== 6n) fails.push("gcd(18, 12)");
@@ -267,7 +269,7 @@ const T = {
     selfOk: "✓ checked against the RSA slides, Wikipedia and a brute-force search", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "← / →: step · n / p: next / previous row",
     cardIn: "The two numbers", presets: "examples:",
-    preNames: ["160, 7 (the RSA slides)", "120, 23", "3120, 17 (Wikipedia, RSA)", "phi of two 20-digit primes, 65537", "89, 55 (Fibonacci)", "18, 12 (gcd 6)"],
+    preNames: ["160, 7 (the RSA slides)", "120, 23", "3120, 17 (Wikipedia, RSA)", "phi of two 20-digit primes, 65539", "89, 55 (Fibonacci)", "18, 12 (gcd 6)"],
     inA: "a", inB: "b", inLimit: "whole numbers, up to 60 digits",
     errNum: "Type whole numbers from 1 to 60 digits, a ≥ 2 and b ≥ 1.",
     cardEuclid: (a, b) => "Euclid's algorithm: gcd(" + a + ", " + b + ")",
@@ -307,7 +309,7 @@ const T = {
     selfOk: "✓ sprawdzone z przykładami ze slajdów RSA, Wikipedii i z przeszukaniem wszystkich d", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "← / →: krok · n / p: następny / poprzedni wiersz",
     cardIn: "Dwie liczby", presets: "przykłady:",
-    preNames: ["160, 7 (slajdy o RSA)", "120, 23", "3120, 17 (Wikipedia, RSA)", "phi dwóch 20-cyfrowych liczb pierwszych, 65537", "89, 55 (Fibonacci)", "18, 12 (NWD 6)"],
+    preNames: ["160, 7 (slajdy o RSA)", "120, 23", "3120, 17 (Wikipedia, RSA)", "phi dwóch 20-cyfrowych liczb pierwszych, 65539", "89, 55 (Fibonacci)", "18, 12 (NWD 6)"],
     inA: "a", inB: "b", inLimit: "liczby całkowite, do 60 cyfr",
     errNum: "Wpisz liczby całkowite od 1 do 60 cyfr, a ≥ 2 i b ≥ 1.",
     cardEuclid: (a, b) => "Algorytm Euklidesa: gcd(" + a + ", " + b + ")",

@@ -6,8 +6,9 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 
 ## Ready
 
-- **ChaCha20** (`chacha20/`): black box, inside, one round, one operation, and the comparison with RC4 (the two key
-  tests of Lecture 2 over 10 000 or 100 000 keys; the fixed seed 2026 gives the numbers on the slides).
+- **ChaCha20** (`chacha20/`): black box, inside, one round, one operation, the comparison with RC4 (the two key
+  tests of Lecture 2 over 10 000 or 100 000 keys; the fixed seed 2026 gives the numbers on the slides), Salsa20 vs ChaCha20,
+  the Poly1305 tag.
 
 ## In progress
 
@@ -18,11 +19,12 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 - **RSA** (`rsa/`): black box (a story in 9 steps), making the keys, why decryption works, Eve tries to break it, why textbook RSA is not enough. The algorithms behind
   d and the power are in the mathematics section.
 - **Diffie-Hellman and ElGamal** (`diffie-hellman/`): black box, the powers of g, Mallory in the middle, ElGamal, one power, k used twice.
-- **Elliptic curves** (`elliptic-curves/`): black box, adding points, from real numbers to modulo 17 (four parts), the curve modulo 17 (multiples of G, double and add, with play), one addition as a line that wraps around the grid.
-- **Hash functions** (`hash/`): black box, the avalanche, padding and the chain of blocks, `update()` in pieces, one bit through the rounds, guessing a short hash.
-- **Collisions and passwords** (`passwords/`): the birthday paradox, one MD5 collision gives many, four ways to store a password, a rainbow table, the cost of bcrypt.
+- **Elliptic curves** (`elliptic-curves/`): black box, adding points, from real numbers to modulo 17 (four parts), the curve modulo 17 (multiples of G, double and add, with play), one addition as a line that wraps around the grid, fake points (the invalid-curve attack).
+- **Hash functions** (`hash/`): black box, the avalanche, padding and the chain of blocks, `update()` in pieces, one bit through the rounds, guessing a short hash, a Merkle tree, length extension, the sponge of SHA-3.
+- **Collisions and passwords** (`passwords/`): the birthday paradox, a collision search without a table (rho), one MD5 collision gives many, four ways to store a password, a rainbow table, the cost of bcrypt.
 - **Certificates and PKI** (`pki/`): black box (Mallory swaps a key, a CA signature stops her), inside a certificate (X.509 fields, DER
-  bytes, fingerprint), chain of trust, validation checks, revocation (CRL, OCSP, stapling), certificates in TLS 1.3 and mTLS, pinning.
+  bytes, fingerprint), chain of trust, validation checks, revocation (CRL, OCSP, stapling), certificates in TLS 1.3 and mTLS, pinning,
+  Certificate Transparency (a Merkle tree, inclusion and consistency proofs), getting a certificate by ACME.
 
 ## Coming soon
 

@@ -190,6 +190,13 @@ input,textarea,select{font-family:var(--mono);color:var(--ink);background:var(--
 .grid17 .sel{fill:none;stroke:var(--focus);stroke-width:2}
 .grid17 .mlab{font-family:var(--sans);font-size:12px;font-weight:700}
 .grid17 .halo{stroke:var(--surface);stroke-width:4;paint-order:stroke}
+.hidebar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--sunken);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:13px}
+.hidv{display:inline-block;min-width:44px;text-align:center;font-size:20px;font-weight:700;color:var(--key-b)}
+.cand{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px;max-width:620px;margin:6px 0}
+.cand span{font-family:var(--mono);font-size:12px;text-align:center;padding:3px 0;border-radius:4px;border:1.5px solid var(--key-b);background:var(--key-bg);transition:opacity .3s}
+.cand span.out{border-color:var(--rule);background:var(--sunken);color:var(--muted);opacity:.45}
+.cand span.bobd{box-shadow:0 0 0 2.5px var(--ctr-b)}
+.cyc text{font-family:var(--sans);font-size:13px;fill:var(--ink)}
 .chk{font-size:14px;margin:8px 0 0;min-height:3em}
 .mchips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
 .mchip{display:flex;flex-direction:column;align-items:center;padding:3px 7px;border-radius:6px;font-family:var(--mono);font-size:12.5px;line-height:1.3;min-width:58px}
@@ -450,6 +457,19 @@ function pointsByX(a, b, p) {
   return { sq: sq, cols: cols };
 }
 
+// step 6: Mallory's fake points (slides "The formulas never use b" to "Three fake points give the whole key").
+// Each lies on y^2 = x^3 + 2x + b' with another b', not on the toy curve, and has a small order there.
+const FAKES = [{ P: { x: 7n, y: 1n }, b: 1n }, { P: { x: 2n, y: 8n }, b: 1n }, { P: { x: 3n, y: 6n }, b: 3n }];
+const fakeCurve = f => ({ a: 2n, b: f.b, p: 17n });
+// the cycle O, P, 2P, ..., (n - 1)P of a point (n = its order); add() never uses b, so Bob's code computes the same
+function cycleOf(C, P) { const pts = [null]; let R = P; while (R !== null && pts.length < 100) { pts.push(R); R = add(C, R, P); } return pts; }
+// what Bob's answer tells Mallory: S = dP is the j-th point of the cycle, so d mod n = j
+function fakePiece(d, f) {
+  const cyc = cycleOf(TOY, f.P), S = mul(TOY, BigInt(d), f.P);
+  for (let j = 0; j < cyc.length; j++) if (samePoint(cyc[j], S)) return { n: cyc.length, j: j, S: S, cyc: cyc };
+  return null;
+}
+
 /* Test values and their sources.
    Slides (Lecture05-Elliptic-Curves/main.tex, % CHECKED lines) and Paar and Pelzl, "Understanding Cryptography" (2010),
    chapter 9.2, the same example curve y^2 = x^3 + 2x + 2 mod 17 with G = (5, 1), 19 points, 2G = (6, 3).
@@ -547,6 +567,16 @@ function selfTest() {
     for (const A of curvePoints(C)) if (mod(I.s * A.x + c0, C.p) === A.y) got.add(A.x + "," + A.y);
     if (got.size !== want.size || [...got].some(k => !want.has(k))) { fails.push("the line through (" + P.x + ", " + P.y + ") and (" + Q.x + ", " + Q.y + ")"); break lineTest; }
   }
+  // step 6: the slides with d = 7: (7, 1), (2, 8), (3, 6) have orders 3, 4, 11 and give d mod 3 = 1, mod 4 = 3, mod 11 = 7;
+  // none is on the toy curve, each is on its own curve; of 0 .. 131 only 7 fits
+  const want6 = [[3, 1], [4, 3], [11, 7]];
+  for (let i = 0; i < 3; i++) {
+    const f = FAKES[i], pc = fakePiece(7, f);
+    if (onCurve(TOY, f.P) || !onCurve(fakeCurve(f), f.P) || !pc || pc.n !== want6[i][0] || pc.j !== want6[i][1]) { fails.push("fake point " + i); break; }
+  }
+  const left6 = [];
+  for (let v = 0; v < 132; v++) if (v % 3 === 1 && v % 4 === 3 && v % 11 === 7) left6.push(v);
+  if (left6.join() !== "7") fails.push("the candidates of step 6");
   return fails;
 }
 // CORE-END
@@ -562,10 +592,11 @@ const T = {
   en: {
     title: "Elliptic-curve explorer", home: "All simulators",
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
-    stepOf: n => "Step " + n + " of 5 · ECC",
+    stepOf: n => "Step " + n + " of 6 · ECC",
     steps: [["Black box", "two secrets in, one shared point out"], ["Adding points", "chord and tangent on the real curve"],
             ["Real to modulo 17", "the same formulas, exact numbers"],
-            ["Modulo 17", "dots, multiples of G, double and add"], ["One addition", "the line wraps around the grid"]],
+            ["Modulo 17", "dots, multiples of G, double and add"], ["One addition", "the line wraps around the grid"],
+            ["Fake points", "a point off the curve gives away the key"]],
     explain: {
       ecdh: ["Diffie-Hellman with points", "Alice and Bob each pick a secret number and publish a point: A = aG and B = bG. Each multiplies the other's point by their own secret, and both get the same point abG. Eve sees the curve, G, A and B. Change the secrets. Click an a × G box to see what multiplying a point means."],
       elg: ["ElGamal with points", "Bob publishes Q = dG. Alice's message is a point M. She picks a random k and sends C₁ = kG and C₂ = M + kQ. Bob subtracts dC₁ = kQ and gets M back. Eve sees Q, C₁ and C₂. Click a box to see how points are added."],
@@ -575,6 +606,7 @@ const T = {
       trans3: ["Where the 18 dots come from", "Go through x = 0, 1, …, 16: compute the right side x³ + 2x + 2 mod 17 and look for the y whose square is that number. Every match is a dot of the curve."],
       trans4: ["Why the dots look random", "Click a bar to pick x: its value x³ + 2x + 2 goes round the clock of 17 and stops at the remainder."],
       mod: ["The same curve modulo 17", "The curve of step 3, dot by dot: its 18 points, plus the point at infinity O. Click any square to check whether it is a point of the curve. Then add G again and again (G, 2G, 3G, …), or get to kG fast with double and add."],
+      fake: ["Mallory's fake points", "Bob keeps one private key d and answers anyone who sends him a point P, with a key made from S = dP. The formulas of addition never use b, so Bob also adds points of other curves y² = x³ + 2x + b′. Mallory picks points with tiny cycles there: S is then one of a few points, and Bob's answer tells her which, that is d mod the length of the cycle. Pick a fake point, send it to Bob, and watch the candidates for d disappear. Then let Bob check the point."],
       one: ["One addition on the grid", "The picture of step 2 again, modulo 17: the line through P and Q wraps around the grid, meets the curve in exactly one more dot, and the mirror image of that dot is P + Q. Beside it, the same three formulas with numbers. Pick two points, or come here from step 4."],
     },
     selfOk: "✓ checked against the slides, Paar and Pelzl (ch. 9) and RFC 5903 (P-256)", selfBad: f => "✗ self-test failed: " + f,
@@ -583,6 +615,18 @@ const T = {
     pubT: "public", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1)",
     alice: "Alice", bob: "Bob", eve: "Eve", rand: "random number",
     secA: "secret a (1 to 18)", secB: "secret b (1 to 18)", box_s: "click to look inside",
+    secAh: "secret a (random)", secBh: "secret b (random)", rkh: "random k", privDh: "private key d (random)",
+    hid1: "The secret numbers are hidden: with them, this page would give away the answers of Tasks 2 and 3 of the lecture. The dice still picks new secrets, and both sides still get the same point.",
+    hid1Btn: "show the numbers (after Task 3)",
+    fCard1: "Mallory's fake point", fCard2: "Candidates for Bob's d", fSend: "send it to Bob",
+    fNot: (P, b, l, r) => P + " is on y² = x³ + 2x + " + b + ", not on Bob's curve: left side y² = " + l + ", right side x³ + 2x + 2 = " + r + " (mod 17). add() never uses b, so Bob's code adds it anyway.",
+    fCycle: n => "Its multiples go round a cycle of only " + n + " points (G has 19): O, P, 2P, …",
+    fRefused: "Bob checks the point: not on his curve, refused. Mallory learns nothing.",
+    fAnswer: (n, j) => "Bob answers with a key made from S = dP. Mallory makes the " + n + " possible keys, from O, P, …, " + (n - 1) + "P, and one of them opens the answer: S = " + j + "P, so d mod " + n + " = " + j + ".",
+    fWait: "Not sent yet.", fCandNote: "The numbers 0 to 131 (3 × 4 × 11 = 132). Every answer greys out the numbers that do not fit.",
+    fLeft: n => n + " candidates left.", fOne: d => "Only one is left: d = " + d + ". Bob's key is between 1 and 18, so this is it.",
+    fShowD: "show Bob's d", fNewD: "new random d for Bob", fReset: "start again", fBobD: d => "Bob's d = " + d,
+    fCheck: "Bob checks every point: y² = x³ + 2x + 2 mod 17 (with b), or he refuses it", legFake: "points of Mallory's curve",
     ptA: "public A = aG", ptB: "public B = bG", toBob: "A to Bob", toAlice: "B to Alice",
     sharedA: "shared point aB", sharedB: "shared point bA", eveListens: "Eve listens", eveSees: "sees",
     cardCurve1: "On the curve", cardEve: "Eve's attack on this small curve",
@@ -669,10 +713,10 @@ const T = {
   pl: {
     title: "Eksplorator krzywych eliptycznych", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
-    stepOf: n => "Krok " + n + " z 5 · ECC",
+    stepOf: n => "Krok " + n + " z 6 · ECC",
     steps: [["Czarna skrzynka", "dwa sekrety na wejściu, jeden wspólny punkt"], ["Dodawanie punktów", "sieczna i styczna na krzywej rzeczywistej"],
             ["Od liczb rzeczywistych do modulo 17", "te same wzory, dokładne liczby"],
-            ["Modulo 17", "kropki, wielokrotności G, podwajanie i dodawanie"], ["Jedno dodawanie", "prosta zawija się na siatce"]],
+            ["Modulo 17", "kropki, wielokrotności G, podwajanie i dodawanie"], ["Jedno dodawanie", "prosta zawija się na siatce"], ["Fałszywe punkty", "punkt spoza krzywej zdradza klucz"]],
     explain: {
       ecdh: ["Diffie-Hellman na punktach", "Alice i Bob wybierają po tajnej liczbie i publikują punkt: A = aG oraz B = bG. Każde mnoży punkt drugiej strony przez swój sekret i oboje dostają ten sam punkt abG. Eve widzi krzywą, G, A i B. Zmień sekrety. Kliknij pole a × G, żeby zobaczyć, co znaczy mnożenie punktu."],
       elg: ["ElGamal na punktach", "Bob publikuje Q = dG. Wiadomość Alice to punkt M. Alice losuje k i wysyła C₁ = kG oraz C₂ = M + kQ. Bob odejmuje dC₁ = kQ i odzyskuje M. Eve widzi Q, C₁ i C₂. Kliknij pole, żeby zobaczyć, jak dodaje się punkty."],
@@ -682,6 +726,7 @@ const T = {
       trans3: ["Skąd się bierze 18 kropek", "Przejdź przez x = 0, 1, …, 16: policz prawą stronę x³ + 2x + 2 mod 17 i znajdź y, którego kwadrat to ta liczba. Każde trafienie to kropka krzywej."],
       trans4: ["Dlaczego kropki wyglądają na losowe", "Kliknij słupek, żeby wybrać x: jego wartość x³ + 2x + 2 obiega tarczę z 17 liczbami i zatrzymuje się na reszcie."],
       mod: ["Ta sama krzywa modulo 17", "Krzywa z kroku 3, kropka po kropce: jej 18 punktów i punkt w nieskończoności O. Kliknij dowolne pole, żeby sprawdzić, czy to punkt krzywej. Potem dodawaj G raz za razem (G, 2G, 3G, …) albo szybko dojdź do kG podwajaniem i dodawaniem."],
+      fake: ["Fałszywe punkty Mallory'ego", "Bob ma jeden klucz prywatny d i odpowiada każdemu, kto przyśle mu punkt P, kluczem zrobionym z S = dP. Wzory na dodawanie nigdy nie używają b, więc Bob dodaje też punkty innych krzywych y² = x³ + 2x + b′. Mallory wybiera tam punkty o malutkich cyklach: S jest wtedy jednym z kilku punktów, a odpowiedź Boba mówi, którym, czyli ile wynosi d modulo długość cyklu. Wybierz fałszywy punkt, wyślij go Bobowi i patrz, jak znikają kandydaci na d. Potem niech Bob sprawdza punkt."],
       one: ["Jedno dodawanie na siatce", "Rysunek z kroku 2 jeszcze raz, modulo 17: prosta przez P i Q zawija się na siatce, trafia w krzywą w dokładnie jednej kropce więcej, a odbicie tej kropki to P + Q. Obok te same trzy wzory z liczbami. Wybierz dwa punkty albo przyjdź tu z kroku 4."],
     },
     selfOk: "✓ sprawdzone ze slajdami, z Paarem i Pelzlem (rozdz. 9) i z RFC 5903 (P-256)", selfBad: f => "✗ samotest nie przeszedł: " + f,
@@ -690,6 +735,18 @@ const T = {
     pubT: "jawne", curveEq: "y² = x³ + 2x + 2 mod 17", gLine: "G = (5, 1)",
     alice: "Alice", bob: "Bob", eve: "Eve", rand: "losowa liczba",
     secA: "sekret a (od 1 do 18)", secB: "sekret b (od 1 do 18)", box_s: "kliknij, by zajrzeć",
+    secAh: "sekret a (losowy)", secBh: "sekret b (losowy)", rkh: "losowe k", privDh: "klucz prywatny d (losowy)",
+    hid1: "Tajne liczby są ukryte: z nimi ta strona zdradzałaby odpowiedzi zadań 2 i 3 z wykładu. Kostka dalej losuje nowe sekrety, a obie strony dalej dostają ten sam punkt.",
+    hid1Btn: "pokaż liczby (po zadaniu 3)",
+    fCard1: "Fałszywy punkt Mallory'ego", fCard2: "Kandydaci na d Boba", fSend: "wyślij Bobowi",
+    fNot: (P, b, l, r) => P + " leży na y² = x³ + 2x + " + b + ", nie na krzywej Boba: lewa strona y² = " + l + ", prawa x³ + 2x + 2 = " + r + " (mod 17). add() nie używa b, więc kod Boba i tak go dodaje.",
+    fCycle: n => "Jego wielokrotności krążą po cyklu tylko " + n + " punktów (G ma 19): O, P, 2P, …",
+    fRefused: "Bob sprawdza punkt: nie leży na jego krzywej, odrzucony. Mallory niczego się nie dowiaduje.",
+    fAnswer: (n, j) => "Bob odpowiada kluczem z S = dP. Mallory robi " + n + " możliwych kluczy, z O, P, …, " + (n - 1) + "P, i jeden otwiera odpowiedź: S = " + j + "P, więc d mod " + n + " = " + j + ".",
+    fWait: "Jeszcze nie wysłany.", fCandNote: "Liczby od 0 do 131 (3 × 4 × 11 = 132). Każda odpowiedź wyszarza liczby, które nie pasują.",
+    fLeft: n => "Zostało kandydatów: " + n + ".", fOne: d => "Został jeden: d = " + d + ". Klucz Boba jest od 1 do 18, więc to on.",
+    fShowD: "pokaż d Boba", fNewD: "nowe losowe d Boba", fReset: "od nowa", fBobD: d => "d Boba = " + d,
+    fCheck: "Bob sprawdza każdy punkt: y² = x³ + 2x + 2 mod 17 (z b), inaczej go odrzuca", legFake: "punkty krzywej Mallory'ego",
     ptA: "jawny punkt A = aG", ptB: "jawny punkt B = bG", toBob: "A do Boba", toAlice: "B do Alice",
     sharedA: "wspólny punkt aB", sharedB: "wspólny punkt bA", eveListens: "Eve podsłuchuje", eveSees: "widzi",
     cardCurve1: "Na krzywej", cardEve: "Atak Eve na tę małą krzywą",
@@ -785,8 +842,9 @@ const multOf = P => { for (let k = 1; k <= 19; k++) if (samePoint(MULT[k], P)) r
 const BY_XY = curvePoints(TOY).map(P => multOf(P));
 
 const app = {
-  level: 0, tab1: "ecdh", eveOpen: false, scrollTo: null,
-  a: 3, b: 10, d: 7, m: 11, k: 4,
+  level: 0, tab1: "ecdh", eveOpen: false, scrollTo: null, show1: false,
+  fsel: 0, fd: 7, fres: [null, null, null], fcheck: false, fshowD: false,
+  a: 13, b: 5, d: 7, m: 11, k: 4,   // a, b: hidden secrets of #1; #1.1 and "show the numbers" set the slide's a = 3, b = 10
   bigA: RFC5903.i.toString(16), bigB: RFC5903.r.toString(16),
   rmode: "add", rP: { x: -0.7, up: true }, rQ: { x: 0.2, up: true },
   sub3: 1, timer: null,
@@ -811,7 +869,9 @@ const PERSON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="
 const EAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9a5 5 0 0 1 10 0c0 3-3 4-3 7a3 3 0 0 1-6 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M10 9.5a2 2 0 0 1 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const DICE = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/></svg>';
 
-const numCtl = f => '<span class="ctrline"><button data-action="dec" data-f="' + f + '" aria-label="−">&minus;</button>' +
+const numCtl = f => !app.show1 && "abdk".indexOf(f) >= 0 && f.length === 1 ? '<span class="ctrline"><span class="hidv mono">?</span>' +
+  '<button class="icon-btn" data-action="rand" data-f="' + f + '" title="' + esc(L().rand) + '" aria-label="' + esc(L().rand) + '">' + DICE + "</button></span>" :
+  '<span class="ctrline"><button data-action="dec" data-f="' + f + '" aria-label="−">&minus;</button>' +
   '<input type="number" min="1" max="18" data-field="' + f + '" value="' + app[f] + '"><button data-action="inc" data-f="' + f + '" aria-label="+">+</button>' +
   '<button class="icon-btn" data-action="rand" data-f="' + f + '" title="' + esc(L().rand) + '" aria-label="' + esc(L().rand) + '">' + DICE + "</button></span>";
 
@@ -839,7 +899,7 @@ function gridSVG(o) {
   if (o.path && o.path.length > 1) {
     for (let i = 1; i < o.path.length; i++) {
       const A = o.path[i - 1], B = o.path[i], last = i === o.path.length - 1;
-      s += '<line x1="' + gx(A.x) + '" y1="' + gy(A.y) + '" x2="' + gx(B.x) + '" y2="' + gy(B.y) + '" stroke="var(--chg)" stroke-width="' + (last ? 2.6 : 1.4) + '" opacity="' + (last ? 1 : 0.55) + '"' + (last ? ' marker-end="url(#gm_chg)"' : "") + ' pointer-events="none"/>';
+      s += '<line x1="' + gx(A.x) + '" y1="' + gy(A.y) + '" x2="' + gx(B.x) + '" y2="' + gy(B.y) + '" stroke="' + (o.pathCol || "var(--chg)") + '" stroke-width="' + (last ? 2.6 : 1.4) + '" opacity="' + (last ? 1 : 0.55) + '"' + (last && !o.pathCol ? ' marker-end="url(#gm_chg)"' : "") + ' pointer-events="none"/>';
     }
   }
   if (o.wline) {   // the line y = s x + c mod 17, drawn with the gentler of s and s - 17, and its copies 17 apart
@@ -854,6 +914,7 @@ function gridSVG(o) {
     const A = o.reflect.from, B = o.reflect.to, d = Number(B.y) > Number(A.y) ? 1 : -1;
     s += '<line x1="' + gx(A.x) + '" y1="' + (gy(A.y) - d * c * 0.45) + '" x2="' + gx(B.x) + '" y2="' + (gy(B.y) + d * c * 0.55) + '" stroke="var(--chg)" stroke-width="2.2" stroke-dasharray="5 4" marker-end="url(#gm_chg)" pointer-events="none"/>';
   }
+  for (const P of (o.rings || [])) s += '<circle cx="' + gx(P.x) + '" cy="' + gy(P.y) + '" r="' + (c * 0.3) + '" fill="none" stroke="var(--eve-b)" stroke-width="1.6" pointer-events="none"/>';
   for (const P of (o.only || curvePoints(TOY))) s += '<circle class="pt" cx="' + gx(P.x) + '" cy="' + gy(P.y) + '" r="' + (c * 0.24) + '" pointer-events="none"/>';
   for (const m of (o.marks || [])) {
     if (m.P === null) continue;
@@ -878,6 +939,7 @@ function render0() {
     '<span class="role-eve">' + t.legEve + "</span></div>";
   const pub = '<div class="pubbox role-pub"><b>' + t.pubT + '</b><span class="mono">' + t.curveEq + '</span><span class="mono">' + t.gLine + "</span></div>";
   const who = (x, name, col) => '<div class="who" style="left:' + x + "px;color:" + col + '">' + PERSON + name + "</div>";
+  const hid = app.show1 ? "" : '<div class="hidebar"><span>' + t.hid1 + '</span><button data-action="show1">' + t.hid1Btn + "</button></div>";
   if (app.tab1 === "ecdh") {
     const svg = '<svg class="arrows" width="900" height="550" aria-hidden="true"><defs>' + MARKERS + "</defs>" +
       ln("135,108 135,146", "var(--key-b)", "m_priv") + ln("765,108 765,146", "var(--key-b)", "m_priv") +
@@ -888,10 +950,10 @@ function render0() {
       ln("135,442 135,474", "var(--key-b)", "m_priv") + ln("765,442 765,474", "var(--key-b)", "m_priv") +
       ln("250,507 424,507", "var(--key-b)") + ln("650,507 476,507", "var(--key-b)") +
       '<polyline fill="none" stroke="var(--eve-b)" stroke-width="2" stroke-dasharray="3 4" points="450,370 450,328"/>' + "</svg>";
-    return '<div class="card" style="padding:14px 10px">' + tabs + '<div class="schwrap"><div class="sch" style="height:550px">' + svg + pub +
+    return '<div class="card" style="padding:14px 10px">' + tabs + hid + '<div class="schwrap"><div class="sch" style="height:550px">' + svg + pub +
         who(0, t.alice, "var(--non-b)") + who(650, t.bob, "var(--ctr-b)") +
-        '<div class="chip role-priv" style="left:0;top:36px;width:250px;height:72px">' + t.secA + numCtl("a") + "</div>" +
-        '<div class="chip role-priv" style="left:650px;top:36px;width:250px;height:72px">' + t.secB + numCtl("b") + "</div>" +
+        '<div class="chip role-priv" style="left:0;top:36px;width:250px;height:72px">' + (app.show1 ? t.secA : t.secAh) + numCtl("a") + "</div>" +
+        '<div class="chip role-priv" style="left:650px;top:36px;width:250px;height:72px">' + (app.show1 ? t.secB : t.secBh) + numCtl("b") + "</div>" +
         '<button class="box abs" style="left:50px;top:150px;width:170px;height:62px" data-action="zoom">a × G<small>' + t.box_s + "</small></button>" +
         '<button class="box abs" style="left:680px;top:150px;width:170px;height:62px" data-action="zoom">b × G<small>' + t.box_s + "</small></button>" +
         '<div class="chip role-pub" style="left:40px;top:250px;width:210px">' + t.ptA + '<span class="val" id="vA"></span></div>' +
@@ -924,11 +986,11 @@ function render0() {
     ln("890,102 890,350 854,350", "var(--key-b)", "m_priv") + ln("765,372 765,406", "var(--const-b)", "m_msg") +
     '<polyline fill="none" stroke="var(--eve-b)" stroke-width="2" stroke-dasharray="3 4" points="450,384 450,334"/>' +
     '<polyline fill="none" stroke="var(--eve-b)" stroke-width="2" stroke-dasharray="3 4" points="560,392 600,392 600,246"/>' + "</svg>";
-  return '<div class="card" style="padding:14px 10px">' + tabs + '<div class="schwrap"><div class="sch" style="height:500px">' + svg + pub +
+  return '<div class="card" style="padding:14px 10px">' + tabs + hid + '<div class="schwrap"><div class="sch" style="height:500px">' + svg + pub +
       who(0, t.alice, "var(--non-b)") + who(650, t.bob, "var(--ctr-b)") +
       '<div class="chip role-msg" style="left:0;top:36px;width:250px;height:66px">' + t.msgM + '<br><select data-field="m">' + opts + "</select></div>" +
-      '<div class="chip role-priv" style="left:270px;top:150px;width:200px;height:72px">' + t.rk + numCtl("k") + "</div>" +
-      '<div class="chip role-priv" style="left:650px;top:36px;width:250px;height:66px">' + t.privD + numCtl("d") + "</div>" +
+      '<div class="chip role-priv" style="left:270px;top:150px;width:200px;height:72px">' + (app.show1 ? t.rk : t.rkh) + numCtl("k") + "</div>" +
+      '<div class="chip role-priv" style="left:650px;top:36px;width:250px;height:66px">' + (app.show1 ? t.privD : t.privDh) + numCtl("d") + "</div>" +
       '<button class="box abs" style="left:680px;top:130px;width:170px;height:56px" data-action="zoom">d × G<small>' + t.box_s + "</small></button>" +
       '<div class="chip role-pub" style="left:650px;top:214px;width:225px">' + t.pubQ + '<span class="val" id="vQ"></span></div>' +
       '<div class="alab" style="left:420px;top:218px;color:var(--ct-b)">← ' + t.toAliceQ + "</div>" +
@@ -999,6 +1061,64 @@ function updateBig() {
   ao.innerHTML = pt("A = aG", e.A);
   bo.innerHTML = pt("B = bG", e.B);
   so.innerHTML = pt(t.bigShared, e.SA) + '<div style="margin-top:4px" class="' + (samePoint(e.SA, e.SB) ? "okline" : "badline") + '">' + (samePoint(e.SA, e.SB) ? t.bigEq : t.bigNe) + "</div>";
+}
+
+/* ---------- step 6: Mallory's fake points ---------- */
+function render5() {
+  const t = L();
+  const tabs = FAKES.map((f, i) => '<button data-action="fsel" data-i="' + i + '" aria-pressed="' + (app.fsel === i) + '">' + ps(f.P) +
+    (app.fres[i] === null ? "" : app.fres[i] === "refused" ? " ✗" : " ✓") + "</button>").join("");
+  return '<div class="card"><h3>' + t.fCard1 + '</h3><span class="tabs" style="margin-bottom:10px">' + tabs + "</span>" +
+      '<div class="row" style="align-items:flex-start;margin-top:8px"><div style="flex:0 0 auto" id="fGrid"></div>' +
+      '<div style="flex:0 0 auto" id="fCyc"></div><div style="flex:1 1 260px;min-width:240px" id="fInfo"></div></div>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" data-action="fcheck"' + (app.fcheck ? " checked" : "") + "> " + t.fCheck + "</label></div>" +
+    '<div class="card"><h3>' + t.fCard2 + '</h3><p class="note" style="margin:0 0 4px">' + t.fCandNote + '</p><div class="cand" id="fCand"></div>' +
+      '<p id="fLeft" style="margin:6px 0"></p><div class="btns" style="display:flex;gap:6px;flex-wrap:wrap">' +
+      '<button data-action="fshowd">' + t.fShowD + '</button><button data-action="fnewd">' + DICE + " " + t.fNewD + '</button><button data-action="freset">' + t.fReset + "</button></div></div>";
+}
+function updateL5() {
+  const t = L(), f = FAKES[app.fsel], FC = fakeCurve(f), pc = fakePiece(app.fd, f), cyc = pc.cyc, n = cyc.length;
+  const res = app.fres[app.fsel], sent = res !== null && res !== "refused";
+  const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
+  // the grid: Bob's dots, Mallory's curve as red rings, the cycle of P
+  const path = [];
+  for (let j = 1; j < n; j++) path.push(cyc[j]);
+  if (path.length > 1) path.push(cyc[1]);
+  const marks = [{ P: f.P, col: "var(--eve-b)", fill: "var(--eve-bg)", label: "P", big: true }];
+  if (sent && pc.S !== null) marks.push({ P: pc.S, col: "var(--key-b)", fill: "var(--key-bg)", label: "S = dP", up: false });
+  set("fGrid", gridSVG({ c: 15, rings: curvePoints(FC), path: path, pathCol: "var(--eve-b)", marks: marks }) +
+    '<div class="legend" style="margin-top:4px"><span style="color:var(--eve-b)">◯ ' + t.legFake + " (b′ = " + f.b + ")</span></div>");
+  // the cycle: O, P, 2P, ... round a circle; Bob's S marked once he has answered
+  const R = 92, W = 240, cx = W / 2, cy = 118;
+  let svg = '<svg class="cyc" width="' + W + '" height="240" aria-hidden="true">';
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="var(--eve-b)" stroke-width="1.5" stroke-dasharray="4 4"/>';
+  for (let j = 0; j < n; j++) {
+    const ang = -Math.PI / 2 + 2 * Math.PI * j / n, x = cx + R * Math.cos(ang), y = cy + R * Math.sin(ang);
+    const hit = sent && j === res;
+    svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (n > 6 ? 15 : 19) + '" fill="' + (hit ? "var(--key-bg)" : "var(--eve-bg)") + '" stroke="' + (hit ? "var(--key-b)" : "var(--eve-b)") + '" stroke-width="' + (hit ? 3 : 1.5) + '"/>';
+    svg += '<text x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="middle" font-weight="700">' + (j === 0 ? "O" : j === 1 ? "P" : j + "P") + "</text>";
+  }
+  svg += '<text x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" fill="var(--muted)">' + "n = " + n + "</text></svg>";
+  set("fCyc", svg);
+  const l = mod(f.P.y * f.P.y, 17n), r = mod(f.P.x * f.P.x * f.P.x + 2n * f.P.x + 2n, 17n);
+  set("fInfo", "<p style=\"margin:0 0 6px\">" + t.fNot(ps(f.P), f.b, l, r) + "</p><p style=\"margin:0 0 8px\">" + t.fCycle(n) + "</p>" +
+    '<button data-action="fsend">' + t.fSend + "</button>" +
+    '<p style="margin:8px 0 0">' + (res === null ? '<span class="note">' + t.fWait + "</span>" :
+      res === "refused" ? '<span class="okline">' + t.fRefused + "</span>" : "<b>" + t.fAnswer(n, res) + "</b>") + "</p>");
+  // the candidates 0 .. 131
+  let cells = "", left = [];
+  for (let v = 0; v < 132; v++) {
+    let ok = true;
+    for (let i = 0; i < 3; i++) {
+      const ri = app.fres[i];
+      if (ri !== null && ri !== "refused" && v % fakePiece(app.fd, FAKES[i]).n !== ri) ok = false;
+    }
+    if (ok) left.push(v);
+    cells += '<span class="' + (ok ? "" : "out") + (app.fshowD && v === app.fd ? " bobd" : "") + '">' + v + "</span>";
+  }
+  set("fCand", cells);
+  set("fLeft", (left.length === 1 ? '<span class="okline">' + t.fOne(left[0]) + "</span>" : t.fLeft(left.length)) +
+    (app.fshowD ? ' <span style="color:var(--ctr-b);font-weight:600">' + t.fBobD(app.fd) + "</span>" : ""));
 }
 
 /* ---------- step 2: the real curve ---------- */
@@ -1549,26 +1669,29 @@ function render() {
   document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
   document.getElementById("mhSub").textContent = t.steps[app.level][1];
-  const ex = t.explain[[app.tab1, "add", "trans" + app.sub3, "mod", "one"][app.level]];
+  const ex = t.explain[[app.tab1, "add", "trans" + app.sub3, "mod", "one", "fake"][app.level]];
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
-    [render0, render1, renderT, render2, render3][app.level]() + "</div>";
+    [render0, render1, renderT, render2, render3, render5][app.level]() + "</div>";
   if (app.level === 0) updateL0();
   if (app.level === 1) { drawReal(); hookReal(); }
   if (app.level === 2) renderTBody();
   if (app.level === 3) renderL2Body();
   if (app.level === 4) renderL3Body();
+  if (app.level === 5) updateL5();
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
   try { if (location.hash !== hashStr()) history.replaceState(null, "", hashStr()); } catch (e) {}
   if (app.scrollTo) { const el = document.getElementById(app.scrollTo); app.scrollTo = null; if (el) el.scrollIntoView({ block: "start" }); }
 }
 /* the address: #N is a step, #N.M a tab or a card of the step
-   #1 (#1.1) ECDH, #1.2 ElGamal, #1.3 ECDH with Eve's attack open, #1.4 ECDH, scrolled to P-256
+   #1 ECDH with the secret numbers hidden (linked before Tasks 2 and 3), #1.1 ECDH with the numbers, #1.2 ElGamal, #1.3 ECDH with Eve's attack open, #1.4 ECDH, scrolled to P-256
    #3 (#3.1) from real numbers to modulo 17: the same formulas, #3.2 rounding, #3.3 where the dots come from, #3.4 why they look random
-   #4 (#4.1) the points, #4.2 kG: double and add, #4.3 the multiples of G */
+   #4 (#4.1) the points, #4.2 kG: double and add, #4.3 the multiples of G
+   #5 one addition, #6 Mallory's fake points */
 function hashStr() {
   let h = "#" + (app.level + 1);
   if (app.level === 0 && app.tab1 === "elg") h += ".2";
+  else if (app.level === 0 && app.show1) h += ".1";
   if (app.level === 2 && app.sub3 > 1) h += "." + app.sub3;
   if (app.level === 3 && app.mode3 === "dbl") h += ".2";
   if (app.level === 3 && app.mode3 === "mult") h += ".3";
@@ -1578,10 +1701,12 @@ function readHash() {
   const m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash);
   if (!m) return;
   const n = +m[1], sub = m[2] ? +m[2] : 1;
-  if (n < 1 || n > 5) return;
+  if (n < 1 || n > 6) return;
   app.level = n - 1;
   if (n === 1) {
     app.tab1 = sub === 2 ? "elg" : "ecdh";
+    app.show1 = m[2] !== undefined;   // #1 hides the secret numbers (before Tasks 2 and 3); #1.1 to #1.4 show them
+    if (app.show1) { app.a = 3; app.b = 10; }
     if (sub === 3) { app.eveOpen = true; app.scrollTo = "eveCard"; }
     if (sub === 4) app.scrollTo = "bigCard";
   }
@@ -1616,7 +1741,7 @@ function originFromStep4() {
 }
 function zoomIn() {
   if (app.level === 3) originFromStep4();
-  if (app.level < 4) goTo(app.level + 1);
+  if (app.level < 5) goTo(app.level + 1);
 }
 function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
 
@@ -1665,7 +1790,14 @@ view.addEventListener("click", e => {
     playTimer(() => { if (app.dstep >= n || app.level !== 3) return false; app.dstep++; renderL2Body(); return true; });
   }
   else if (a === "tab1") { app.tab1 = el.dataset.t; render(); }
-  else if (a === "eve-show") { app.eveOpen = true; updateL0(); }
+  else if (a === "eve-show") { app.eveOpen = true; app.show1 = true; render(); }
+  else if (a === "show1") { app.show1 = true; app.a = 3; app.b = 10; render(); }
+  else if (a === "fsel") { app.fsel = +el.dataset.i; render(); }
+  else if (a === "fsend") { const pc = fakePiece(app.fd, FAKES[app.fsel]); app.fres[app.fsel] = app.fcheck ? "refused" : pc.j; render(); }
+  else if (a === "fcheck") { app.fcheck = el.checked; app.fres = [null, null, null]; render(); }
+  else if (a === "fshowd") { app.fshowD = !app.fshowD; render(); }
+  else if (a === "fnewd") { const r = new Uint32Array(1); crypto.getRandomValues(r); app.fd = 1 + r[0] % 18; app.fres = [null, null, null]; app.fshowD = false; render(); }
+  else if (a === "freset") { app.fres = [null, null, null]; render(); }
   else if (a === "dec" || a === "inc") setSmall(el.dataset.f, app[el.dataset.f] + (a === "inc" ? 1 : -1));
   else if (a === "rand") { const r = new Uint32Array(1); crypto.getRandomValues(r); setSmall(el.dataset.f, 1 + r[0] % 18); }
   else if (a === "bigrand") {

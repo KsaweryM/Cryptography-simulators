@@ -349,6 +349,35 @@ figcaption{font-size:12.5px;color:var(--muted);margin-top:4px}
 .role-key.role-key{border-color:var(--key-b)}
 .role-ctr.role-ctr{border-color:var(--ctr-b)}
 .role-nonce.role-nonce{border-color:var(--non-b)}
+/* steps 6 and 7 */
+.duo{display:flex;gap:28px;flex-wrap:wrap}
+.duo>div{flex:1 1 420px;min-width:0}
+.fbit{border:0;padding:0;width:16px;height:22px;line-height:22px;font-family:var(--mono);font-size:12px;border-radius:3px;background:var(--sunken);color:var(--muted);text-align:center}
+.fbit.one{background:var(--ink);color:var(--surface)}
+.fbit.chg{background:var(--chg);color:#fff}
+.wrow{display:flex;align-items:center;gap:10px;margin:3px 0}
+.wrow .nm{font-weight:700;width:1.2em}
+.wbits{display:flex;gap:1px;flex-wrap:nowrap}
+.duo .wbits .fbit{width:13px;font-size:11px}
+.duo .wbits .bitgap{width:5px}
+.duo>div{overflow-x:auto}
+.map{display:inline-grid;grid-template-columns:repeat(4,auto);gap:7px;margin-top:8px}
+.mapw{display:grid;grid-template-columns:repeat(8,11px);gap:1px;padding:3px;border:1.5px solid;border-radius:5px}
+.mapw i{width:11px;height:11px;border-radius:2px;background:var(--surface)}
+.mapw i.on{background:var(--chg)}
+.mbar{position:relative;height:18px;background:var(--sunken);border-radius:5px;margin:6px 0;width:400px;max-width:100%}
+.mbar span{display:block;height:100%;border-radius:5px;background:var(--chg)}
+.mbar u{position:absolute;left:50%;top:-3px;bottom:-3px;border-left:2px dashed var(--ink)}
+.chk{display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap;padding:2px 6px;border-radius:6px}
+.chk .nm{width:6.5em;font-weight:600;font-size:13px}
+.chk.cur{background:var(--chg-bg);outline:2px solid var(--chg)}
+.chk.todo{opacity:.45}
+.by{border:1.5px solid var(--rule);border-radius:4px;background:var(--surface);font-family:var(--mono);font-size:12.5px;padding:1px 4px;min-width:2.1em;text-align:center}
+.by.aad{border-color:var(--ink)} .by.ct{border-color:var(--ct-b);background:var(--ct-bg)} .by.pad{color:var(--muted);border-style:dashed}
+.by.r,.by.s{border-color:var(--key-b);background:var(--key-bg)} .by.off{opacity:.4}
+.by.hot{border-color:var(--chg);background:var(--chg);color:#fff}
+button.by{cursor:pointer}
+.accv{font-family:var(--mono);font-size:13px;background:var(--sunken);border-radius:6px;padding:6px 10px;margin:6px 0;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -633,6 +662,94 @@ function cmpSelfTest(done) {
   };
   setTimeout(step, 0);
 }
+/* ===================== step 6: Salsa20 (Bernstein 2005), the older sibling ===================== */
+// the layout: constants on the diagonal (0, 5, 10, 15), key 1-4 and 11-14, nonce 6-7, counter 8-9
+const SALSA_ROLE = ["const", "key", "key", "key", "key", "const", "nonce", "nonce", "ctr", "ctr", "const", "key", "key", "key", "key", "const"];
+const SALSA_COLS = [[0, 4, 8, 12], [5, 9, 13, 1], [10, 14, 2, 6], [15, 3, 7, 11]];
+const SALSA_ROWS = [[0, 1, 2, 3], [5, 6, 7, 4], [10, 11, 8, 9], [15, 12, 13, 14]];
+function salsaQR(s, a, b, c, d) {
+  s[b] ^= rotl((s[a] + s[d]) >>> 0, 7);
+  s[c] ^= rotl((s[b] + s[a]) >>> 0, 9);
+  s[d] ^= rotl((s[c] + s[b]) >>> 0, 13);
+  s[a] ^= rotl((s[d] + s[c]) >>> 0, 18);
+}
+function salsaInit(key, counterLo, nonce8) {
+  const s = new Uint32Array(16);
+  [0, 5, 10, 15].forEach((p, i) => { s[p] = SIGMA[i]; });
+  for (let i = 0; i < 4; i++) { s[1 + i] = u32le(key, 4 * i); s[11 + i] = u32le(key, 16 + 4 * i); }
+  s[6] = u32le(nonce8, 0); s[7] = u32le(nonce8, 4); s[8] = counterLo >>> 0; s[9] = 0;
+  return s;
+}
+function salsaRounds(s, n) { for (let r = 1; r <= n; r++) for (const g of (r % 2 ? SALSA_COLS : SALSA_ROWS)) salsaQR(s, g[0], g[1], g[2], g[3]); }
+function chachaRounds(s, n) { for (let r = 1; r <= n; r++) for (const g of groupsOfRound(r)) quarterRound(s, g[0], g[1], g[2], g[3]); }
+// bits changed by one quarter round when input bit i (0..127, bit i % 32 of word i / 32) flips
+function qrDiff(which, words, i) {
+  const x = Uint32Array.from(words), y = Uint32Array.from(words);
+  y[i >> 5] ^= (1 << (i & 31)) >>> 0;
+  const f = which === "salsa" ? salsaQR : quarterRound;
+  f(x, 0, 1, 2, 3); f(y, 0, 1, 2, 3);
+  return { x: x, y: y, n: popcount(x[0] ^ y[0]) + popcount(x[1] ^ y[1]) + popcount(x[2] ^ y[2]) + popcount(x[3] ^ y[3]) };
+}
+function qrAverage(which, words) { let t = 0; for (let i = 0; i < 128; i++) t += qrDiff(which, words, i).n; return t / 128; }
+// the whole table: key bit kb flipped (key 00..1f, nonce 0, counter 0, as in Task 3), bits changed after n rounds
+function tableDiff(which, key, kb, n) {
+  const k2 = Uint8Array.from(key); k2[kb >> 3] ^= 1 << (kb & 7);
+  let a, b;
+  if (which === "salsa") { a = salsaInit(key, 0, new Uint8Array(8)); b = salsaInit(k2, 0, new Uint8Array(8)); salsaRounds(a, n); salsaRounds(b, n); }
+  else { a = initState(key, 0, new Uint8Array(12)); b = initState(k2, 0, new Uint8Array(12)); chachaRounds(a, n); chachaRounds(b, n); }
+  let c = 0; for (let i = 0; i < 16; i++) c += popcount(a[i] ^ b[i]);
+  return c;
+}
+
+/* ===================== step 7: Poly1305 and the AEAD tag (RFC 8439, 2.5 and 2.8) ===================== */
+const P1305 = (1n << 130n) - 5n;
+function leBig(b) { let v = 0n; for (let i = b.length - 1; i >= 0; i--) v = (v << 8n) | BigInt(b[i]); return v; }
+function bigLe(v, n) { const b = new Uint8Array(n); for (let i = 0; i < n; i++) { b[i] = Number(v & 255n); v >>= 8n; } return b; }
+function polyKey(key, nonce) { return wordsToBytes(blockWords(initState(key, 0, nonce))).slice(0, 32); }
+function clampR(rb) { return leBig(rb) & 0x0ffffffc0ffffffc0ffffffc0fffffffn; }
+// the data the tag covers: aad, zeros up to 16, ciphertext, zeros up to 16, the two lengths (8 bytes each)
+function macChunks(aad, ct) {
+  const chunks = [];
+  const add = (b, kind) => { for (let i = 0; i < b.length; i += 16) { const c = new Uint8Array(16); c.set(b.subarray(i, i + 16)); chunks.push({ kind: kind, b: c, len: Math.min(16, b.length - i) }); } };
+  add(aad, "aad"); add(ct, "ct");
+  const L = new Uint8Array(16); L.set(bigLe(BigInt(aad.length), 8), 0); L.set(bigLe(BigInt(ct.length), 8), 8);
+  chunks.push({ kind: "len", b: L, len: 16 });
+  return chunks;
+}
+// the accumulator after every chunk: acc = (acc + chunk with a 01 byte on top) * r mod p
+function polyTrace(r, chunks) {
+  const acc = [0n];
+  for (const c of chunks) acc.push(((acc[acc.length - 1] + leBig(c.b) + (1n << 128n)) * r) % P1305);
+  return acc;
+}
+function aeadTag(key, nonce, aad, ct) {
+  const pk = polyKey(key, nonce), r = clampR(pk.slice(0, 16)), sv = leBig(pk.slice(16, 32));
+  const acc = polyTrace(r, macChunks(aad, ct));
+  return bigLe((acc[acc.length - 1] + sv) & ((1n << 128n) - 1n), 16);
+}
+const AEAD_KEY = "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f", AEAD_NONCE = "070000004041424344454647",
+      AEAD_AAD = "50515253c0c1c2c3c4c5c6c7", AEAD_TAG = "1ae10b594f09e26a7e902ecbd0600691", AEAD_CT_START = "d31a8d34648e60db";   // RFC 8439, 2.8.2
+function newSelfTest() {
+  const fails = [];
+  // Salsa20 specification (cr.yp.to/snuffle/spec.pdf): quarterround examples and the Salsa20 hash example
+  const q = Uint32Array.from([1, 0, 0, 0]); salsaQR(q, 0, 1, 2, 3);
+  const q2 = Uint32Array.from([0xe7e8c006, 0xc4f9417d, 0x6479b4b2, 0x68c67137]); salsaQR(q2, 0, 1, 2, 3);
+  if (Array.from(q, hex8).join("") !== "08008145000000800001020020500000" || Array.from(q2, hex8).join("") !== "e876d72b9361dfd5f1460244948541a3") fails.push("Salsa20 quarter round");
+  const hin = [211,159,13,115,76,55,82,183,3,117,222,37,191,187,234,136,49,237,179,48,1,106,178,219,175,199,166,48,86,16,179,207,31,240,32,63,15,83,93,161,116,147,48,113,238,55,204,36,79,201,235,79,3,81,156,47,203,26,244,243,88,118,104,54];
+  const hb = Uint8Array.from(hin), st = new Uint32Array(16); for (let i = 0; i < 16; i++) st[i] = u32le(hb, 4 * i);
+  const x = Uint32Array.from(st); salsaRounds(x, 20); for (let i = 0; i < 16; i++) x[i] = x[i] + st[i];
+  if (bytesHex(wordsToBytes(x).slice(0, 8)) !== "6d2ab2a89cf0f8ee") fails.push("Salsa20 hash");
+  // the numbers of Lecture 2, Task 3 (Task3/solution/mix.py)
+  const W = [0x11111111, 0x01020304, 0x9b8d6f43, 0x01234567];
+  if (qrDiff("salsa", W, 0).n !== 31 || qrDiff("chacha", W, 0).n !== 36 || qrAverage("salsa", W) !== 15.8125 || qrAverage("chacha", W) !== 25.140625) fails.push("Task 3 quarter rounds");
+  const tk = Uint8Array.from({ length: 32 }, (_, i) => i), want = [[15, 37], [124, 245], [234, 238], [265, 256]];
+  for (let n = 1; n <= 4; n++) if (tableDiff("salsa", tk, 0, n) !== want[n - 1][0] || tableDiff("chacha", tk, 0, n) !== want[n - 1][1]) { fails.push("Task 3 table"); break; }
+  // RFC 8439 2.8.2: ChaCha20-Poly1305
+  const k = parseHex(AEAD_KEY, 32), nn = parseHex(AEAD_NONCE, 12), msg = new TextEncoder().encode(RFC_MSG);
+  const z = keystream(k, nn, 1, msg.length), ct = msg.map((v, i) => v ^ z[i]);
+  if (bytesHex(ct.slice(0, 8)) !== AEAD_CT_START || bytesHex(aeadTag(k, nn, parseHex(AEAD_AAD, 12), ct)) !== AEAD_TAG) fails.push("AEAD (2.8.2)");
+  return fails;
+}
 // CORE-END
 
 /* ===================== texts (EN and PL) ===================== */
@@ -646,16 +763,19 @@ const T = {
   en: {
     title: "ChaCha20 explorer", home: "All simulators",
     intro: "From the outside in. Pick a step on the left, or click inside a step to zoom in.",
-    stepOf: n => "Step " + n + " of 5 · ChaCha20",
+    stepOf: n => "Step " + n + " of 7 · ChaCha20",
     steps: [["Black box", "key, nonce, counter in; keystream out"], ["Inside", "the inputs fill a 4×4 table"],
             ["One round", "4 quarter rounds, 12 small steps each"], ["One operation", "add, xor, rotate, bit by bit"],
-            ["Compared with RC4", "the same two key tests on both ciphers"]],
+            ["Compared with RC4", "the same two key tests on both ciphers"], ["Salsa20 vs ChaCha20", "two quarter rounds, one flipped bit"],
+            ["The Poly1305 tag", "block 0 gives the key, the chunks go into an accumulator"]],
     explain: [
       ["Three inputs, one keystream", "Three inputs go in, a keystream comes out, 64 bytes per block. Encrypting is XOR of the message with the keystream. Change the counter and watch your message move along the keystream. Click the ChaCha20 box to look inside."],
       ["A table, mixed and added back", "The key, the nonce and the counter fill a 4×4 table S together with 4 fixed constants. 20 rounds mix S into X. At the end S is added back to X, word by word, and the result is one block of keystream. Click “20 rounds” to zoom in."],
       ["Inside one round", "One round splits the table into 4 groups of 4 words and runs a quarter round on each: odd rounds take the columns, even rounds the diagonals. ChaCha20 does this 20 times. Pick a group, then step through its 12 small operations. Click an operation to see it bit by bit."],
       ["Three simple operations", "Everything in ChaCha20 is built from add, xor and rotate on 32-bit words. No tables, the same work for every key."],
-      ["Two tests that RC4 fails", "In Lecture 1, RC4 leaked in two ways. Here we run the same two tests on RC4 and on ChaCha20, with many random keys. If an output byte looks random, each test hits by chance in 1 key of 256, that is 0.39%. If a cipher hits more often, Eve learns something about the key or the message."]],
+      ["Two tests that RC4 fails", "In Lecture 1, RC4 leaked in two ways. Here we run the same two tests on RC4 and on ChaCha20, with many random keys. If an output byte looks random, each test hits by chance in 1 key of 256, that is 0.39%. If a cipher hits more often, Eve learns something about the key or the message."],
+      ["One flipped bit, two quarter rounds", "Salsa20 (2005) is the older sibling of ChaCha20 (2008), by the same author. Both do the same number of small steps per quarter round. Flip one input bit and see how far the change spreads: click any bit of the words a, b, c, d, then move the round slider."],
+      ["A tag, chunk by chunk", "Poly1305 reads the data in 16-byte chunks. Each chunk is added to the accumulator, and the sum is multiplied by the secret r, modulo 2¹³⁰ − 5. At the end the secret s is added: that is the tag. Step through it, then click a byte of the data to change it as Mallory would."]],
     selfOk: "✓ checked against RFC 8439", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: deeper · ← / Esc: back", fixFirst: "Fix the key or the nonce in step 1.",
     cardInputs: "Inputs", key: "key", key_s: "the shared secret: 32 bytes = 256 bits (64 hex digits)", nonce: "nonce", nonce_s: "public, new for every message, so no two messages share a keystream (12 bytes = 24 hex digits)",
@@ -710,11 +830,11 @@ const T = {
     exXor: "XOR gives 1 where the two bits differ, 0 where they are the same. Do it twice with the same b and you get a back.",
     exRot: n => "Rotate left by " + n + ": every bit moves " + n + " places to the left. The " + n + " bits that fall off the left (framed) come back on the right. Nothing is lost.",
     selfWait: "… checking the seed-2026 numbers",
-    cmpTitle: ["Test 1: does the output remember the key?", "Test 2: the second byte"],
-    cmpWhat: ["For every random key we check one thing: is the first output byte equal to the first key byte, key[0]?",
+    cmpTitle: ["Test 1: does what comes out of the key setup remember the key?", "Test 2: the second byte"],
+    cmpWhat: ["For every random key we check one thing: is the first byte of what the key setup gives equal to the first key byte, key[0]? For RC4 that is its table S after the key schedule (in WEP this state leaks into the first keystream bytes: the FMS attack). For ChaCha20 it is the output block itself.",
               "For every random key we check one thing: is the second keystream byte 0?"],
     cmpKeys: "RC4 keys have 16 bytes. ChaCha20 keys have 32 bytes, with nonce 0 and counter 0.",
-    cmpRows: [[["RC4", "S[0] == key[0]"], ["ChaCha20", "first byte == key[0]"]], [["RC4", "second byte == 0"], ["ChaCha20", "second byte == 0"]]],
+    cmpRows: [[["RC4: S after the key schedule", "S[0] == key[0]"], ["ChaCha20: the output block", "byte 0 == key[0]"]], [["RC4", "second byte == 0"], ["ChaCha20", "second byte == 0"]]],
     cmpRun: "▶ Run", cmpRunning: "Running…", cmpKeysN: n => fmtN(n) + " keys",
     cmpSeed: "fixed seed 2026 (the numbers on the slides)",
     cmpSeedTip: "Python's random.seed(2026), ported to this page: the same keys in every run. Without it: new random keys every time.",
@@ -730,20 +850,33 @@ const T = {
                 "<b>Why RC4 likes 0.</b> If S[2] = 0 after the key schedule (1 key in 256), the second byte comes out 0 almost always. Add the 1 in 256 by chance and you get about 2 in 256. So Eve, who sees one message under many keys, finds its second byte: it is the most common second byte of the ciphertext (Mantin and Shamir, 2001). See it in the RC4 explorer: <a href=\"../rc4/index.html#4.2\">4.2 The second byte</a>."],
     cmpWhyCc: ["<b>Why ChaCha20 looks like chance.</b> 20 rounds of add, xor and rotate mix every key bit into every output word (steps 2 to 4). Nothing of key[0] stays in place: the first byte matches key[0] only by luck, in 1 key of 256.",
                "<b>Why ChaCha20 looks like chance.</b> 20 rounds of add, xor and rotate mix every key bit into every output word (steps 2 to 4). No output byte prefers any value: 0 comes in 1 key of 256, like every other byte."],
+    s6Card1: "One quarter round", s6Flip: "Input words. Click a bit to flip it:", s6Bits: n => "<b>" + n + "</b> of 128 output bits change", s6Avg: v => "average over all 128 input bits: " + v,
+    s6Once: "each word changes once", s6Twice: "each word changes twice",
+    s6Card2: "The whole table: 512 bits, one key bit flipped", s6Round: n => "after " + n + (n === 1 ? " round" : " rounds"), s6Of: n => "<b>" + n + "</b> of 512 bits changed",
+    s6Half: "orange: a changed bit. A good mix changes about half: 256.", s6Lay: "Word by word, as in the table. Salsa20 keeps the constants on the diagonal, ChaCha20 in the first row.",
+    s7Key: "Block 0 gives the one-time key", s7KeyTxt: "ChaCha20 block with counter 0, for this key and nonce: the first 16 bytes become r (a few bits are forced to 0: the orange bytes changed), the next 16 are s. The rest is not used.",
+    s7Raw: "raw", s7Unused: "not used", s7Data: "What the tag covers", s7DataTxt: "Header, ciphertext, then their lengths, filled with zeros to 16 bytes. Click a byte of the header or of the ciphertext to flip one bit. A byte you changed is orange.",
+    s7Msg: "message", s7Aad: "header (associated data)", s7Nonce: "nonce", s7K: { aad: "header", ct: "ciphertext", len: "lengths" },
+    s7Acc: "The accumulator", s7Start: "start: accumulator = 0", s7Step: (i, n) => "chunk " + i + " of " + n, s7Fin: "add s, keep 16 bytes: the tag",
+    s7Line: "(accumulator + chunk) × r mod p", s7All: "to the tag ⏭", s7Tag: "tag in the packet", s7New: "Bob's tag", s7Ok: "✓ equal: Bob accepts and decrypts", s7Bad: n => "✗ different (" + n + " of 16 bytes): Bob rejects the packet", s7Undo: "undo Mallory's change",
+    s7Why: "<b>Why can't Mallory fix the tag?</b> Her change is multiplied by powers of r, and the sum is hidden by s. She knows neither. <b>Why a new key for every message?</b> Two tags with the same r and s: their difference cancels s, and what is left is an equation for r. A new nonce gives a new block 0, so new r and s.",
   },
   pl: {
     title: "Eksplorator ChaCha20", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu. Wybierz krok po lewej albo kliknij w środku kroku, żeby wejść głębiej.",
-    stepOf: n => "Krok " + n + " z 5 · ChaCha20",
+    stepOf: n => "Krok " + n + " z 7 · ChaCha20",
     steps: [["Czarna skrzynka", "klucz, nonce i licznik na wejściu, keystream na wyjściu"], ["W środku", "wejścia wypełniają tabelę 4×4"],
             ["Jedna runda", "4 ćwiartki rundy, po 12 małych kroków"], ["Jedna operacja", "dodawanie, XOR, rotacja bit po bicie"],
-            ["Porównanie z RC4", "te same dwa testy klucza na obu szyfrach"]],
+            ["Porównanie z RC4", "te same dwa testy klucza na obu szyfrach"], ["Salsa20 i ChaCha20", "dwie ćwiartki rundy, jeden odwrócony bit"],
+            ["Znacznik Poly1305", "blok 0 daje klucz, kawałki wpadają do akumulatora"]],
     explain: [
       ["Trzy wejścia, jeden keystream", "Na wejściu trzy wartości, na wyjściu keystream, po 64 bajty na blok. Szyfrowanie to XOR wiadomości z keystreamem. Zmień licznik i patrz, jak wiadomość przesuwa się wzdłuż keystreamu. Kliknij pole ChaCha20, żeby zajrzeć do środka."],
       ["Tabela, wymieszana i dodana z powrotem", "Klucz, nonce i licznik wypełniają tabelę 4×4 S razem z 4 stałymi. 20 rund miesza S w X. Na końcu S jest dodawana z powrotem do X, słowo po słowie, i wynik to jeden blok keystreamu. Kliknij „20 rund”, żeby wejść głębiej."],
       ["Wnętrze jednej rundy", "Runda dzieli tabelę na 4 grupy po 4 słowa i na każdej wykonuje ćwiartkę rundy: rundy nieparzyste biorą kolumny, parzyste przekątne. ChaCha20 robi to 20 razy. Wybierz grupę i przejdź krok po kroku przez jej 12 małych operacji. Kliknij operację, żeby zobaczyć ją bit po bicie."],
       ["Trzy proste operacje", "Cały ChaCha20 jest zbudowany z dodawania, XOR i rotacji na słowach 32-bitowych. Bez tablic, ta sama praca dla każdego klucza."],
-      ["Dwa testy, których RC4 nie przechodzi", "Na wykładzie 1 RC4 przeciekał na dwa sposoby. Tutaj robimy te same dwa testy na RC4 i na ChaCha20, dla wielu losowych kluczy. Jeśli bajt wyjścia wygląda na losowy, każdy test trafia przypadkiem w 1 kluczu na 256, czyli w 0,39%. Jeśli szyfr trafia częściej, Eve dowiaduje się czegoś o kluczu albo o wiadomości."]],
+      ["Dwa testy, których RC4 nie przechodzi", "Na wykładzie 1 RC4 przeciekał na dwa sposoby. Tutaj robimy te same dwa testy na RC4 i na ChaCha20, dla wielu losowych kluczy. Jeśli bajt wyjścia wygląda na losowy, każdy test trafia przypadkiem w 1 kluczu na 256, czyli w 0,39%. Jeśli szyfr trafia częściej, Eve dowiaduje się czegoś o kluczu albo o wiadomości."],
+      ["Jeden odwrócony bit, dwie ćwiartki rundy", "Salsa20 (2005) to starszy brat ChaCha20 (2008), tego samego autora. Obie robią tyle samo małych kroków w ćwiartce rundy. Odwróć jeden bit wejścia i zobacz, jak daleko rozejdzie się zmiana: kliknij dowolny bit słów a, b, c, d, a potem przesuń suwak rund."],
+      ["Znacznik, kawałek po kawałku", "Poly1305 czyta dane w kawałkach po 16 bajtów. Każdy kawałek dodaje do akumulatora, a sumę mnoży przez tajne r, modulo 2¹³⁰ − 5. Na końcu dodaje tajne s i to jest znacznik. Przejdź krok po kroku, a potem kliknij bajt danych, żeby go zmienić jak Mallory."]],
     selfOk: "✓ sprawdzone z RFC 8439", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: głębiej · ← / Esc: wyżej", fixFirst: "Popraw klucz albo nonce w kroku 1.",
     cardInputs: "Wejścia", key: "klucz", key_s: "wspólny sekret: 32 bajty = 256 bitów (64 cyfry hex)", nonce: "nonce", nonce_s: "jawny, nowy dla każdej wiadomości, żeby dwie wiadomości nie dostały tego samego keystreamu (12 bajtów = 24 cyfry hex)",
@@ -798,11 +931,11 @@ const T = {
     exXor: "XOR daje 1 tam, gdzie bity się różnią, i 0 tam, gdzie są takie same. Zrób go dwa razy z tym samym b, a wrócisz do a.",
     exRot: n => "Rotacja w lewo o " + n + ": każdy bit przesuwa się o " + n + " " + plN(n, "miejsce", "miejsca", "miejsc") + " w lewo. Bity, które wypadają z lewej (w ramkach), wracają z prawej. Nic nie ginie.",
     selfWait: "… sprawdzam liczby z ziarnem 2026",
-    cmpTitle: ["Test 1: czy wyjście pamięta klucz?", "Test 2: drugi bajt"],
-    cmpWhat: ["Dla każdego losowego klucza sprawdzamy jedno: czy pierwszy bajt wyjścia jest równy pierwszemu bajtowi klucza, key[0]?",
+    cmpTitle: ["Test 1: czy to, co wychodzi z przygotowania klucza, pamięta klucz?", "Test 2: drugi bajt"],
+    cmpWhat: ["Dla każdego losowego klucza sprawdzamy jedno: czy pierwszy bajt tego, co daje przygotowanie klucza, jest równy pierwszemu bajtowi klucza, key[0]? W RC4 to tablica S po układaniu klucza (w WEP ten stan przecieka do pierwszych bajtów keystreamu: atak FMS). W ChaCha20 to sam blok wyjścia.",
               "Dla każdego losowego klucza sprawdzamy jedno: czy drugi bajt keystreamu to 0?"],
     cmpKeys: "Klucze RC4 mają 16 bajtów. Klucze ChaCha20 mają 32 bajty, nonce 0 i licznik 0.",
-    cmpRows: [[["RC4", "S[0] == key[0]"], ["ChaCha20", "pierwszy bajt == key[0]"]], [["RC4", "drugi bajt == 0"], ["ChaCha20", "drugi bajt == 0"]]],
+    cmpRows: [[["RC4: S po układaniu klucza", "S[0] == key[0]"], ["ChaCha20: blok wyjścia", "bajt 0 == key[0]"]], [["RC4", "drugi bajt == 0"], ["ChaCha20", "drugi bajt == 0"]]],
     cmpRun: "▶ Uruchom", cmpRunning: "Liczę…", cmpKeysN: n => fmtN(n) + " " + plN(n, "klucz", "klucze", "kluczy"),
     cmpSeed: "stałe ziarno 2026 (liczby ze slajdów)",
     cmpSeedTip: "random.seed(2026) z Pythona, przeniesione na tę stronę: te same klucze przy każdym uruchomieniu. Bez tego: za każdym razem nowe losowe klucze.",
@@ -818,6 +951,16 @@ const T = {
                 "<b>Dlaczego RC4 lubi 0.</b> Jeśli po układaniu klucza S[2] = 0 (1 klucz na 256), drugi bajt wychodzi 0 prawie zawsze. Dodaj 1 na 256 z przypadku i masz około 2 na 256. Więc Eve, która widzi jedną wiadomość pod wieloma kluczami, znajduje jej drugi bajt: to najczęstszy drugi bajt szyfrogramu (Mantin i Shamir, 2001). Zobacz w eksploratorze RC4: <a href=\"../rc4/index.html#4.2\">4.2 Drugi bajt</a>."],
     cmpWhyCc: ["<b>Dlaczego ChaCha20 wygląda jak przypadek.</b> 20 rund dodawania, XOR i rotacji miesza każdy bit klucza z każdym słowem wyjścia (kroki 2 do 4). Z key[0] nic nie zostaje na miejscu: pierwszy bajt równa się key[0] tylko przez przypadek, w 1 kluczu na 256.",
                "<b>Dlaczego ChaCha20 wygląda jak przypadek.</b> 20 rund dodawania, XOR i rotacji miesza każdy bit klucza z każdym słowem wyjścia (kroki 2 do 4). Żaden bajt wyjścia nie woli żadnej wartości: 0 wypada w 1 kluczu na 256, jak każdy inny bajt."],
+    s6Card1: "Jedna ćwiartka rundy", s6Flip: "Słowa wejściowe. Kliknij bit, żeby go odwrócić:", s6Bits: n => "zmienione bity wyjścia: <b>" + n + "</b> ze 128", s6Avg: v => "średnia po wszystkich 128 bitach wejścia: " + v,
+    s6Once: "każde słowo zmienia się raz", s6Twice: "każde słowo zmienia się dwa razy",
+    s6Card2: "Cała tabela: 512 bitów, odwrócony jeden bit klucza", s6Round: n => "liczba rund: " + n, s6Of: n => "zmienione bity: <b>" + n + "</b> z 512",
+    s6Half: "pomarańczowe: zmieniony bit. Dobre mieszanie zmienia około połowy: 256.", s6Lay: "Słowo po słowie, jak w tabeli. Salsa20 trzyma stałe na przekątnej, ChaCha20 w pierwszym wierszu.",
+    s7Key: "Blok 0 daje klucz jednorazowy", s7KeyTxt: "Blok ChaCha20 z licznikiem 0 dla tego klucza i nonce: pierwsze 16 bajtów staje się r (kilka bitów jest zerowanych: pomarańczowe bajty się zmieniły), następne 16 to s. Reszta nie jest używana.",
+    s7Raw: "surowe", s7Unused: "nieużywane", s7Data: "Co obejmuje znacznik", s7DataTxt: "Nagłówek, szyfrogram, potem ich długości, dopełnione zerami do 16 bajtów. Kliknij bajt nagłówka albo szyfrogramu, żeby odwrócić jeden bit. Zmieniony bajt jest pomarańczowy.",
+    s7Msg: "wiadomość", s7Aad: "nagłówek (dane powiązane)", s7Nonce: "nonce", s7K: { aad: "nagłówek", ct: "szyfrogram", len: "długości" },
+    s7Acc: "Akumulator", s7Start: "start: akumulator = 0", s7Step: (i, n) => "kawałek " + i + " z " + n, s7Fin: "dodaj s, zostaw 16 bajtów: znacznik",
+    s7Line: "(akumulator + kawałek) × r mod p", s7All: "do znacznika ⏭", s7Tag: "znacznik w pakiecie", s7New: "znacznik Boba", s7Ok: "✓ równe: Bob przyjmuje i odszyfrowuje", s7Bad: n => "✗ różne (" + n + " z 16 bajtów): Bob odrzuca pakiet", s7Undo: "cofnij zmianę Mallory",
+    s7Why: "<b>Czemu Mallory nie poprawi znacznika?</b> Jej zmiana jest mnożona przez potęgi r, a suma jest ukryta przez s. Nie zna ani r, ani s. <b>Czemu nowy klucz dla każdej wiadomości?</b> Dwa znaczniki z tym samym r i s: w ich różnicy s znika i zostaje równanie na r. Nowy nonce daje nowy blok 0, więc nowe r i s.",
   },
 };
 
@@ -1301,6 +1444,103 @@ function cmpStart(ci) {
   updateCmp(ci);
 }
 
+/* ---------- step 6: Salsa20 and ChaCha20 ---------- */
+const W6 = [0x11111111, 0x01020304, 0x9b8d6f43, 0x01234567];   // RFC 8439, 2.1.1 (Task 3 of Lecture 2)
+const KEY6 = Uint8Array.from({ length: 32 }, (_, i) => i);
+app.s6bit = 70; app.s6n = 1;
+const CODE6 = { salsa: ["b ^= (a + d) <<< 7", "c ^= (b + a) <<< 9", "d ^= (c + b) <<< 13", "a ^= (d + c) <<< 18"],
+                chacha: ["a += b; d ^= a; d <<<= 16", "c += d; b ^= c; b <<<= 12", "a += b; d ^= a; d <<<= 8", "c += d; b ^= c; b <<<= 7"] };
+function word6(v, name, diff, word) {
+  let h = '<div class="wrow"><span class="nm">' + name + '</span><span class="wbits">';
+  for (let p = 31; p >= 0; p--) {
+    const bit = (v >>> p) & 1, on = (diff >>> p) & 1, c = "fbit" + (bit ? " one" : "") + (on ? " chg" : "");
+    h += word === undefined ? '<span class="' + c + '">' + bit + "</span>" : '<button class="' + c + '" data-action="s6-bit" data-b="' + (32 * word + p) + '">' + bit + "</button>";
+    if (p % 8 === 0 && p) h += '<span class="bitgap"></span>';
+  }
+  return h + "</span></div>";
+}
+function tables6(which, n) {
+  const k2 = Uint8Array.from(KEY6); k2[0] ^= 1;
+  const mkT = k => which === "salsa" ? salsaInit(k, 0, new Uint8Array(8)) : initState(k, 0, new Uint8Array(12));
+  const a = mkT(KEY6), b = mkT(k2), f = which === "salsa" ? salsaRounds : chachaRounds;
+  f(a, n); f(b, n);
+  return Array.from(a, (v, i) => (v ^ b[i]) >>> 0);
+}
+function render6() {
+  const t = L(), names = { salsa: "Salsa20", chacha: "ChaCha20" }, abcd = ["a", "b", "c", "d"], fm = v => lang === "pl" ? v.replace(".", ",") : v;
+  let h = '<div class="card"><h3>' + t.s6Card1 + '</h3><p class="cmpwhat">' + t.s6Flip + "</p>";
+  W6.forEach((w, i) => { const d = (app.s6bit >> 5) === i ? (1 << (app.s6bit & 31)) >>> 0 : 0; h += word6((w ^ d) >>> 0, abcd[i], d, i); });
+  h += '<div class="duo" style="margin-top:14px">';
+  ["salsa", "chacha"].forEach(c => {
+    const r = qrDiff(c, W6, app.s6bit);
+    h += "<div><h3>" + names[c] + '</h3><div class="code" style="line-height:1.6;font-size:13.5px">' + CODE6[c].map(esc).join("<br>") + '</div><p class="note">' + (c === "salsa" ? t.s6Once : t.s6Twice) + "</p>" +
+      [0, 1, 2, 3].map(k => word6(r.y[k], abcd[k], (r.x[k] ^ r.y[k]) >>> 0)).join("") +
+      '<p style="margin:8px 0 0">' + t.s6Bits(r.n) + '<br><span class="note">' + t.s6Avg(fm(qrAverage(c, W6).toFixed(1))) + "</span></p></div>";
+  });
+  h += '</div></div><div class="card"><h3>' + t.s6Card2 + '</h3><p class="cmpwhat">' + t.s6Lay + '</p><div class="controls"><input type="range" min="0" max="8" data-field="s6n" value="' + app.s6n + '" aria-label="rounds"><b id="s6lbl"></b></div><div class="duo" id="s6map"></div><p class="note">' + t.s6Half + "</p></div>";
+  return h;
+}
+function updateS6() {
+  const t = L();
+  document.getElementById("s6lbl").textContent = t.s6Round(app.s6n);
+  document.getElementById("s6map").innerHTML = ["salsa", "chacha"].map(c => {
+    const d = tables6(c, app.s6n), n = d.reduce((x, v) => x + popcount(v), 0);
+    return "<div><h3>" + (c === "salsa" ? "Salsa20" : "ChaCha20") + '</h3><div class="mbar"><span style="width:' + (100 * n / 512) + '%"></span><u></u></div>' + t.s6Of(n) + '<br><div class="map">' +
+      d.map((v, i) => { let q = ""; for (let p = 31; p >= 0; p--) q += "<i" + ((v >>> p) & 1 ? ' class="on"' : "") + "></i>"; return '<div class="mapw role-' + (c === "salsa" ? SALSA_ROLE[i] : roleOf(i)) + '">' + q + "</div>"; }).join("") + "</div></div>";
+  }).join("");
+}
+
+/* ---------- step 7: Poly1305 ---------- */
+app.s7 = { msg: "Meet Carol at the old bridge at nine.", aad: "to: Bob, packet 7", nonce: "000000000000004a00000000", k: 0, flips: {} };
+function data7() {
+  const u = new TextEncoder(), st = app.s7, nonce = parseHex(st.nonce, 12), msg = u.encode(st.msg), aad0 = u.encode(st.aad), z = keystream(KEY6, nonce, 1, msg.length);
+  const ct0 = msg.map((v, i) => v ^ z[i]), aad = aad0.slice(), ct = ct0.slice();
+  for (const f in st.flips) { const a = f[0] === "a" ? aad : ct, i = +f.slice(1); if (i < a.length) a[i] ^= 1; }
+  const blk = wordsToBytes(blockWords(initState(KEY6, 0, nonce))), r = clampR(blk.slice(0, 16)), sv = leBig(blk.slice(16, 32)), chunks = macChunks(aad, ct), acc = polyTrace(r, chunks);
+  return { blk: blk, r: bigLe(r, 16), chunks: chunks, acc: acc, tag0: aeadTag(KEY6, nonce, aad0, ct0), tag: bigLe((acc[acc.length - 1] + sv) & ((1n << 128n) - 1n), 16), changed: Object.keys(st.flips).length };
+}
+const by7 = (v, c) => '<span class="by ' + c + '">' + hx2(v) + "</span>";
+function render7() {
+  const t = L(), st = app.s7;
+  return '<div class="card"><div class="opctl"><label>' + t.s7Msg + ' <input type="text" maxlength="64" style="width:40ch" data-field="s7-msg" value="' + esc(st.msg) + '"></label><label>' + t.s7Aad + ' <input type="text" maxlength="32" style="width:24ch" data-field="s7-aad" value="' + esc(st.aad) + '"></label>' +
+    "<label>" + t.s7Nonce + ' <button data-action="s7-nonce">' + DICE_SVG + '</button> <span class="mono" id="s7n"></span></label></div></div><div id="s7body"></div>';
+}
+function updateS7() {
+  const t = L(), st = app.s7, d = data7(), n = d.chunks.length;
+  st.k = Math.min(st.k, n + 1);
+  document.getElementById("s7n").textContent = st.nonce;
+  let h = '<div class="card"><h3>' + t.s7Key + '</h3><p class="cmpwhat">' + t.s7KeyTxt + "</p>";
+  const raw = Array.from(d.blk);
+  h += '<div class="chk"><span class="nm">' + t.s7Raw + "</span>" + raw.slice(0, 16).map(v => by7(v, "off")).join("") + "</div>";
+  h += '<div class="chk"><span class="nm">r</span>' + Array.from(d.r, (v, i) => by7(v, v !== raw[i] ? "hot" : "r")).join("") + "</div>";
+  h += '<div class="chk"><span class="nm">s</span>' + raw.slice(16, 32).map(v => by7(v, "s")).join("") + "</div>";
+  h += '<div class="chk"><span class="nm">' + t.s7Unused + "</span>" + raw.slice(32, 48).map(v => by7(v, "off")).join("") + " …</div></div>";
+  h += '<div class="card"><h3>' + t.s7Data + '</h3><p class="cmpwhat">' + t.s7DataTxt + "</p>";
+  const pos = { aad: 0, ct: 0, len: 0 };
+  d.chunks.forEach((c, i) => {
+    const from = pos[c.kind]; pos[c.kind] += 16;
+    h += '<div class="chk' + (st.k === i + 1 ? " cur" : st.k <= i ? " todo" : "") + '"><span class="nm">' + t.s7K[c.kind] + "</span>" + Array.from(c.b, (v, j) => {
+      if (c.kind === "len") return by7(v, "");
+      if (j >= c.len) return by7(v, "pad");
+      const id = (c.kind === "aad" ? "a" : "c") + (from + j);
+      return '<button class="by ' + c.kind + (st.flips[id] ? " hot" : "") + '" data-action="s7-flip" data-f="' + id + '">' + hx2(v) + "</button>";
+    }).join("") + "</div>";
+  });
+  h += "</div>";
+  const acc = st.k === 0 ? 0n : d.acc[Math.min(st.k, n)];
+  h += '<div class="card"><h3>' + t.s7Acc + '</h3><div class="controls"><button data-action="s7-go" data-k="0">' + t.bReset + '</button><button data-action="s7-go" data-k="' + Math.max(0, st.k - 1) + '">' + t.bPrev + '</button><button class="dark" data-action="s7-go" data-k="' + Math.min(n + 1, st.k + 1) + '">' + t.bNext + '</button><button data-action="s7-go" data-k="' + (n + 1) + '">' + t.s7All + "</button> <b>" +
+    (st.k === 0 ? t.s7Start : st.k <= n ? t.s7Step(st.k, n) : t.s7Fin) + "</b></div>" + (st.k > 0 && st.k <= n ? '<p class="note" style="margin:8px 0 0">' + t.s7Line + "</p>" : "") + '<div class="accv">' + acc.toString(16).padStart(33, "0") + "</div>";
+  if (st.k > n) {
+    const diff = Array.from(d.tag).filter((v, i) => v !== d.tag0[i]).length;
+    h += '<div class="chk"><span class="nm">' + t.s7Tag + "</span>" + Array.from(d.tag0, v => by7(v, "")).join("") + "</div>" +
+      '<div class="chk"><span class="nm">' + t.s7New + "</span>" + Array.from(d.tag, (v, i) => by7(v, v !== d.tag0[i] ? "hot" : "")).join("") + "</div>" +
+      '<p class="' + (diff ? "badline" : "okline") + '">' + (diff ? t.s7Bad(diff) : t.s7Ok) + "</p>";
+  }
+  if (d.changed) h += '<button data-action="s7-undo">' + t.s7Undo + "</button>";
+  h += '<div class="why">' + t.s7Why + "</div></div>";
+  document.getElementById("s7body").innerHTML = h;
+}
+
 /* ---------- frame, navigation ---------- */
 function buildSide() {
   const t = L();
@@ -1331,12 +1571,14 @@ function render() {
   const ex = t.explain[app.level];
   const view = document.getElementById("view");
   view.innerHTML = '<div class="fade"><div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>" +
-    [render0, render1, render2, render4, render5][app.level]() + "</div>";
+    [render0, render1, render2, render4, render5, render6, render7][app.level]() + "</div>";
   if (app.level === 0) updateL0();
   if (app.level === 1) renderL1Body();
   if (app.level === 2) renderL2Body();
   if (app.level === 3) renderL4Body();
   if (app.level === 4) { updateCmp(0); updateCmp(1); }
+  if (app.level === 5) updateS6();
+  if (app.level === 6) updateS7();
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
   try { history.replaceState(null, "", "#" + (app.level + 1)); } catch (e) {}
@@ -1398,6 +1640,11 @@ view.addEventListener("click", e => {
   else if (a === "op-line") { setOpFromQR(+el.dataset.k); goTo(3); }
   else if (a === "cmp-n") { const st = app.cmp[+el.dataset.c]; st.n = +el.dataset.n;
     el.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === el))); }
+  else if (a === "s6-bit") { app.s6bit = +el.dataset.b; const y = view.scrollTop; render(); view.scrollTop = y; }
+  else if (a === "s7-go") { app.s7.k = +el.dataset.k; updateS7(); }
+  else if (a === "s7-flip") { const f = el.dataset.f, fl = app.s7.flips; if (fl[f]) delete fl[f]; else fl[f] = 1; updateS7(); }
+  else if (a === "s7-undo") { app.s7.flips = {}; updateS7(); }
+  else if (a === "s7-nonce") { app.s7.nonce = bytesHex(crypto.getRandomValues(new Uint8Array(12))); updateS7(); }
   else if (a === "cmp-run") cmpStart(+el.dataset.c);
   else if (a === "tab") { app.opType = el.dataset.t; app.opOrigin = null; render(); }
 });
@@ -1408,6 +1655,8 @@ view.addEventListener("input", e => {
   if (f === "key") { const b = parseHex(v, 32); app.keyText = v; app.keyErr = !b; if (b) app.key = b; inputsChanged(); }
   else if (f === "nonce") { const b = parseHex(v, 12); app.nonceText = v; app.nonceErr = !b; if (b) app.nonce = b; inputsChanged(); }
   else if (f === "counter") { const n = parseInt(v, 10); if (!isNaN(n) && n >= 0 && n <= 0xffffffff) { app.counter = n; inputsChanged(); } }
+  else if (f === "s6n") { app.s6n = +v; updateS6(); }
+  else if (f === "s7-msg" || f === "s7-aad") { app.s7[f.slice(3)] = v; app.s7.flips = {}; updateS7(); }
   else if (f === "msg") { app.msg = v; updateL0(); }
   else if (f === "opN") { app.opN = +v; const nv = document.getElementById("nval"); if (nv) nv.textContent = v; renderL4Body(); }
 });
@@ -1463,14 +1712,14 @@ document.addEventListener("keydown", e => {
 
 window.addEventListener("hashchange", () => {
   const n = parseInt(location.hash.slice(1), 10);
-  if (n >= 1 && n <= 5 && n - 1 !== app.level) { if (n === 4) setOpFromQR(0); goTo(n - 1); }
+  if (n >= 1 && n <= 7 && n - 1 !== app.level) { if (n === 4) setOpFromQR(0); goTo(n - 1); }
 });
 
 /* ---------- start ---------- */
-const SELF_FAILS = selfTest().concat(cmpQuickTest());
+const SELF_FAILS = selfTest().concat(cmpQuickTest(), newSelfTest());
 let CMP_FAILS = null;   // the seed-2026 numbers are checked in pieces after the first paint
 const startStep = parseInt(location.hash.slice(1), 10);
-if (startStep >= 1 && startStep <= 5) {
+if (startStep >= 1 && startStep <= 7) {
   app.level = startStep - 1;
   if (app.level === 3) setOpFromQR(0);
 }

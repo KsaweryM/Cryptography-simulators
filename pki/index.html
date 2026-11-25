@@ -721,7 +721,7 @@ async function validate(scn, host, now, useRev) {
   return R;
 }
 
-/* the TLS 1.3 CertificateVerify content (RFC 8446, 4.4.3): 64 spaces, the context string, one zero byte, the transcript hash */
+/* the TLS 1.3 CertificateVerify content (RFC 9846, 4.5.2; RFC 8446, 4.4.3): 64 spaces, the context string, one zero byte, the transcript hash */
 function cvContent(hash, who) {
   const ctx = new TextEncoder().encode("TLS 1.3, " + (who || "server") + " CertificateVerify");
   const u = new Uint8Array(64 + ctx.length + 1 + hash.length);
@@ -729,6 +729,83 @@ function cvContent(hash, who) {
   return u;
 }
 const pinOf = async u => b64e(await sha256(u));
+
+/* ---------- Certificate Transparency: a Merkle tree log (RFC 6962 section 2.1, verification as in RFC 9162 section 2.1.3 and 2.1.4) ---------- */
+const cat = (...us) => { let n = 0; us.forEach(u => n += u.length); const o = new Uint8Array(n); let p = 0; us.forEach(u => { o.set(u, p); p += u.length; }); return o; };
+const leafHash = d => sha256(cat(new Uint8Array([0]), d));               // 0x00 before a leaf
+const nodeHash = (l, r) => sha256(cat(new Uint8Array([1]), l, r));        // 0x01 before a node
+const split = n => { let k = 1; while (k * 2 < n) k *= 2; return k; };    // the largest power of 2 below n
+// the tree over entries a..b-1: { a, b, hash, l, r, h (height) }
+async function mtree(D, a, b) {
+  if (a === undefined) { a = 0; b = D.length; }
+  if (b - a === 1) return { a, b, hash: await leafHash(D[a]), h: 0 };
+  const k = split(b - a), l = await mtree(D, a, a + k), r = await mtree(D, a + k, b);
+  return { a, b, l, r, h: Math.max(l.h, r.h) + 1, hash: await nodeHash(l.hash, r.hash) };
+}
+function subtree(t, a, b) { if (t.a === a && t.b === b) return t; if (!t.l) return null; return b <= t.r.a ? subtree(t.l, a, b) : subtree(t.r, a, b); }
+// the audit path of entry m: ranges of the sibling subtrees, from the leaf up
+function auditPath(m, a, b) { if (b - a <= 1) return []; const k = split(b - a); return m < a + k ? auditPath(m, a, a + k).concat([[a + k, b]]) : auditPath(m, a + k, b).concat([[a, a + k]]); }
+// the consistency proof between the first m entries and all n
+function consProof(m, n) {
+  const sub = (m, a, b, full) => { if (m === b - a) return full ? [] : [[a, b]]; const k = split(b - a); return m <= k ? sub(m, a, a + k, full).concat([[a + k, b]]) : sub(m - k, a + k, b, false).concat([[a, a + k]]); };
+  return sub(m, 0, n, true);
+}
+async function verifyInclusion(index, size, leaf, path, root) {
+  let fn = index, sn = size - 1, r = leaf;
+  const steps = [];
+  if (index >= size) return { ok: false, r, steps };
+  for (const p of path) {
+    if (sn === 0) return { ok: false, r, steps };
+    if ((fn & 1) || fn === sn) {
+      r = await nodeHash(p, r); steps.push({ left: true, r });
+      if (!(fn & 1)) while (!(fn & 1) && fn !== 0) { fn >>= 1; sn >>= 1; }
+    } else { r = await nodeHash(r, p); steps.push({ left: false, r }); }
+    fn >>= 1; sn >>= 1;
+  }
+  return { ok: sn === 0 && eqBytes(r, root), r, steps };
+}
+async function verifyConsistency(m, n, oldRoot, newRoot, proof) {
+  if (m === n) return { ok: proof.length === 0 && eqBytes(oldRoot, newRoot), fr: oldRoot, sr: newRoot };
+  if (m < 1 || m > n || !proof.length) return { ok: false };
+  const path = proof.slice();
+  if ((m & (m - 1)) === 0) path.unshift(oldRoot);                         // m is a power of 2: the old root is a node of the new tree
+  let fn = m - 1, sn = n - 1;
+  while (fn & 1) { fn >>= 1; sn >>= 1; }
+  let fr = path[0], sr = path[0];
+  for (let i = 1; i < path.length; i++) {
+    const c = path[i];
+    if (sn === 0) return { ok: false, fr, sr };
+    if ((fn & 1) || fn === sn) {
+      fr = await nodeHash(c, fr); sr = await nodeHash(c, sr);
+      if (!(fn & 1)) while (!(fn & 1) && fn !== 0) { fn >>= 1; sn >>= 1; }
+    } else sr = await nodeHash(sr, c);
+    fn >>= 1; sn >>= 1;
+  }
+  return { ok: eqBytes(fr, oldRoot) && eqBytes(sr, newRoot) && sn === 0, fr, sr };
+}
+
+/* ---------- ACME: the account key thumbprint (RFC 7638) and a PKCS #10 CSR (RFC 2986) ---------- */
+const b64url = u => b64e(u).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const jwkThumb = async jwk => b64url(await sha256(new TextEncoder().encode('{"crv":"' + jwk.crv + '","kty":"EC","x":"' + jwk.x + '","y":"' + jwk.y + '"}')));
+const derLen = n => n < 128 ? [n] : n < 256 ? [0x81, n] : [0x82, n >> 8, n & 255];
+const derTLV = (tag, body) => cat(new Uint8Array([tag].concat(derLen(body.length))), body);
+const ECDSA_SHA256 = new Uint8Array([0x30, 0x0A, 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x02]);
+// CertificationRequestInfo: version 0, subject CN, the public key, no attributes
+function csrInfo(cn, spki) {
+  const name = derTLV(0x30, derTLV(0x31, derTLV(0x30, cat(new Uint8Array([0x06, 0x03, 0x55, 0x04, 0x03]), derTLV(0x0C, new TextEncoder().encode(cn))))));
+  return derTLV(0x30, cat(new Uint8Array([0x02, 0x01, 0x00]), name, spki, new Uint8Array([0xA0, 0x00])));
+}
+async function makeCSR(cn, keyPair) {
+  const spki = new Uint8Array(await SUBTLE.exportKey("spki", keyPair.publicKey)), info = csrInfo(cn, spki);
+  const sig = ecdsaDer(new Uint8Array(await SUBTLE.sign({ name: "ECDSA", hash: "SHA-256" }, keyPair.privateKey, info)));
+  return derTLV(0x30, cat(info, ECDSA_SHA256, derTLV(0x03, cat(new Uint8Array([0]), sig))));
+}
+function parseCSR(u) {
+  const root = derNode(u, 0), info = root.kids[0];
+  return { der: u, info: whole(info), spki: whole(info.kids[2]), cn: utf8(val(info.kids[1].kids[0].kids[0].kids[1])), sigAlg: oidStr(root.kids[1].kids[0]), sig: val(root.kids[2]).subarray(1),
+    cut: [info.kids[1].hs, info.kids[1].ce, info.kids[2].hs, info.kids[2].ce, root.kids[1].hs] };
+}
+const csrSigOK = c => verifySig(c.spki, c.sigAlg, c.info, c.sig);
 
 /* ---------- self-test: python3 values (PY) and the numbers on the slides ---------- */
 async function selfTest() {
@@ -804,6 +881,29 @@ async function selfTest() {
   if (cv.first !== -1 || cv.P.path.length !== 3 || cv.P.unused.length !== 1 || cv.P.unused[0].key !== "gtsR4x") fails.push("Coventry chain");
   const rv = await validate(SCN4.find(s => s.id === "revoked"), "carol.example", NOW0, true);
   if (!rv.err || rv.err[1] !== 23) fails.push("revoked Carol");
+  // Certificate Transparency: roots from python3 hashlib (local/audyt/tmp-pki/ref.py), every proof for 1 to 16 entries
+  const D = CT_E.map(ctBytes);
+  const want8 = "e6eb2764123d753b16d4a8a3d0d2e77b60732a9ca4582522499d639c3837a00a", want16 = "88de28258bec0133184715bf7acbcd9096744916f5043e1325b21e3e4d82da46";
+  const trees = [];
+  for (let n = 1; n <= 16; n++) trees[n] = await mtree(D.slice(0, n));
+  if (hex(trees[8].hash) !== want8 || hex(trees[16].hash) !== want16 || hex(trees[11].hash) !== "5b373f5a8589d13ef33057e2ff9f8f53da3520d1c6860d797342fc256e4fadbf" || hex(trees[6].hash) !== "70c05dbf69eaf62b274ae9ae5db5d545aa3999a1506314ea3deb470318f41dbf") fails.push("CT roots");
+  let incl = 0, cons = 0;
+  for (let n = 1; n <= 16; n++) for (let m = 0; m < n; m++) {
+    const T = trees[n], pth = auditPath(m, 0, n).map(r => subtree(T, r[0], r[1]).hash);
+    if ((await verifyInclusion(m, n, subtree(T, m, m + 1).hash, pth, T.hash)).ok) incl++;
+    const cp = consProof(m + 1, n).map(r => subtree(T, r[0], r[1]).hash);
+    if ((await verifyConsistency(m + 1, n, trees[m + 1].hash, T.hash, cp)).ok) cons++;
+  }
+  if (incl !== 136 || cons !== 136) fails.push("CT proofs " + incl + "/" + cons);
+  const Tm = await mtree(ctTampered(8).map(ctBytes));
+  if (hex(Tm.hash) !== "f8571b2c1cd39aeabdca805856e9e397372d361a94fe901e95de0ae5033b5adc" || (await verifyConsistency(6, 8, trees[6].hash, Tm.hash, consProof(6, 8).map(r => subtree(Tm, r[0], r[1]).hash))).ok) fails.push("CT tampered log");
+  const bad = await leafHash(ctBytes(CT_ALT));
+  if ((await verifyInclusion(3, 8, bad, auditPath(3, 0, 8).map(r => subtree(trees[8], r[0], r[1]).hash), trees[8].hash)).ok) fails.push("CT changed entry");
+  // ACME: the JWK thumbprint of the EC key in RFC 7517, appendix A.1 (python3 hashlib); a CSR signed now, then changed
+  if (await jwkThumb({ crv: "P-256", x: "MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4", y: "4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM" }) !== "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s") fails.push("JWK thumbprint");
+  const kp = await SUBTLE.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const csr = await makeCSR("www.bob.example", kp), pc = parseCSR(csr), ch = csrChanged(csr);
+  if (!(await csrSigOK(pc)) || pc.cn !== "www.bob.example" || await csrSigOK(parseCSR(ch)) || parseCSR(ch).cn !== "www.cob.example") fails.push("CSR");
   return fails;
 }
 // CORE-END
@@ -813,38 +913,41 @@ const T = {
   en: {
     title: "Certificates and PKI explorer", home: "All simulators",
     intro: "From the outside in: whose key is it, what a certificate holds, how a browser checks it. Pick a step on the left.",
-    stepOf: n => "Step " + n + " of 7 · PKI",
+    stepOf: n => "Step " + n + " of 9 · PKI",
     steps: [["Black box", "Mallory swaps a key, a CA signature stops her"], ["Inside a certificate", "X.509 fields, extensions, DER bytes, fingerprint"],
             ["Chain of trust", "leaf, intermediate, root, trust store"], ["Validation checks", "the seven checks a browser runs"],
             ["Revocation", "CRL, OCSP, soft-fail, stapling"], ["Certificates in TLS 1.3", "Certificate, CertificateVerify, mTLS"],
-            ["Pinning", "pin the certificate or the key?"]],
+            ["Pinning", "pin the certificate or the key?"], ["Certificate Transparency", "a public log as a Merkle tree, two proofs"],
+            ["Getting a certificate: ACME", "account key, http-01 challenge, CSR"]],
     explain: [
       ["", ""],
       ["Three parts, eight fields, a few extensions", "A certificate is tbsCertificate (the part the CA signs), the signature algorithm and the signature. Pick a certificate, click a field on the left to see what it means and where its bytes are. At the bottom: flip one bit and watch the fingerprint and the signature."],
       ["From the leaf up to a root Alice already has", "The server sends a pile of certificates. Alice links them: the issuer of each one is the subject of the next, and the next one's key checks its signature, until she reaches a root in her trust store. Pick a chain (some have a broken link) and follow the checks one by one with “Next check”."],
-      ["Seven checks, one answer", "Before Alice trusts a chain she runs every check: signatures, dates, the name, may the issuers sign, what the key is for, the trust anchor and revocation (RFC 5280, simplified). Pick a chain, change the host name or the date, and see which check fails first and what OpenSSL and Chrome say."],
+      ["Seven checks, one answer", "Before Alice trusts a chain she runs every check: signatures, dates, the name, may the issuers sign, what the key is for, the trust anchor and revocation (RFC 5280, simplified). Pick a chain and predict which check fails first; then press “Run the checks”. Change the host name or the date and the checks run again."],
       ["When a certificate must die before it expires", "Carol's private key leaked on 10 November 2026, but her certificate is valid until 2028, so Trusty Issuing CA 1 revoked it. Alice can learn that from a list (CRL) or by asking (OCSP). Let Mallory block the network and compare soft-fail with hard-fail, then let the server staple the answer."],
       ["", ""],
-      ["Accept only the key you expect", "An app that talks only to its own server can pin it: it keeps the SHA-256 of the expected certificate or of its public key (SPKI) and refuses anything else, even a valid chain from another CA. Compare the two kinds of pin across three renewals of api.bob.example (Lecture 11, Task 8)."]],
-    selfOk: "✓ checked against python3 and the slides of Lectures 9 to 11", selfBad: f => "✗ self-test failed: " + f, selfRun: "self-test running…",
+      ["Accept only the key you expect", "An app that talks only to its own server can pin it: it keeps the SHA-256 of the expected certificate or of its public key (SPKI) and refuses anything else, even a valid chain from another CA. Pick a kind of pin, then let api.bob.example renew its certificate and see whether Bob's app still connects."],
+      ["Anybody can check what a CA has issued", "Every public certificate goes into public logs. A log is a Merkle tree (Lecture 6) with a leaf per certificate; it signs its root. Add entries and watch what changes, then check the two proofs a log gives: that an entry is in the tree, and that the tree only grew."],
+      ["", ""]],
+    selfOk: "✓ checked against python3, RFC test values and the slides of Lectures 9 to 11", selfBad: f => "✗ self-test failed: " + f, selfRun: "self-test running…",
     moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back", keys2: "In a story: N or Space next, P back",
     leg: { alice: "Alice", mal: "Mallory", bob: "Bob, his server and certificate", ca: "certificate authority, its signature", pub: "public key", prv: "private key" },
     storyOf: (i, n) => "Story " + i + " of " + n, sFirst: "First", sPrev: "Previous", sNext: "Next",
     storyTitle: ["Alice needs Bob's public key", "Bob sends his key", "Mallory swaps it", "Mallory reads everything", "Trusty CA signs a name card",
                  "Alice checks the card", "Mallory changes the key on the card", "Mallory signs her own card", "That card is a certificate"],
     story: [
-      "Alice wants to send Bob a secret, so she needs Bob's public key (32 bytes, Ed25519, the keys of Lecture 9). Bob's private key never leaves Bob. Between them is the network, and Mallory sits on it: she can read and change every packet.",
+      "Alice wants to send Bob a secret, so she needs Bob's public key (here 32 bytes). Bob's private key never leaves Bob. Between them is the network, and Mallory sits on it: she can read and change every packet.",
       "Bob sends his public key over the network and Alice gets 32 bytes. How does she know they are Bob's? Nothing in the bytes says “Bob”.",
       "Mallory catches Bob's key and sends Alice her own key instead. Alice again gets 32 bytes and cannot tell the difference: a public key alone does not say whose it is.",
       "Alice encrypts her secret with the key she got, which is Mallory's. Mallory decrypts it, reads it, encrypts it again with Bob's real key and passes it on. Bob notices nothing. Encryption alone does not stop the man in the middle.",
-      "A third party that Alice already trusts, the certificate authority Trusty CA, checks that the key is really Bob's and signs the bytes <span class=\"mono\">name=bob.example;key=2fa8…3c40</span> with its private key. Alice got the public key of Trusty CA earlier, not over this network (step 3 shows how).",
+      "A third party that Alice already trusts, the certificate authority Trusty CA, checks that the key is really Bob's and signs the bytes <span class=\"mono\">name=bob.example;key=2fa8…3c40</span> with its private key. Alice got the public key of Trusty CA earlier, not over this network (step 3 shows how). From here on the key on the card is Bob's signing key (Ed25519, Lecture 8); a key for encryption has the same problem and the same fix.",
       "Bob sends the signed card. Alice checks the signature with the public key of Trusty CA: verify(CA public key, card, signature). The answer is computed now in your browser (Ed25519 in WebCrypto) and gives True.",
       "Mallory puts her own key in the card and keeps the CA's signature. The signed bytes have changed, so the old signature does not fit them: verify gives False.",
       "Mallory signs the changed card with her own private key. But Alice always checks with the key of Trusty CA, never with a key that came with the card: False again. For a good signature Mallory would need the private key of the CA.",
       "A certificate is this card in a fixed format, X.509: a name, a public key and a few more fields, signed by a CA. The only thing Alice needs in advance is the public key of the CA. Mallory can get a certificate only for a name she controls, such as mallory.example. A public key infrastructure (PKI) is the keys, the certificates, the CAs and the rules around them."],
     net: "the network", netSub: "anyone can read and change packets",
     caSub: "the certificate authority: checks Bob, signs his card", caPriv: "CA private key, only here",
-    bobPub: "Bob's public key", bytes32: "32 bytes, Ed25519", bobPrv: "Bob's private key", stays: "never leaves Bob",
+    bobPub: "Bob's public key", bytes32: "32 bytes", bobPrv: "Bob's private key", stays: "never leaves Bob",
     bobGets: "Bob gets", secret: "meet at 6", bobNothing: "and notices nothing",
     cardT: "name card", sigCA: "signature of Trusty CA", sigMal: "Mallory's signature",
     onWire: "Bob's key, on its way", swapped: "what Alice gets now", malKey: "Mallory's key, not Bob's",
@@ -901,9 +1004,10 @@ const T = {
     fmore: {},
     bytesT: n => "The bytes: " + n + " bytes of DER",
     hexNote: "Orange: the bytes of the field you clicked; dark orange: its tag and length (type, length, value). Red frame: the bit you flip below.",
-    pemNote: n => "PEM is the same DER in Base64, 64 characters per line, between two lines: " + n + " characters. Almost every certificate starts with MII, because 30 82 in Base64 always gives MII.",
+    pemNote: n => "PEM is the same DER in Base64, 64 characters per line, between two lines: " + n + " characters. Almost every certificate starts with MII: 30 82 and a length below 40 00 (up to about 16 KB) give MII in Base64.",
     fpT: "The fingerprint: SHA-256 of the DER bytes",
-    fpNote: "The fingerprint is not part of the certificate; anybody computes it from the bytes. Flip one bit and the fingerprint changes completely. Bob's certificate, byte 100, bit 0 (a minute of notBefore): A2:C3:4F:BA…, as in Lecture 9.",
+    fpNote: "The fingerprint is not part of the certificate; anybody computes it from the bytes. Predict first: if one bit of the certificate changes, how many of the 32 bytes of the fingerprint change? Then pick a byte and a bit and press “Flip the bit”.",
+    fpShow: "Compute the fingerprint", flipGo: "Flip the bit", allVals: "Show every value", oneVal: "Only the clicked field",
     flipByte: "flip byte", flipBit: "bit",
     flipSigOk: "the signature still verifies", flipSigBad: "the CA's signature no longer verifies: a client rejects the changed certificate",
     flipBroken: "the changed bytes are no longer a certificate (the DER structure broke)",
@@ -912,7 +1016,7 @@ const T = {
     // step 3
     kRoot: "root", kInt: "intermediate", kLeaf: "leaf",
     pick3: "Pick a chain", c3reset: "Reset", c3next: "Next check", c3all: "All checks",
-    s3foot: "Here Alice checks only the links. The other checks (the name, what the key is for, revocation) come in step 4.",
+    s3foot: "Here Alice checks only the links. Lecture 10 checks a link by its signature and ends in the trust store; Lecture 11 adds the rest of each link (key identifiers, may the issuer sign, dates). The other checks (the name, what the key is for, revocation) come in step 4.",
     pileT: "What the server sent", issuedBy: "issued by", unused: "not used in the path", viaAIA: "fetched from the AIA address",
     storeT: "Alice's trust store", until: "until", storeNote: "Two roots here; Ubuntu 24.04 has 120.",
     linkT: (c, p) => "Is <b>" + c + "</b> issued by <b>" + p + "</b>?",
@@ -936,20 +1040,20 @@ const T = {
       unknown: "Mallory Root CA is not in Alice's store, so the chain leads nowhere Alice trusts.",
       self: "issuer = subject, the signature is fine, but the certificate is not in the store: OpenSSL 18, “self-signed certificate”." },
     scn: {
-      good: ["bob.example", "Bob's server sends his leaf and Trusty Issuing CA 1 (Lecture 11, Task 1). The root Trusty Root CA is in Alice's store."],
+      good: ["bob.example", "Bob's server sends his leaf and Trusty Issuing CA 1. The root Trusty Root CA is in Alice's store."],
       cov: ["www.coventry.ac.uk (real)", "The real chain saved on 15 November 2026: the leaf, WE1 of Google Trust Services, and GTS Root R4 cross-signed by GlobalSign."],
-      noint: ["missing intermediate", "Bob's server sends only his leaf (Lecture 11, Task 1, no_intermediate)."],
+      noint: ["missing intermediate", "Bob's server sends only his leaf."],
       covnoint: ["Coventry without WE1", "The same real leaf, but the server forgot WE1."],
-      expired: ["expired leaf", "Bob's old certificate, valid until 1 October 2026 (Lecture 11, Task 1, expired)."],
-      expint: ["expired intermediate", "The leaf is valid, but Trusty Issuing CA 0 ended on 30 June 2026 (Lecture 11, Task 3, case 2)."],
-      wild: ["*.bob.example", "A wildcard certificate, and Alice types bob.example (Task 3, case 3). Try www.bob.example and a.b.bob.example."],
-      notca: ["issuer not a CA", "Mallory has an honest certificate for mallory.example (CA:FALSE) and signs bob.example with its key (Task 3, case 4)."],
-      fakeint: ["fake intermediate", "Mallory makes her own “Trusty Issuing CA 1”: the same name, her own key (Task 3, case 5)."],
-      client: ["client certificate", "A certificate for bob.example whose Extended Key Usage is clientAuth only (Task 3, case 6)."],
-      wrong: ["wrong name", "A good certificate for carol.example; Alice asked for bob.example (Task 1, wrong_name)."],
-      unknown: ["unknown CA", "A certificate for bob.example from Mallory Root CA, which is not in Alice's store (Task 1, unknown_ca)."],
-      self: ["self-signed", "A self-signed certificate for bob.example (Task 1, self_signed)."],
-      revoked: ["revoked (Carol)", "Carol's certificate, serial 0x1002: her key leaked and Trusty Issuing CA 1 put it on its CRL (Lecture 11, Task 4)."] },
+      expired: ["expired leaf", "Bob's old certificate, valid until 1 October 2026."],
+      expint: ["expired intermediate", "The leaf is valid, but Trusty Issuing CA 0 ended on 30 June 2026."],
+      wild: ["*.bob.example", "A wildcard certificate, and Alice types bob.example. Try www.bob.example and a.b.bob.example."],
+      notca: ["issuer not a CA", "Mallory has an honest certificate for mallory.example (CA:FALSE) and signs bob.example with its key."],
+      fakeint: ["fake intermediate", "Mallory makes her own “Trusty Issuing CA 1”: the same name, her own key."],
+      client: ["client certificate", "A certificate for bob.example whose Extended Key Usage is clientAuth only."],
+      wrong: ["wrong name", "A good certificate for carol.example; Alice asked for bob.example."],
+      unknown: ["unknown CA", "A certificate for bob.example from Mallory Root CA, which is not in Alice's store."],
+      self: ["self-signed", "A self-signed certificate for bob.example."],
+      revoked: ["revoked (Carol)", "Carol's certificate, serial 0x1002: her key leaked and Trusty Issuing CA 1 put it on its CRL."] },
     // step 4
     pick4: "Pick a chain", hostL: "Alice types", dateL: "Now", revL: "check revocation (the issuer's CRL)", reset4: "Reset",
     checksT: "The checks", pathIs: "Path:", inStore: "(in the trust store)", selfEnd: "self-signed, not in the store", noIssuer: "the issuer is missing",
@@ -970,6 +1074,7 @@ const T = {
               rev: ["Revocation", "is the leaf on the issuer's CRL? (step 5)"] },
     allOK: "Every check passed: Alice trusts the chain and the connection goes on.", rejected: "Rejected.",
     firstNote: n => "The red row is the first failed check (check " + n + "); OpenSSL and Chrome report that one. Each check stops a different attack.",
+    run4: "Run the checks", say4: "Show what OpenSSL and Chrome say", predict4: "Predict first: will Alice accept this chain, and if not, which check fails first? Then press “Run the checks”.",
     // step 5
     r5certL: "Certificate:", r5bob: "bob.example (good)", r5carol: "carol.example (key leaked)", r5polL: "If there is no answer:", noMust: "no Must-Staple",
     r5blockL: "Mallory blocks the CA",
@@ -997,7 +1102,7 @@ const T = {
     mustNo: "Must-Staple: the certificate promises a staple; without it Alice rejects.", softStaple: "Without Must-Staple Alice does not notice the missing staple and accepts.",
     blockNoMatter: "Mallory's block does not matter here: Alice sends no question that could be blocked.",
     staplePriv: "Privacy and speed: Alice talks only to the server.",
-    oc1: s => "1. Alice asks the responder: “is serial 0x" + s + " revoked?”", oc2: b => "2. The responder answers: " + b + " bytes, signed.",
+    oc1: s => "1. Alice asks the responder: “is serial 0x" + s + " revoked?”", oc2: b => "2. The responder answers: about " + b + " bytes, signed (the size varies by a few bytes, because an ECDSA signature has 70 to 72 bytes).",
     ocspPriv: "Privacy: the CA's responder learns that Alice visits this site. Speed: one more round trip.",
     stapleNoMust: "stapled", stapleMust: "stapled + Must-Staple", blocked: "Mallory blocks", acc: "accept", rej: "reject",
     realCRL: "CRL of WE1 (one shard)", size: "size", entry: "entry", sigW: "signature",
@@ -1016,9 +1121,9 @@ const T = {
     d1T: "Two key shares", d1: "ClientHello carries Alice's key share and the server name (SNI) bob.example, so a server with many sites picks the right certificate. ServerHello carries Bob's key share. Both compute the same secret, and the rest of the handshake is encrypted with keys derived from it. Only the next two messages show who Bob is.",
     realLines: "openssl s_client -connect www.coventry.ac.uk:443 (15 November 2026):<br>New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384<br>Server Temp Key: X25519, 253 bits<br>Peer signature type: ECDSA · Peer signing digest: SHA256",
     d2T: "The Certificate message", d2: "Bob's Certificate message carries his chain, leaf first:", entryN: i => "entry " + (i + 1) + ":",
-    d2b: "Each entry can also carry an OCSP staple (step 5). The root is not sent: Alice must already have it. www.coventry.ac.uk sends three certificates: its leaf, WE1 and a cross-signed GTS Root R4.",
+    d2b: "Each entry can also carry an OCSP staple (step 5; RFC 9846, section 4.5.1.1). The root is not sent: Alice must already have it. www.coventry.ac.uk sends three certificates: its leaf, WE1 and a cross-signed GTS Root R4.",
     go4: "How Alice checks the chain", go5: "Stapling",
-    d3T: "What exactly is signed", d3: "The signed content is 130 bytes (RFC 8446, 4.4.3): 64 spaces, the context string, one zero byte and the SHA-256 transcript hash. Bob signs it with the private key of his leaf (ECDSA P-256, Lecture 11, Task 6); Alice verifies with the public key from that certificate.",
+    d3T: "What exactly is signed", d3: "The signed content is 130 bytes (RFC 9846, section 4.5.2; in the older RFC 8446: 4.4.3): 64 spaces, the context string, one zero byte and the SHA-256 transcript hash. Bob signs it with the private key of his leaf (ECDSA P-256); Alice verifies with the public key from that certificate.",
     cvToday: "Bob signs today's handshake", cvMal: "Mallory with a copy of the certificate", cvOld: "an old signature replayed", cvNew: "a new handshake",
     yesterday: "Bob, yesterday",
     seg1: "64 × 0x20", seg2: "context, 33 bytes", seg3: "separator", seg4: "transcript hash, 32 bytes",
@@ -1028,60 +1133,123 @@ const T = {
              mallory: "Mallory copied Bob's certificate but signs with her own key. The key in the certificate is Bob's, so the signature does not fit.",
              old: "Mallory replays a signature Bob made yesterday. Yesterday's handshake had other random values, so its transcript hash differs.",
              new: "A new handshake has new random values, so a new transcript hash. Bob's key signs it now in your browser (WebCrypto ECDSA P-256), and the signature verifies." },
-    cvAgain: "another handshake",
+    cvAgain: "another handshake", cvCheck: "Alice verifies the signature", cliCheck: "The server checks the client",
     d4T: "Finished", d4: "Finished is a MAC (HMAC) over the whole transcript, with a key derived from the handshake. It shows that both sides saw the same messages, so Mallory could not change any of them. Certificates play no part here.",
-    d5T: "The server checks the client", d5: "Bob's server sends CertificateRequest. The client answers with its certificate and a CertificateVerify with the context “TLS 1.3, client CertificateVerify”. The server trusts only its own CA, Bob Staff CA, not the public roots, and turns the certificate into an identity (CN = Alice).",
+    d5T: "The server checks the client", d5: "Bob's server sends CertificateRequest (RFC 9846, section 4.4.2; in RFC 8446: 4.3.2). The client answers with its certificate and a CertificateVerify with the context “TLS 1.3, client CertificateVerify”. The server trusts only its own CA, Bob Staff CA, not the public roots, and turns the certificate into an identity (CN = Alice).",
     cliAlice: "Alice (from Bob Staff CA)", cliNone: "no certificate", cliMal: "Mallory's own “Alice”",
     cliNoCert: "Alice's app sends no certificate, but the server requires one.",
     cliIss: n => "Issuer " + n + ": is it the server's CA, Bob Staff CA?", cliSig: "The key of Bob Staff CA verifies the signature of the certificate (checked now).",
     cliEku: "Extended Key Usage includes clientAuth.", cliCV: "The client's CertificateVerify fits (it holds the private key).",
     loggedIn: "hello, Alice: you are logged in",
     // step 7
-    pinApp: "Alice's app for api.bob.example", pinCertMode: "pin the certificate", pinKeyMode: "pin the key (SPKI) + a backup",
+    pinApp: "Bob's app for api.bob.example", pinCertMode: "pin the certificate", pinKeyMode: "pin the key (SPKI) + a backup",
     pinsCert: "The app accepts only this certificate:", pinsKey: "The app accepts only these keys:", backup: "backup key, kept offline", current: "the key in use",
-    pinTabT: "The server renews its certificate", pinCol: ["certificate", "certificate pin (SHA-256 of the DER)", "key pin (SHA-256 of the SPKI)", "chain", "the app says"],
+    pinTabT: "The server renews its certificate", pinPick: "Which certificate does the server send now? Predict first: will the app connect?", pinAll: "Show all four side by side", pinOpen: "the pin matches: the app connects", pinShut: "no pin matches: the app refuses, even though the chain is valid", pinHas: "this certificate", pinCol: ["certificate", "certificate pin (SHA-256 of the DER)", "key pin (SHA-256 of the SPKI)", "chain", "the app says"],
     pinRows: ["2026, in the app", "2027, the same key", "2027, a new key", "2027, the backup key"],
     chainOK2: "valid", pinMatch: "accept", pinNo: "reject: the app stops working",
     pinWhyCert: "A certificate pin breaks at every renewal, even with the same key: the dates and the serial change, so the hash changes. The app needs an update first.",
     pinWhyKey: "A key pin survives a renewal with the same key. A new key breaks it, unless the app also pins a backup key that is kept offline for exactly this day.",
     pinHowT: "How a pin is computed", pinHow: "SHA-256 of the DER bytes of the certificate, or of its SubjectPublicKeyInfo, in Base64. The real values of the Coventry chain, computed now:",
     hpkpT: "HPKP: pinning for the whole web, and its end", hpkp: "The header Public-Key-Pins (RFC 7469, 2015) let any web site pin its keys in browsers. A lost key or an attacker who set a pin locked visitors out for months (“HPKP suicide”), so browsers removed it between 2018 and 2020. Certificate Transparency (Lecture 10) now catches wrong certificates instead. Pin only when you control both the app and the server.",
+    // step 5: the timeline of a recorded answer
+    tlT: "A recorded answer: Mallory's window", tlDay: "Today (November 2026)",
+    tlNote: "On 7 November Mallory saved a signed OCSP answer for Carol's certificate: “good”, next update 14 November. On 10 November Carol's key leaked and the CA revoked the certificate. Move the day and see what the old answer is worth.",
+    tlWin: "revoked, but the old answer is still fresh", tlAns: "the answer Mallory saved (7 → 14 Nov)", tlNowGood: "the responder says: good", tlNowRev: "the responder says: revoked",
+    tlBefore: "Before 10 November the answer “good” is true: there is nothing to attack yet.",
+    tlDanger: "Mallory staples the saved answer. It is signed by the CA, says “good” and its next update has not passed, so Alice accepts a revoked certificate.",
+    tlAfter: "The saved answer is too old (its next update, 14 November, has passed), so Alice does not use it. Mallory can only send no answer: soft-fail accepts, hard-fail and Must-Staple reject.",
+    tlLesson: "Alice checks the signature, the serial and that “now” is before the next update. She cannot tell a fresh answer from an old one inside that window, so the window is as long as the CA lets an answer live (7 days for github.com below).",
+    // step 8: Certificate Transparency
+    ctMode: ["The log grows", "Inclusion proof", "Consistency proof"],
+    ctModeSub: ["Each new certificate becomes a leaf on the right. Add entries and watch which hashes change.",
+                "Alice has a certificate and the root the log signed. Is the certificate in the log? Pick an entry: the log sends only the teal hashes.",
+                "A monitor saved the signed root when the log had fewer entries. Did the log only append since then? Pick the old size."],
+    ctAdd: "Add an entry", ctReset: "Back to 8 entries", ctPickK: "Entry:", ctAlter: k => "Mallory changes entry " + k, ctPickM: "Old size:", ctTamper: "Mallory's log removed entry 2",
+    ctLgNew: "changed by the last entry", ctLgProof: "hashes the log sends (the proof)", ctLgPath: "hashes Alice computes", ctLgOld: "the old tree the monitor knows",
+    ctRoot: n => "root, " + n + " entries",
+    ctSthT: "Signed Tree Head", ctSigned: "+ timestamp, signed by the log's private key",
+    ctGrow: n => "Orange: what changed when entry " + (n - 1) + " came in, the new leaf and the nodes above it. Every other node stays, so every older tree is still a part of the new one; tab 3 uses exactly that. Leaf = SHA-256(0x00 ‖ entry), node = SHA-256(0x01 ‖ left ‖ right), as in RFC 6962; the hashes are computed now in your browser.",
+    ctInclT: (k, n) => "Is entry " + k + " in the tree of " + n + "?", ctInclSub: (p, n) => "The proof has " + p + (p === 1 ? " hash" : " hashes") + " for " + n + " entries (about log₂ n): Alice never downloads the log.",
+    ctLeaf: "the leaf", ctUp: i => "up " + i, ctSigned2: "the root the log signed",
+    ctInclOK: "The computed root equals the signed one: the entry is in the log.", ctInclBad: "The computed root differs: this entry is not what the log signed.",
+    ctConsT: (m, n) => "Is the old tree of " + m + " the beginning of today's tree of " + n + "?",
+    ctConsSub: (p, pw) => "The log sends " + p + (p === 1 ? " teal hash." : " teal hashes.") + " From them alone Alice computes both the old root and the new one." + (pw ? " The old tree has a power of 2 entries, so it is one node of the new tree, and Alice starts from the old root itself." : ""),
+    ctFromProof: "computed from the proof", ctKnown: "known", ctOldRoot: m => "old root (" + m + ")", ctNewRoot: n => "new root (" + n + ")", ctSaved: "saved earlier", ctSigned3: "signed today",
+    ctConsOK: "Both roots fit: the log only appended entries.", ctConsBad: "The old root does not fit: the log changed or removed something the monitor had seen.",
+    ctTamperWhy: "Mallory's log dropped entry 2 (blog.eve.example) and appended www.mallory.example, so the size looks right. But the old root is signed and the monitor kept it: no proof from the new tree can rebuild it.",
+    ctTamperSmall: "The old tree ends before entry 2, so removing entry 2 did not touch it. A monitor that saved a root with entry 2 in it would catch the log.",
+    // step 9: ACME
+    amAcc: "newAccount: the account public key", amOrder: h => "newOrder: " + h, amChal: "challenge http-01: a token", amFile: "put the file on the web server", amReady: "ready, check it",
+    amKa: "the file: the key authorization", amCSR: "finalize: the CSR", amCert: "the certificate", amClient: "ACME client (Bob's server)", amMalClient: "Mallory's ACME client", amWeb: h => "web server " + h, amCA: "ACME server (the CA)",
+    amTitle: ["An account key", "Order a name, get a token", "Put the answer where the CA can see it", "The CA checks", "The CSR, then the certificate"],
+    amText: ["Bob's ACME client makes an account key pair and registers its public key with the CA. Every later request is signed with this key, so the CA knows which account asks.",
+             "The client asks for a certificate for www.bob.example. The CA answers with an http-01 challenge: a random token, new for every order.",
+             "The client writes one file to the web server of www.bob.example: its name is the token, its text the key authorization, the token and the thumbprint of the account key.",
+             "The client says “ready”. The CA downloads the file over plain HTTP (port 80) and compares it with what it expects for the account that asked. Only someone who controls the web server can put the file there.",
+             "The client sends a CSR: the name and the site's public key, signed with the site's private key. The CA checks it and issues the certificate."],
+    adAccT: "The account key and its thumbprint", adAcc: "A key pair made now in your browser (ECDSA P-256). It is not the key of the website; that one comes in part 5. Its public key as a JWK:",
+    adJwk: "the account public key (JWK)", adThumb: "its thumbprint: SHA-256 of that text, in base64url (RFC 7638)",
+    adAccNote: "In real ACME every request is a JWS signed with the account key and sent over HTTPS (RFC 8555).", adNewKeys: "new keys",
+    adTokT: "The token", adTok: "The CA picks 32 random bytes and writes them in base64url: 43 characters.", adTokNote: "A new token for every order, so an old answer cannot be used again.", adNewTok: "a new order",
+    adFileT: "The file on the web server", adFile: "The client writes the key authorization at a fixed address under the name:", adContent: "the text of the file: token + \".\" + thumbprint",
+    adFileNote: "The token alone is not enough: the thumbprint ties the answer to Bob's account.",
+    adChkT: "What the CA fetches and what it expects", adWho: { bob: "Bob", token: "Mallory uses Bob's token", noaccess: "Mallory, no access to the server" },
+    adWhoText: { bob: "Bob's account asked; Bob's file is on the server.",
+                 token: "Mallory has seen Bob's token (the URL is public) and answers the challenge from her own account, hoping Bob's file will do.",
+                 noaccess: "Mallory orders www.bob.example on her own account and gets her own token, but she cannot write a file on Bob's server." },
+    adFetched: u => "the CA fetches " + u + ":", adExpect: w => "the CA expects: the token + \".\" + the thumbprint of " + w + "'s account key", adRun4: "The CA compares",
+    adValid: "the texts are equal: the account controls the name.",
+    adInvalid: { token: "the thumbprint is Bob's, not Mallory's: Bob's file proves nothing for her account.", noaccess: "there is no file: Mallory does not control the server." },
+    adCsrT: "The CSR: proof that the client has the private key", adCsr: "A PKCS #10 request made now in your browser: the name, the public key of the site, and a signature over both with the site's private key.",
+    adCsrOpt: { bob: "Bob's CSR", changed: "one letter changed after signing", mal: "Mallory's CSR for www.bob.example" },
+    adCsrName: n => "subject: CN=" + n, adCsrKey: w => w + "'s site public key (SPKI)", adCsrSig: "ecdsa-with-SHA256, signature", adCsrLen: n => n + " bytes of DER (simplified: a real CSR also asks for the SAN in an extension).",
+    adRun5: "The CA checks the CSR",
+    adCsrSigOK: "The key inside the CSR verifies its signature: the sender has the private key.", adCsrSigBad: "The signature does not verify: the bytes are not what the key holder signed.",
+    adCsrAuthz: { bob: "Bob's account has a valid authorization for www.bob.example (part 4).", changed: "Not checked: the CSR is already rejected.", mal: "Mallory's account has no valid authorization for www.bob.example (part 4)." },
+    adIssued: "The CA issues the certificate and logs it in CT logs (step 8).", adRefused: "The CA refuses.",
+    adCsrWhy: { bob: "The certificate holds the name from the order and the key from the CSR.",
+                changed: "The CA signs only what the key holder signed: www.cob.example was never signed by Bob's key.",
+                mal: "Mallory's signature is fine: a CSR proves only that she has her own key, never that the name is hers. The name is proved by the challenge, and that failed." },
+    adGoCT: "The certificate goes into the logs", adGoCert: "What a certificate holds",
   },
   pl: {
     title: "Certyfikaty i PKI krok po kroku", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu: czyj to klucz, co jest w certyfikacie, jak przeglądarka go sprawdza. Wybierz krok po lewej.",
-    stepOf: n => "Krok " + n + " z 7 · PKI",
+    stepOf: n => "Krok " + n + " z 9 · PKI",
     steps: [["Czarna skrzynka", "Mallory podmienia klucz, podpis CA ją zatrzymuje"], ["Wnętrze certyfikatu", "pola X.509, rozszerzenia, bajty DER, odcisk"],
             ["Łańcuch zaufania", "liść, pośrednie CA, root, magazyn zaufania"], ["Sprawdzenia walidacji", "siedem sprawdzeń przeglądarki"],
             ["Unieważnianie", "CRL, OCSP, soft-fail, stapling"], ["Certyfikaty w TLS 1.3", "Certificate, CertificateVerify, mTLS"],
-            ["Pinning", "przypiąć certyfikat czy klucz?"]],
+            ["Pinning", "przypiąć certyfikat czy klucz?"], ["Certificate Transparency", "publiczny log jako drzewo Merkle, dwa dowody"],
+            ["Certyfikat przez ACME", "klucz konta, wyzwanie http-01, CSR"]],
     explain: [
       ["", ""],
       ["Trzy części, osiem pól, kilka rozszerzeń", "Certyfikat to tbsCertificate (część, którą podpisuje CA), algorytm podpisu i podpis. Wybierz certyfikat i kliknij pole po lewej: zobaczysz, co znaczy i gdzie są jego bajty. Na dole: odwróć jeden bit i patrz na odcisk palca i podpis."],
       ["Od liścia do roota, którego Alice już ma", "Serwer wysyła kupkę certyfikatów. Alice je łączy: wystawca każdego to podmiot następnego, a klucz następnego sprawdza jego podpis, aż dojdzie do roota z magazynu zaufania. Wybierz łańcuch (niektóre mają zepsute ogniwo) i przejdź sprawdzenia po kolei przyciskiem „Następne sprawdzenie”."],
-      ["Siedem sprawdzeń, jedna odpowiedź", "Zanim Alice zaufa łańcuchowi, robi wszystkie sprawdzenia: podpisy, daty, nazwa, czy wystawcy mogą podpisywać, do czego jest klucz, kotwica zaufania i unieważnienie (RFC 5280, w uproszczeniu). Wybierz łańcuch, zmień nazwę hosta albo datę i zobacz, które sprawdzenie zawodzi pierwsze i co mówią OpenSSL i Chrome."],
+      ["Siedem sprawdzeń, jedna odpowiedź", "Zanim Alice zaufa łańcuchowi, robi wszystkie sprawdzenia: podpisy, daty, nazwa, czy wystawcy mogą podpisywać, do czego jest klucz, kotwica zaufania i unieważnienie (RFC 5280, w uproszczeniu). Wybierz łańcuch i przewidź, które sprawdzenie zawiedzie pierwsze; potem naciśnij „Uruchom sprawdzenia”. Zmień nazwę hosta albo datę, a sprawdzenia przeliczą się od nowa."],
       ["Gdy certyfikat musi umrzeć przed końcem ważności", "Klucz prywatny Carol wyciekł 10 listopada 2026, a jej certyfikat jest ważny do 2028, więc Trusty Issuing CA 1 go unieważnił. Alice może się o tym dowiedzieć z listy (CRL) albo pytając (OCSP). Niech Mallory zablokuje sieć: porównaj soft-fail z hard-fail, a potem niech serwer dołączy odpowiedź (stapling)."],
       ["", ""],
-      ["Przyjmij tylko klucz, którego się spodziewasz", "Aplikacja, która rozmawia tylko z własnym serwerem, może go przypiąć: trzyma SHA-256 oczekiwanego certyfikatu albo jego klucza publicznego (SPKI) i odrzuca wszystko inne, nawet poprawny łańcuch od innego CA. Porównaj oba rodzaje pinów przy trzech odnowieniach api.bob.example (wykład 11, zadanie 8)."]],
-    selfOk: "✓ zgodne z python3 i slajdami wykładów 9 do 11", selfBad: f => "✗ autotest nie przeszedł: " + f, selfRun: "autotest trwa…",
+      ["Przyjmij tylko klucz, którego się spodziewasz", "Aplikacja, która rozmawia tylko z własnym serwerem, może go przypiąć: trzyma SHA-256 oczekiwanego certyfikatu albo jego klucza publicznego (SPKI) i odrzuca wszystko inne, nawet poprawny łańcuch od innego CA. Wybierz rodzaj pinu, a potem niech api.bob.example odnowi certyfikat: czy aplikacja Boba nadal się łączy?"],
+      ["Każdy może sprawdzić, co wydało CA", "Każdy publiczny certyfikat trafia do publicznych logów. Log to drzewo Merkle (wykład 6) z liściem na każdy certyfikat; log podpisuje korzeń. Dodawaj wpisy i patrz, co się zmienia, a potem sprawdź dwa dowody, które daje log: że wpis jest w drzewie i że drzewo tylko rosło."],
+      ["", ""]],
+    selfOk: "✓ zgodne z python3, wartościami z RFC i slajdami wykładów 9 do 11", selfBad: f => "✗ autotest nie przeszedł: " + f, selfRun: "autotest trwa…",
     moreBelow: "Więcej poniżej", keys: "→ / Enter: następny krok · ← / Esc: wstecz", keys2: "W historii: N lub spacja dalej, P wstecz",
     leg: { alice: "Alice", mal: "Mallory", bob: "Bob, jego serwer i certyfikat", ca: "urząd certyfikacji, jego podpis", pub: "klucz publiczny", prv: "klucz prywatny" },
     storyOf: (i, n) => "Historia " + i + " z " + n, sFirst: "Od początku", sPrev: "Wstecz", sNext: "Dalej",
     storyTitle: ["Alice potrzebuje klucza publicznego Boba", "Bob wysyła swój klucz", "Mallory go podmienia", "Mallory czyta wszystko", "Trusty CA podpisuje wizytówkę",
                  "Alice sprawdza wizytówkę", "Mallory zmienia klucz na wizytówce", "Mallory podpisuje własną wizytówkę", "Ta wizytówka to certyfikat"],
     story: [
-      "Alice chce wysłać Bobowi sekret, więc potrzebuje klucza publicznego Boba (32 bajty, Ed25519, klucze z wykładu 9). Klucz prywatny Boba nigdy go nie opuszcza. Między nimi jest sieć, a w niej Mallory: może czytać i zmieniać każdy pakiet.",
+      "Alice chce wysłać Bobowi sekret, więc potrzebuje klucza publicznego Boba (tutaj 32 bajty). Klucz prywatny Boba nigdy go nie opuszcza. Między nimi jest sieć, a w niej Mallory: może czytać i zmieniać każdy pakiet.",
       "Bob wysyła swój klucz publiczny przez sieć i Alice dostaje 32 bajty. Skąd wie, że to klucz Boba? Nic w tych bajtach nie mówi „Bob”.",
       "Mallory łapie klucz Boba i wysyła Alice swój własny. Alice znów dostaje 32 bajty i nie widzi różnicy: sam klucz publiczny nie mówi, czyj jest.",
       "Alice szyfruje sekret kluczem, który dostała, czyli kluczem Mallory. Mallory odszyfrowuje, czyta, szyfruje ponownie prawdziwym kluczem Boba i przekazuje dalej. Bob niczego nie zauważa. Samo szyfrowanie nie powstrzymuje człowieka pośrodku.",
-      "Trzecia strona, której Alice już ufa, urząd certyfikacji Trusty CA, sprawdza, że klucz naprawdę należy do Boba, i podpisuje swoim kluczem prywatnym bajty <span class=\"mono\">name=bob.example;key=2fa8…3c40</span>. Klucz publiczny Trusty CA Alice dostała wcześniej, nie przez tę sieć (krok 3 pokazuje skąd).",
+      "Trzecia strona, której Alice już ufa, urząd certyfikacji Trusty CA, sprawdza, że klucz naprawdę należy do Boba, i podpisuje swoim kluczem prywatnym bajty <span class=\"mono\">name=bob.example;key=2fa8…3c40</span>. Klucz publiczny Trusty CA Alice dostała wcześniej, nie przez tę sieć (krok 3 pokazuje skąd). Od tej chwili klucz na wizytówce to klucz Boba do podpisu (Ed25519, wykład 8); klucz do szyfrowania ma ten sam problem i to samo rozwiązanie.",
       "Bob wysyła podpisaną wizytówkę. Alice sprawdza podpis kluczem publicznym Trusty CA: verify(klucz publiczny CA, wizytówka, podpis). Wynik liczy teraz Twoja przeglądarka (Ed25519 w WebCrypto): True.",
       "Mallory wstawia na wizytówkę swój klucz i zostawia podpis CA. Podpisane bajty się zmieniły, więc stary podpis do nich nie pasuje: verify daje False.",
       "Mallory podpisuje zmienioną wizytówkę własnym kluczem prywatnym. Ale Alice zawsze sprawdza kluczem Trusty CA, nigdy kluczem, który przyszedł z wizytówką: znów False. Do dobrego podpisu Mallory potrzebowałaby klucza prywatnego CA.",
       "Certyfikat to ta wizytówka w ustalonym formacie X.509: nazwa, klucz publiczny i kilka innych pól, podpisane przez CA. Alice musi mieć wcześniej tylko klucz publiczny CA. Mallory dostanie certyfikat tylko na nazwę, którą sama kontroluje, np. mallory.example. Infrastruktura klucza publicznego (PKI) to klucze, certyfikaty, urzędy i reguły wokół nich."],
     net: "sieć", netSub: "każdy może czytać i zmieniać pakiety",
     caSub: "urząd certyfikacji: sprawdza Boba, podpisuje wizytówkę", caPriv: "klucz prywatny CA, tylko tutaj",
-    bobPub: "klucz publiczny Boba", bytes32: "32 bajty, Ed25519", bobPrv: "klucz prywatny Boba", stays: "nigdy nie opuszcza Boba",
+    bobPub: "klucz publiczny Boba", bytes32: "32 bajty", bobPrv: "klucz prywatny Boba", stays: "nigdy nie opuszcza Boba",
     bobGets: "Bob dostaje", secret: "spotkajmy się o 6", bobNothing: "i niczego nie zauważa",
     cardT: "wizytówka", sigCA: "podpis Trusty CA", sigMal: "podpis Mallory",
     onWire: "klucz Boba w drodze", swapped: "co teraz dostaje Alice", malKey: "klucz Mallory, nie Boba",
@@ -1137,9 +1305,10 @@ const T = {
     fmore: {},
     bytesT: n => "Bajty: " + n + " bajtów DER",
     hexNote: "Pomarańczowe: bajty klikniętego pola; ciemnopomarańczowe: jego znacznik i długość (typ, długość, wartość). Czerwona ramka: bit, który odwracasz niżej.",
-    pemNote: n => "PEM to ten sam DER w Base64, po 64 znaki w linii, między dwiema liniami: " + n + " znaków. Prawie każdy certyfikat zaczyna się od MII, bo 30 82 w Base64 to zawsze MII.",
+    pemNote: n => "PEM to ten sam DER w Base64, po 64 znaki w linii, między dwiema liniami: " + n + " znaków. Prawie każdy certyfikat zaczyna się od MII: 30 82 i długość poniżej 40 00 (do ok. 16 KB) dają w Base64 MII.",
     fpT: "Odcisk palca: SHA-256 bajtów DER",
-    fpNote: "Odcisk nie jest częścią certyfikatu; każdy liczy go z bajtów. Odwróć jeden bit, a odcisk zmieni się cały. Certyfikat Boba, bajt 100, bit 0 (minuta w notBefore): A2:C3:4F:BA…, jak na wykładzie 9.",
+    fpNote: "Odcisk nie jest częścią certyfikatu; każdy liczy go z bajtów. Najpierw przewidź: jeśli zmieni się jeden bit certyfikatu, ile z 32 bajtów odcisku się zmieni? Potem wybierz bajt i bit i naciśnij „Odwróć bit”.",
+    fpShow: "Policz odcisk", flipGo: "Odwróć bit", allVals: "Pokaż wszystkie wartości", oneVal: "Tylko kliknięte pole",
     flipByte: "odwróć bajt", flipBit: "bit",
     flipSigOk: "podpis nadal się zgadza", flipSigBad: "podpis CA już się nie zgadza: klient odrzuci zmieniony certyfikat",
     flipBroken: "zmienione bajty nie są już certyfikatem (zepsuła się struktura DER)",
@@ -1147,7 +1316,7 @@ const T = {
     flipDiff: n => "Zmieniło się " + n + " z 32 bajtów odcisku.",
     kRoot: "root", kInt: "pośredni", kLeaf: "liść",
     pick3: "Wybierz łańcuch", c3reset: "Od początku", c3next: "Następne sprawdzenie", c3all: "Wszystkie sprawdzenia",
-    s3foot: "Tutaj Alice sprawdza tylko ogniwa. Pozostałe sprawdzenia (nazwa, przeznaczenie klucza, unieważnienie) są w kroku 4.",
+    s3foot: "Tutaj Alice sprawdza tylko ogniwa. Wykład 10 sprawdza ogniwo podpisem i kończy w magazynie zaufania; wykład 11 dodaje resztę sprawdzeń ogniwa (identyfikatory kluczy, czy wystawca może podpisywać, daty). Pozostałe sprawdzenia (nazwa, przeznaczenie klucza, unieważnienie) są w kroku 4.",
     pileT: "Co wysłał serwer", issuedBy: "wystawca:", unused: "nieużyty w ścieżce", viaAIA: "pobrany z adresu AIA",
     storeT: "Magazyn zaufania Alice", until: "do", storeNote: "Tu dwa rooty; Ubuntu 24.04 ma ich 120.",
     linkT: (c, p) => "Czy <b>" + c + "</b> wystawił <b>" + p + "</b>?",
@@ -1171,20 +1340,20 @@ const T = {
       unknown: "Mallory Root CA nie ma w magazynie Alice, więc łańcuch nie prowadzi do nikogo, komu Alice ufa.",
       self: "Wystawca = podmiot, podpis jest dobry, ale certyfikatu nie ma w magazynie: OpenSSL 18, „self-signed certificate”." },
     scn: {
-      good: ["bob.example", "Serwer Boba wysyła liść i Trusty Issuing CA 1 (wykład 11, zadanie 1). Root Trusty Root CA jest w magazynie Alice."],
+      good: ["bob.example", "Serwer Boba wysyła liść i Trusty Issuing CA 1. Root Trusty Root CA jest w magazynie Alice."],
       cov: ["www.coventry.ac.uk (prawdziwy)", "Prawdziwy łańcuch zapisany 15 listopada 2026: liść, WE1 z Google Trust Services i GTS Root R4 podpisany krzyżowo przez GlobalSign."],
-      noint: ["brak pośredniego", "Serwer Boba wysyła tylko liść (wykład 11, zadanie 1, no_intermediate)."],
+      noint: ["brak pośredniego", "Serwer Boba wysyła tylko liść."],
       covnoint: ["Coventry bez WE1", "Ten sam prawdziwy liść, ale serwer zapomniał o WE1."],
-      expired: ["wygasły liść", "Stary certyfikat Boba, ważny do 1 października 2026 (wykład 11, zadanie 1, expired)."],
-      expint: ["wygasły pośredni", "Liść jest ważny, ale Trusty Issuing CA 0 skończył się 30 czerwca 2026 (wykład 11, zadanie 3, case 2)."],
-      wild: ["*.bob.example", "Certyfikat z gwiazdką, a Alice wpisuje bob.example (zadanie 3, case 3). Spróbuj www.bob.example i a.b.bob.example."],
-      notca: ["wystawca nie jest CA", "Mallory ma uczciwy certyfikat dla mallory.example (CA:FALSE) i jego kluczem podpisuje bob.example (zadanie 3, case 4)."],
-      fakeint: ["fałszywy pośredni", "Mallory robi własny „Trusty Issuing CA 1”: ta sama nazwa, jej klucz (zadanie 3, case 5)."],
-      client: ["certyfikat klienta", "Certyfikat dla bob.example z Extended Key Usage tylko clientAuth (zadanie 3, case 6)."],
-      wrong: ["zła nazwa", "Dobry certyfikat dla carol.example, a Alice chciała bob.example (zadanie 1, wrong_name)."],
-      unknown: ["nieznane CA", "Certyfikat dla bob.example od Mallory Root CA, którego nie ma w magazynie Alice (zadanie 1, unknown_ca)."],
-      self: ["samopodpisany", "Samopodpisany certyfikat dla bob.example (zadanie 1, self_signed)."],
-      revoked: ["unieważniony (Carol)", "Certyfikat Carol, numer 0x1002: jej klucz wyciekł i Trusty Issuing CA 1 wpisał go na swoją CRL (wykład 11, zadanie 4)."] },
+      expired: ["wygasły liść", "Stary certyfikat Boba, ważny do 1 października 2026."],
+      expint: ["wygasły pośredni", "Liść jest ważny, ale Trusty Issuing CA 0 skończył się 30 czerwca 2026."],
+      wild: ["*.bob.example", "Certyfikat z gwiazdką, a Alice wpisuje bob.example. Spróbuj www.bob.example i a.b.bob.example."],
+      notca: ["wystawca nie jest CA", "Mallory ma uczciwy certyfikat dla mallory.example (CA:FALSE) i jego kluczem podpisuje bob.example."],
+      fakeint: ["fałszywy pośredni", "Mallory robi własny „Trusty Issuing CA 1”: ta sama nazwa, jej klucz."],
+      client: ["certyfikat klienta", "Certyfikat dla bob.example z Extended Key Usage tylko clientAuth."],
+      wrong: ["zła nazwa", "Dobry certyfikat dla carol.example, a Alice chciała bob.example."],
+      unknown: ["nieznane CA", "Certyfikat dla bob.example od Mallory Root CA, którego nie ma w magazynie Alice."],
+      self: ["samopodpisany", "Samopodpisany certyfikat dla bob.example."],
+      revoked: ["unieważniony (Carol)", "Certyfikat Carol, numer 0x1002: jej klucz wyciekł i Trusty Issuing CA 1 wpisał go na swoją CRL."] },
     pick4: "Wybierz łańcuch", hostL: "Alice wpisuje", dateL: "Teraz", revL: "sprawdź unieważnienie (CRL wystawcy)", reset4: "Od początku",
     checksT: "Sprawdzenia", pathIs: "Ścieżka:", inStore: "(w magazynie zaufania)", selfEnd: "samopodpisany, nie ma go w magazynie", noIssuer: "brak wystawcy",
     sigBy: (c, p, a) => c + " podpisany przez " + p + " <span class=\"note\">(" + a + ", sprawdzone teraz w WebCrypto)</span>",
@@ -1204,6 +1373,7 @@ const T = {
               rev: ["Unieważnienie", "czy liść jest na CRL wystawcy? (krok 5)"] },
     allOK: "Wszystkie sprawdzenia przeszły: Alice ufa łańcuchowi i połączenie trwa dalej.", rejected: "Odrzucony.",
     firstNote: n => "Czerwony wiersz to pierwsze nieudane sprawdzenie (nr " + n + "); to je zgłaszają OpenSSL i Chrome. Każde sprawdzenie zatrzymuje inny atak.",
+    run4: "Uruchom sprawdzenia", say4: "Pokaż, co mówią OpenSSL i Chrome", predict4: "Najpierw przewidź: czy Alice przyjmie ten łańcuch, a jeśli nie, które sprawdzenie zawiedzie pierwsze? Potem naciśnij „Uruchom sprawdzenia”.",
     r5certL: "Certyfikat:", r5bob: "bob.example (dobry)", r5carol: "carol.example (klucz wyciekł)", r5polL: "Gdy nie ma odpowiedzi:", noMust: "bez Must-Staple",
     r5blockL: "Mallory blokuje CA",
     r5carolNote: "Mallory ma skradziony klucz Carol i jej certyfikat, więc może udawać carol.example. Przed 2028 zatrzyma ją tylko unieważnienie.",
@@ -1230,7 +1400,7 @@ const T = {
     mustNo: "Must-Staple: certyfikat obiecuje odpowiedź w handshake'u; bez niej Alice odrzuca.", softStaple: "Bez Must-Staple Alice nie zauważa braku odpowiedzi i przyjmuje.",
     blockNoMatter: "Blokada Mallory nic tu nie zmienia: Alice nie wysyła pytania, które dałoby się zablokować.",
     staplePriv: "Prywatność i szybkość: Alice rozmawia tylko z serwerem.",
-    oc1: s => "1. Alice pyta respondera: „czy numer 0x" + s + " jest unieważniony?”", oc2: b => "2. Responder odpowiada: " + b + " bajtów, z podpisem.",
+    oc1: s => "1. Alice pyta respondera: „czy numer 0x" + s + " jest unieważniony?”", oc2: b => "2. Responder odpowiada: około " + b + " bajtów, z podpisem (rozmiar zmienia się o kilka bajtów, bo podpis ECDSA ma od 70 do 72 bajtów).",
     ocspPriv: "Prywatność: responder CA dowiaduje się, że Alice odwiedza tę stronę. Szybkość: jedna podróż w sieci więcej.",
     stapleNoMust: "stapling", stapleMust: "stapling + Must-Staple", blocked: "Mallory blokuje", acc: "przyjmij", rej: "odrzuć",
     realCRL: "CRL wystawcy WE1 (jeden fragment)", size: "rozmiar", entry: "wpis", sigW: "podpis",
@@ -1248,9 +1418,9 @@ const T = {
     d1T: "Dwa udziały klucza", d1: "ClientHello niesie udział Alice i nazwę serwera (SNI) bob.example, więc serwer z wieloma stronami wybiera właściwy certyfikat. ServerHello niesie udział Boba. Obie strony liczą ten sam sekret, a reszta handshake'u jest szyfrowana kluczami z niego wyprowadzonymi. Kim jest Bob, pokażą dopiero dwa następne komunikaty.",
     realLines: "openssl s_client -connect www.coventry.ac.uk:443 (15 listopada 2026):<br>New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384<br>Server Temp Key: X25519, 253 bits<br>Peer signature type: ECDSA · Peer signing digest: SHA256",
     d2T: "Komunikat Certificate", d2: "Komunikat Certificate Boba niesie jego łańcuch, liść pierwszy:", entryN: i => "wpis " + (i + 1) + ":",
-    d2b: "Każdy wpis może też nieść odpowiedź OCSP (stapling, krok 5). Roota się nie wysyła: Alice musi go już mieć. www.coventry.ac.uk wysyła trzy certyfikaty: liść, WE1 i GTS Root R4 podpisany krzyżowo.",
+    d2b: "Każdy wpis może też nieść odpowiedź OCSP (stapling, krok 5; RFC 9846, sekcja 4.5.1.1). Roota się nie wysyła: Alice musi go już mieć. www.coventry.ac.uk wysyła trzy certyfikaty: liść, WE1 i GTS Root R4 podpisany krzyżowo.",
     go4: "Jak Alice sprawdza łańcuch", go5: "Stapling",
-    d3T: "Co dokładnie jest podpisywane", d3: "Podpisywana treść ma 130 bajtów (RFC 8446, 4.4.3): 64 spacje, tekst kontekstu, jeden bajt zero i skrót SHA-256 transkryptu. Bob podpisuje ją kluczem prywatnym swojego liścia (ECDSA P-256, wykład 11, zadanie 6); Alice sprawdza kluczem publicznym z tego certyfikatu.",
+    d3T: "Co dokładnie jest podpisywane", d3: "Podpisywana treść ma 130 bajtów (RFC 9846, sekcja 4.5.2; w starszym RFC 8446: 4.4.3): 64 spacje, tekst kontekstu, jeden bajt zero i skrót SHA-256 transkryptu. Bob podpisuje ją kluczem prywatnym swojego liścia (ECDSA P-256); Alice sprawdza kluczem publicznym z tego certyfikatu.",
     cvToday: "Bob podpisuje dzisiejszy handshake", cvMal: "Mallory z kopią certyfikatu", cvOld: "powtórzony stary podpis", cvNew: "nowy handshake",
     yesterday: "Boba, wczoraj",
     seg1: "64 × 0x20", seg2: "kontekst, 33 bajty", seg3: "separator", seg4: "skrót transkryptu, 32 bajty",
@@ -1260,23 +1430,80 @@ const T = {
              mallory: "Mallory skopiowała certyfikat Boba, ale podpisuje własnym kluczem. Klucz w certyfikacie jest Boba, więc podpis nie pasuje.",
              old: "Mallory powtarza podpis, który Bob zrobił wczoraj. Wczorajszy handshake miał inne losowe wartości, więc inny skrót transkryptu.",
              new: "Nowy handshake ma nowe losowe wartości, więc nowy skrót transkryptu. Klucz Boba podpisuje go teraz w Twojej przeglądarce (WebCrypto ECDSA P-256), a podpis się zgadza." },
-    cvAgain: "kolejny handshake",
+    cvAgain: "kolejny handshake", cvCheck: "Alice sprawdza podpis", cliCheck: "Serwer sprawdza klienta",
     d4T: "Finished", d4: "Finished to MAC (HMAC) nad całym transkryptem, kluczem wyprowadzonym z handshake'u. Pokazuje, że obie strony widziały te same komunikaty, więc Mallory żadnego nie zmieniła. Certyfikaty nie mają tu udziału.",
-    d5T: "Serwer sprawdza klienta", d5: "Serwer Boba wysyła CertificateRequest. Klient odpowiada swoim certyfikatem i CertificateVerify z kontekstem „TLS 1.3, client CertificateVerify”. Serwer ufa tylko swojemu CA, Bob Staff CA, a nie publicznym rootom, i zamienia certyfikat na tożsamość (CN = Alice).",
+    d5T: "Serwer sprawdza klienta", d5: "Serwer Boba wysyła CertificateRequest (RFC 9846, sekcja 4.4.2; w RFC 8446: 4.3.2). Klient odpowiada swoim certyfikatem i CertificateVerify z kontekstem „TLS 1.3, client CertificateVerify”. Serwer ufa tylko swojemu CA, Bob Staff CA, a nie publicznym rootom, i zamienia certyfikat na tożsamość (CN = Alice).",
     cliAlice: "Alice (od Bob Staff CA)", cliNone: "bez certyfikatu", cliMal: "własna „Alice” Mallory",
     cliNoCert: "Aplikacja Alice nie wysyła certyfikatu, a serwer go wymaga.",
     cliIss: n => "Wystawca " + n + ": czy to CA serwera, Bob Staff CA?", cliSig: "Klucz Bob Staff CA weryfikuje podpis certyfikatu (sprawdzone teraz).",
     cliEku: "Extended Key Usage zawiera clientAuth.", cliCV: "CertificateVerify klienta pasuje (klient ma klucz prywatny).",
     loggedIn: "hello, Alice: you are logged in",
-    pinApp: "Aplikacja Alice dla api.bob.example", pinCertMode: "przypnij certyfikat", pinKeyMode: "przypnij klucz (SPKI) + zapasowy",
+    pinApp: "Aplikacja Boba dla api.bob.example", pinCertMode: "przypnij certyfikat", pinKeyMode: "przypnij klucz (SPKI) + zapasowy",
     pinsCert: "Aplikacja przyjmuje tylko ten certyfikat:", pinsKey: "Aplikacja przyjmuje tylko te klucze:", backup: "klucz zapasowy, trzymany offline", current: "klucz w użyciu",
-    pinTabT: "Serwer odnawia certyfikat", pinCol: ["certyfikat", "pin certyfikatu (SHA-256 z DER)", "pin klucza (SHA-256 z SPKI)", "łańcuch", "aplikacja mówi"],
+    pinTabT: "Serwer odnawia certyfikat", pinPick: "Który certyfikat serwer wysyła teraz? Najpierw przewidź: czy aplikacja się połączy?", pinAll: "Pokaż wszystkie cztery obok siebie", pinOpen: "pin pasuje: aplikacja się łączy", pinShut: "żaden pin nie pasuje: aplikacja odmawia, choć łańcuch jest poprawny", pinHas: "ten certyfikat", pinCol: ["certyfikat", "pin certyfikatu (SHA-256 z DER)", "pin klucza (SHA-256 z SPKI)", "łańcuch", "aplikacja mówi"],
     pinRows: ["2026, zapisany w aplikacji", "2027, ten sam klucz", "2027, nowy klucz", "2027, klucz zapasowy"],
     chainOK2: "poprawny", pinMatch: "przyjmij", pinNo: "odrzuć: aplikacja przestaje działać",
     pinWhyCert: "Pin certyfikatu pęka przy każdym odnowieniu, nawet z tym samym kluczem: zmieniają się daty i numer seryjny, więc zmienia się skrót. Najpierw trzeba zaktualizować aplikację.",
     pinWhyKey: "Pin klucza przetrwa odnowienie z tym samym kluczem. Nowy klucz go psuje, chyba że aplikacja przypina też klucz zapasowy, trzymany offline właśnie na ten dzień.",
     pinHowT: "Jak liczy się pin", pinHow: "SHA-256 bajtów DER certyfikatu albo jego SubjectPublicKeyInfo, w Base64. Prawdziwe wartości łańcucha Coventry, liczone teraz:",
     hpkpT: "HPKP: pinning dla całej sieci i jego koniec", hpkp: "Nagłówek Public-Key-Pins (RFC 7469, 2015) pozwalał każdej stronie przypiąć klucze w przeglądarkach. Zgubiony klucz albo napastnik, który ustawił pin, zamykał odwiedzającym stronę na miesiące („HPKP suicide”), więc przeglądarki usunęły go w latach 2018 do 2020. Dziś złe certyfikaty wyłapuje Certificate Transparency (wykład 10). Przypinaj tylko, gdy masz w ręku i aplikację, i serwer.",
+    tlT: "Nagrana odpowiedź: okno Mallory", tlDay: "Dziś (listopad 2026)",
+    tlNote: "7 listopada Mallory zapisała podpisaną odpowiedź OCSP dla certyfikatu Carol: „good”, następna 14 listopada. 10 listopada klucz Carol wyciekł i CA unieważniło certyfikat. Przesuwaj dzień i patrz, ile warta jest stara odpowiedź.",
+    tlWin: "unieważniony, ale stara odpowiedź jest jeszcze świeża", tlAns: "odpowiedź zapisana przez Mallory (7 → 14 XI)", tlNowGood: "responder mówi: good", tlNowRev: "responder mówi: revoked",
+    tlBefore: "Przed 10 listopada odpowiedź „good” jest prawdziwa: nie ma jeszcze czego atakować.",
+    tlDanger: "Mallory dołącza zapisaną odpowiedź. Jest podpisana przez CA, mówi „good”, a jej następna aktualizacja jeszcze nie minęła, więc Alice przyjmuje unieważniony certyfikat.",
+    tlAfter: "Zapisana odpowiedź jest za stara (następna aktualizacja, 14 listopada, minęła), więc Alice jej nie używa. Mallory może tylko nie wysłać odpowiedzi: soft-fail przyjmuje, hard-fail i Must-Staple odrzucają.",
+    tlLesson: "Alice sprawdza podpis, numer seryjny i to, czy „teraz” jest przed następną aktualizacją. W tym oknie nie odróżni świeżej odpowiedzi od starej, więc okno jest tak długie, jak długo CA pozwala żyć odpowiedzi (7 dni dla github.com niżej).",
+    ctMode: ["Log rośnie", "Dowód przynależności", "Dowód spójności"],
+    ctModeSub: ["Każdy nowy certyfikat staje się liściem z prawej. Dodawaj wpisy i patrz, które skróty się zmieniają.",
+                "Alice ma certyfikat i korzeń podpisany przez log. Czy certyfikat jest w logu? Wybierz wpis: log wysyła tylko turkusowe skróty.",
+                "Monitor zapisał podpisany korzeń, gdy log miał mniej wpisów. Czy od tamtej pory log tylko dopisywał? Wybierz stary rozmiar."],
+    ctAdd: "Dodaj wpis", ctReset: "Wróć do 8 wpisów", ctPickK: "Wpis:", ctAlter: k => "Mallory zmienia wpis " + k, ctPickM: "Stary rozmiar:", ctTamper: "log Mallory usunął wpis 2",
+    ctLgNew: "zmienione przez ostatni wpis", ctLgProof: "skróty, które wysyła log (dowód)", ctLgPath: "skróty, które liczy Alice", ctLgOld: "stare drzewo, które zna monitor",
+    ctRoot: n => "korzeń, wpisów: " + n,
+    ctSthT: "Signed Tree Head (podpisany korzeń)", ctSigned: "+ czas, podpisane kluczem prywatnym logu",
+    ctGrow: n => "Pomarańczowe: to, co zmienił wpis " + (n - 1) + ", czyli nowy liść i węzły nad nim. Każdy inny węzeł zostaje, więc każde starsze drzewo nadal jest częścią nowego; z tego korzysta zakładka 3. Liść = SHA-256(0x00 ‖ wpis), węzeł = SHA-256(0x01 ‖ lewy ‖ prawy), jak w RFC 6962; skróty liczy teraz Twoja przeglądarka.",
+    ctInclT: (k, n) => "Czy wpis " + k + " jest w drzewie " + n + " wpisów?", ctInclSub: (p, n) => "Dowód ma " + p + " " + (p === 1 ? "skrót" : p % 10 >= 2 && p % 10 <= 4 && (p % 100 < 10 || p % 100 >= 20) ? "skróty" : "skrótów") + " na " + n + " wpisów (około log₂ n): Alice nigdy nie pobiera logu.",
+    ctLeaf: "liść", ctUp: i => "w górę " + i, ctSigned2: "korzeń podpisany przez log",
+    ctInclOK: "Policzony korzeń jest równy podpisanemu: wpis jest w logu.", ctInclBad: "Policzony korzeń jest inny: ten wpis nie jest tym, co log podpisał.",
+    ctConsT: (m, n) => "Czy stare drzewo " + m + " wpisów to początek dzisiejszego drzewa " + n + " wpisów?",
+    ctConsSub: (p, pw) => "Log wysyła " + p + " " + (p === 1 ? "turkusowy skrót" : p % 10 >= 2 && p % 10 <= 4 && (p % 100 < 10 || p % 100 >= 20) ? "turkusowe skróty" : "turkusowych skrótów") + ". Tylko z nich Alice liczy i stary korzeń, i nowy." + (pw ? " Stare drzewo ma potęgę 2 wpisów, więc jest jednym węzłem nowego drzewa i Alice zaczyna od samego starego korzenia." : ""),
+    ctFromProof: "policzony z dowodu", ctKnown: "znany", ctOldRoot: m => "stary korzeń (" + m + ")", ctNewRoot: n => "nowy korzeń (" + n + ")", ctSaved: "zapisany wcześniej", ctSigned3: "podpisany dziś",
+    ctConsOK: "Oba korzenie pasują: log tylko dopisywał wpisy.", ctConsBad: "Stary korzeń nie pasuje: log zmienił albo usunął coś, co monitor już widział.",
+    ctTamperWhy: "Log Mallory wyrzucił wpis 2 (blog.eve.example) i dopisał www.mallory.example, więc rozmiar się zgadza. Ale stary korzeń jest podpisany i monitor go zachował: żaden dowód z nowego drzewa go nie odtworzy.",
+    ctTamperSmall: "Stare drzewo kończy się przed wpisem 2, więc usunięcie wpisu 2 go nie dotknęło. Monitor, który zapisał korzeń z wpisem 2, złapałby log.",
+    amAcc: "newAccount: klucz publiczny konta", amOrder: h => "newOrder: " + h, amChal: "wyzwanie http-01: token", amFile: "połóż plik na serwerze WWW", amReady: "gotowe, sprawdź",
+    amKa: "plik: key authorization", amCSR: "finalize: CSR", amCert: "certyfikat", amClient: "klient ACME (serwer Boba)", amMalClient: "klient ACME Mallory", amWeb: h => "serwer WWW " + h, amCA: "serwer ACME (CA)",
+    amTitle: ["Klucz konta", "Zamów nazwę, dostań token", "Połóż odpowiedź tam, gdzie CA ją zobaczy", "CA sprawdza", "CSR, potem certyfikat"],
+    amText: ["Klient ACME Boba tworzy parę kluczy konta i rejestruje w CA klucz publiczny. Każde następne żądanie jest podpisane tym kluczem, więc CA wie, które konto pyta.",
+             "Klient prosi o certyfikat dla www.bob.example. CA odpowiada wyzwaniem http-01: losowym tokenem, nowym przy każdym zamówieniu.",
+             "Klient zapisuje jeden plik na serwerze WWW www.bob.example: jego nazwa to token, a treść to key authorization, czyli token i odcisk klucza konta.",
+             "Klient mówi „gotowe”. CA pobiera plik zwykłym HTTP (port 80) i porównuje z tym, czego oczekuje dla konta, które pyta. Plik może tam położyć tylko ktoś, kto kontroluje serwer WWW.",
+             "Klient wysyła CSR: nazwę i klucz publiczny strony, podpisane kluczem prywatnym strony. CA go sprawdza i wydaje certyfikat."],
+    adAccT: "Klucz konta i jego odcisk", adAcc: "Para kluczy zrobiona teraz w Twojej przeglądarce (ECDSA P-256). To nie jest klucz strony; ten pojawi się w części 5. Klucz publiczny jako JWK:",
+    adJwk: "klucz publiczny konta (JWK)", adThumb: "jego odcisk: SHA-256 tego tekstu w base64url (RFC 7638)",
+    adAccNote: "W prawdziwym ACME każde żądanie to JWS podpisany kluczem konta i wysłany przez HTTPS (RFC 8555).", adNewKeys: "nowe klucze",
+    adTokT: "Token", adTok: "CA losuje 32 bajty i zapisuje je w base64url: 43 znaki.", adTokNote: "Nowy token przy każdym zamówieniu, więc starej odpowiedzi nie da się użyć ponownie.", adNewTok: "nowe zamówienie",
+    adFileT: "Plik na serwerze WWW", adFile: "Klient zapisuje key authorization pod stałym adresem na tej nazwie:", adContent: "treść pliku: token + \".\" + odcisk",
+    adFileNote: "Sam token nie wystarczy: odcisk wiąże odpowiedź z kontem Boba.",
+    adChkT: "Co CA pobiera i czego oczekuje", adWho: { bob: "Bob", token: "Mallory używa tokenu Boba", noaccess: "Mallory bez dostępu do serwera" },
+    adWhoText: { bob: "Pyta konto Boba; plik Boba jest na serwerze.",
+                 token: "Mallory widziała token Boba (adres jest publiczny) i odpowiada na wyzwanie ze swojego konta, licząc, że plik Boba wystarczy.",
+                 noaccess: "Mallory zamawia www.bob.example na swoim koncie i dostaje własny token, ale nie może zapisać pliku na serwerze Boba." },
+    adFetched: u => "CA pobiera " + u + ":", adExpect: w => "CA oczekuje: token + \".\" + odcisk klucza konta " + (w === "Bob" ? "Boba" : "Mallory"), adRun4: "CA porównuje",
+    adValid: "teksty są równe: konto kontroluje nazwę.",
+    adInvalid: { token: "odcisk jest Boba, nie Mallory: plik Boba nic nie dowodzi dla jej konta.", noaccess: "pliku nie ma: Mallory nie kontroluje serwera." },
+    adCsrT: "CSR: dowód, że klient ma klucz prywatny", adCsr: "Żądanie PKCS #10 zrobione teraz w Twojej przeglądarce: nazwa, klucz publiczny strony i podpis nad nimi kluczem prywatnym strony.",
+    adCsrOpt: { bob: "CSR Boba", changed: "jedna litera zmieniona po podpisaniu", mal: "CSR Mallory na www.bob.example" },
+    adCsrName: n => "podmiot: CN=" + n, adCsrKey: w => "klucz publiczny strony (SPKI): " + (w === "Bob" ? "Boba" : "Mallory"), adCsrSig: "ecdsa-with-SHA256, podpis", adCsrLen: n => n + " bajtów DER (w uproszczeniu: prawdziwy CSR prosi też o SAN w rozszerzeniu).",
+    adRun5: "CA sprawdza CSR",
+    adCsrSigOK: "Klucz z CSR weryfikuje jego podpis: nadawca ma klucz prywatny.", adCsrSigBad: "Podpis się nie zgadza: te bajty nie są tym, co podpisał właściciel klucza.",
+    adCsrAuthz: { bob: "Konto Boba ma ważną autoryzację dla www.bob.example (część 4).", changed: "Nie sprawdzane: CSR jest już odrzucony.", mal: "Konto Mallory nie ma ważnej autoryzacji dla www.bob.example (część 4)." },
+    adIssued: "CA wydaje certyfikat i wpisuje go do logów CT (krok 8).", adRefused: "CA odmawia.",
+    adCsrWhy: { bob: "Certyfikat ma nazwę z zamówienia i klucz z CSR.",
+                changed: "CA podpisuje tylko to, co podpisał właściciel klucza: www.cob.example nigdy nie był podpisany kluczem Boba.",
+                mal: "Podpis Mallory jest dobry: CSR dowodzi tylko, że ma własny klucz, nigdy że nazwa jest jej. Nazwy dowodzi wyzwanie, a to się nie udało." },
+    adGoCT: "Certyfikat trafia do logów", adGoCert: "Co jest w certyfikacie",
   },
 };
 
@@ -1285,7 +1512,7 @@ let lang = "en";
 /* one language setting for all the simulators on the site */
 try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
 const L = () => T[lang];
-const NSTEPS = 7;
+const NSTEPS = 9;
 // "now" for every check: 15 November 2026, the day the lecture files were saved (all the shipped certificates are valid then)
 const NOW0 = Date.UTC(2026, 10, 15, 12, 0, 0);
 
@@ -1320,12 +1547,14 @@ const ISSUER2 = { bob6: () => TRUSTY6_SPKI, bob: () => CERT.int1.spki, covLeaf: 
 const app = {
   level: 0, story: 1,
   tryCard: null, trySig: "ca",
-  c2: 0, f2: "subject", view2: "hex", flipByte: 100, flipBit: 0,
-  s3: 0, cur3: 999, aia3: false,
-  s4: 0, host4: null, date4: "2026-11-15", rev4: true,
-  r5cert: "carol", r5block: false, r5hard: false, r5crl: "crl", r5stapled: false,
-  hs: 1, cv: "today", cvHash: null, cvSig: null, cli: "alice",
-  pin: "key",
+  c2: 0, f2: "subject", view2: "hex", flipByte: 100, flipBit: 0, all2: false, fp2: false, flip2: false,
+  s3: 0, cur3: 0, aia3: false,
+  s4: 0, host4: null, date4: "2026-11-15", rev4: true, run4: false, say4: false,
+  r5cert: "carol", r5block: false, r5hard: false, r5crl: "crl", r5stapled: false, tl5: 12,
+  hs: 1, cv: "today", cvHash: null, cvSig: null, cli: "alice", cvRun: false, cliRun: false,
+  pin: "key", pin7: -1, pinAll: false,
+  ct: { mode: 1, n: 8, k: 3, m: 6, alter: false, tamper: false },
+  acme: { k: 1, who: "bob", csr: "bob", run4: false, run5: false, keys: null, token: null, malToken: null },
 };
 
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -1478,7 +1707,7 @@ function render1() {
   const t = L(), c = CERT[CERTS2[app.c2]], F = fieldsOf(c);
   if (!F.find(f => f.id === app.f2)) app.f2 = "subject";
   const row = f => '<button class="trow' + (f.id === app.f2 ? " sel" : "") + '" data-action="field" data-f="' + f.id + '"' + (f.ext ? ' style="padding-left:22px"' : "") + '><span class="tl">' + esc(f.label) +
-    (f.crit ? '<span class="crit">critical</span>' : "") + '</span><span class="tv">' + esc(f.short) + "</span></button>";
+    (f.crit ? '<span class="crit">critical</span>' : "") + "</span>" + (f.id === app.f2 || app.all2 ? '<span class="tv">' + esc(f.short) + "</span>" : "") + "</button>";
   const tabs = CERTS2.map((k, i) => '<button data-action="cert2" data-i="' + i + '" aria-pressed="' + (i === app.c2) + '">' + t.certs2[i] + "</button>").join("");
   let tree = '<div class="part r-neu"><div class="ph"><span>Certificate</span></div>' + row(F[0]);
   tree += '<div class="part"><div class="ph"><span>1 · tbsCertificate</span><span>' + t.tbsSub + "</span></div>" + F.filter(f => !["cert", "sa", "sv"].includes(f.id)).map(row).join("") + "</div>";
@@ -1491,14 +1720,15 @@ function render1() {
     "<tr><td>DER</td><td class=\"mono\">" + t.fx.der(hexU(new Uint8Array([nd.u[nd.hs]])), nd.cs - nd.hs, nd.ce - nd.cs, nd.hs, nd.ce - 1) + "</td></tr></table>" +
     (t.fmore[f.kind] ? '<div class="why">' + t.fmore[f.kind] + "</div>" : "") + "</div>";
   let h = '<div class="card"><div class="cardhead"><h3>' + t.pick2 + '</h3><span class="tabs">' + tabs + "</span></div>" +
-    '<p class="note" style="margin:-4px 0 10px">' + t.certs2sub[app.c2] + "</p>" +
+    '<p class="note" style="margin:-4px 0 6px">' + t.certs2sub[app.c2] + "</p>" + '<div class="btns" style="margin:0 0 8px"><button data-action="all2">' + (app.all2 ? t.oneVal : t.allVals) + "</button></div>" +
     '<div class="cv"><div class="tree">' + tree + '</div><div class="card" style="margin:0;border-color:var(--chg)">' + det + "</div></div></div>";
   h += '<div class="card"><div class="cardhead"><h3>' + t.bytesT(c.der.length) + '</h3><span class="tabs"><button data-action="view2" data-v="hex" aria-pressed="' + (app.view2 === "hex") + '">DER (hex)</button><button data-action="view2" data-v="pem" aria-pressed="' + (app.view2 === "pem") + '">PEM (Base64)</button></span></div>' +
     '<p class="note" style="margin:-4px 0 8px">' + (app.view2 === "hex" ? t.hexNote : t.pemNote(b64e(c.der).length)) + "</p>" + '<div class="hexd" id="hexd">' + bytesView(c, nd) + "</div></div>";
   h += '<div class="card"><h3>' + t.fpT + '</h3><p class="note" style="margin:0 0 8px">' + t.fpNote + "</p>" +
-    '<div class="fprow"><b>SHA-256</b> <span id="fp0">…</span></div>' +
-    '<div class="btns"><span class="inlin">' + t.flipByte + ' <input type="number" min="0" max="' + (c.der.length - 1) + '" data-field="fbyte" value="' + app.flipByte + '"></span><span class="inlin">' + t.flipBit + ' <input type="number" min="0" max="7" data-field="fbit" value="' + app.flipBit + '"></span></div>' +
-    '<div id="fp1" style="margin-top:8px"></div></div>';
+    (app.fp2 ? '<div class="fprow"><b>SHA-256</b> <span id="fp0">…</span></div>' : '<div class="btns" style="margin-top:0"><button class="dark" data-action="fp2">' + t.fpShow + "</button></div>") +
+    '<div class="btns"><span class="inlin">' + t.flipByte + ' <input type="number" min="0" max="' + (c.der.length - 1) + '" data-field="fbyte" value="' + app.flipByte + '"></span><span class="inlin">' + t.flipBit + ' <input type="number" min="0" max="7" data-field="fbit" value="' + app.flipBit + '"></span>' +
+    '<button class="dark" data-action="flip2">' + t.flipGo + "</button></div>" +
+    (app.flip2 ? '<div id="fp1" style="margin-top:8px"></div>' : "") + "</div>";
   return h;
 }
 function bytesView(c, nd) {
@@ -1531,7 +1761,8 @@ function deepest(nd, i) {
 }
 function update1() {
   const t = L(), c = CERT[CERTS2[app.c2]];
-  later("fp0", sha256(c.der).then(h => fpStr(h)));
+  if (app.fp2) later("fp0", sha256(c.der).then(h => fpStr(h)));
+  if (!app.flip2) return;
   const fb = Math.max(0, Math.min(c.der.length - 1, app.flipByte | 0)), bit = Math.max(0, Math.min(7, app.flipBit | 0));
   const u = c.der.slice(); u[fb] ^= 1 << bit;
   const F = fieldsOf(c);
@@ -1644,33 +1875,36 @@ function render3() {
     "<label>" + t.dateL + '<input type="date" data-field="date" value="' + esc(app.date4) + '"></label>' +
     '<label style="flex-direction:row;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" data-field="rev" style="width:auto"' + (app.rev4 ? " checked" : "") + ">" + t.revL + "</label>" +
     '<button data-action="reset4">' + t.reset4 + "</button></div>" +
+    '<div class="btns" style="margin:0 0 8px"><button class="dark" data-action="run4">' + t.run4 + "</button>" + (app.run4 && !app.say4 ? '<button data-action="say4">' + t.say4 + "</button>" : "") + "</div>" +
     '<div class="note" id="s4chain"></div></div>' +
     '<div class="card"><h3>' + t.checksT + '</h3><table class="ctab" id="s4tab"></table><div id="s4verdict"></div></div>';
 }
 function update3() {
   const t = L(), s = SCN4[app.s4], now = now4(), host = app.host4.trim();
-  const g = renderGen;
+  const g = renderGen, run = app.run4;
+  const M = v => run ? mk(v) : mk(null);          // no result before Alice runs the checks
   validate(s, host, now, app.rev4).then(R => {
     if (g !== renderGen) return;
     const P = R.P;
-    document.getElementById("s4chain").innerHTML = t.pathIs + " " + P.path.map(c => '<span class="pill ' + roleOf(c) + '">' + esc(c.cn) + "</span>").join(" → ") +
+    document.getElementById("s4chain").innerHTML = !run ? t.predict4 : t.pathIs + " " + P.path.map(c => '<span class="pill ' + roleOf(c) + '">' + esc(c.cn) + "</span>").join(" → ") +
       (P.anchor ? " " + t.inStore : ' <span class="badline">' + (P.missing === "self" ? t.selfEnd : t.noIssuer) + "</span>");
     const rows = R.checks.map((c, i) => {
       let d = "";
-      if (c.id === "sig") d = R.links.map(l => mk(l.sig) + " " + t.sigBy(esc(l.ch.cn), esc(l.pa.cn), oidName(l.ch.sigAlg))).join("<br>") + (P.missing ? (R.links.length ? "<br>" : "") + mk(false) + " " + t.sigMissing(esc(cnOf(P.path[P.path.length - 1].issuer))) : "");
-      else if (c.id === "date") d = P.path.map(x => mk(now >= x.nb && now <= x.na) + " " + esc(x.cn) + ': <span class="mono">' + fmtDay(x.nb) + " → " + fmtDay(x.na) + "</span>").join("<br>");
-      else if (c.id === "name") d = !c.san ? t.noSan : t.sanIs + '<div class="sanl">' + c.san.map((n, j) => '<span class="' + (c.hits[j] ? "yes" : "no") + '">' + esc(n) + "</span>").join("") + "</div>" +
-        '<div style="margin-top:4px">' + (c.ok ? t.nameOK(esc(host), c.hits.includes("wild")) : t.nameBad(esc(host), c.san.some(n => n.startsWith("*.")))) + "</div>";
-      else if (c.id === "ca") d = R.links.length ? R.links.map(l => mk(l.ca && l.path) + " " + esc(l.pa.cn) + ': <span class="mono">' + (l.pa.bc ? "CA:" + (l.pa.bc.ca ? "TRUE" : "FALSE") + (l.pa.bc.pathLen !== null ? ", pathlen:" + l.pa.bc.pathLen : "") : t.noBC) + "</span>").join("<br>") : t.noLinks;
-      else if (c.id === "eku") d = mk(c.kuOK) + " Key Usage: <span class=\"mono\">" + (R.leaf.ku ? R.leaf.ku.join(", ") : "–") + "</span><br>" + mk(c.ekuOK) + " Extended Key Usage: <span class=\"mono\">" + (R.leaf.eku ? R.leaf.eku.map(oidName).join(", ") : "–") + "</span>" + (c.ekuOK ? "" : "<br>" + t.ekuBad);
-      else if (c.id === "anchor") d = P.anchor ? t.ancOK(esc(P.anchor.cn)) : P.missing === "self" ? t.ancSelf(esc(P.path[P.path.length - 1].cn)) : t.ancMissing(esc(cnOf(P.path[P.path.length - 1].issuer)));
-      else if (c.id === "rev") d = !app.rev4 ? t.revOff : !c.crl ? t.revNone : t.revCRL(esc(cnOf(c.crl.issuer)), c.crl.entries.length, c.crl.der.length, fmtDay(c.crl.nextUpdate)) + "<br>" +
-        (c.entry ? '<span class="badline">' + t.revHit(c.entry.serial, fmtTime(c.entry.date), c.entry.reason || "–") + "</span>" : t.revMiss(R.leaf.serial));
-      return '<tr class="' + (i === R.first ? "first" : "") + '"><td class="n">' + (i + 1) + '</td><td class="m">' + mk(c.ok) + '</td><td class="t">' + t.checkN[c.id][0] + '<div class="note" style="font-weight:400">' + t.checkN[c.id][1] + '</div></td><td class="det">' + d + "</td></tr>";
+      if (c.id === "sig") d = R.links.map(l => M(l.sig) + " " + t.sigBy(esc(l.ch.cn), esc(l.pa.cn), oidName(l.ch.sigAlg))).join("<br>") + (P.missing && run ? (R.links.length ? "<br>" : "") + mk(false) + " " + t.sigMissing(esc(cnOf(P.path[P.path.length - 1].issuer))) : "");
+      else if (c.id === "date") d = P.path.map(x => M(now >= x.nb && now <= x.na) + " " + esc(x.cn) + ': <span class="mono">' + fmtDay(x.nb) + " → " + fmtDay(x.na) + "</span>").join("<br>");
+      else if (c.id === "name") d = !c.san ? t.noSan : t.sanIs + '<div class="sanl">' + c.san.map((n, j) => '<span class="' + (run && c.hits[j] ? "yes" : "no") + '">' + esc(n) + "</span>").join("") + "</div>" +
+        (run ? '<div style="margin-top:4px">' + (c.ok ? t.nameOK(esc(host), c.hits.includes("wild")) : t.nameBad(esc(host), c.san.some(n => n.startsWith("*.")))) + "</div>" : "");
+      else if (c.id === "ca") d = R.links.length ? R.links.map(l => M(l.ca && l.path) + " " + esc(l.pa.cn) + ': <span class="mono">' + (l.pa.bc ? "CA:" + (l.pa.bc.ca ? "TRUE" : "FALSE") + (l.pa.bc.pathLen !== null ? ", pathlen:" + l.pa.bc.pathLen : "") : t.noBC) + "</span>").join("<br>") : t.noLinks;
+      else if (c.id === "eku") d = M(c.kuOK) + " Key Usage: <span class=\"mono\">" + (R.leaf.ku ? R.leaf.ku.join(", ") : "–") + "</span><br>" + M(c.ekuOK) + " Extended Key Usage: <span class=\"mono\">" + (R.leaf.eku ? R.leaf.eku.map(oidName).join(", ") : "–") + "</span>" + (c.ekuOK || !run ? "" : "<br>" + t.ekuBad);
+      else if (c.id === "anchor") d = !run ? "" : P.anchor ? t.ancOK(esc(P.anchor.cn)) : P.missing === "self" ? t.ancSelf(esc(P.path[P.path.length - 1].cn)) : t.ancMissing(esc(cnOf(P.path[P.path.length - 1].issuer)));
+      else if (c.id === "rev") d = !app.rev4 ? t.revOff : !c.crl ? t.revNone : t.revCRL(esc(cnOf(c.crl.issuer)), c.crl.entries.length, c.crl.der.length, fmtDay(c.crl.nextUpdate)) +
+        (run ? "<br>" + (c.entry ? '<span class="badline">' + t.revHit(c.entry.serial, fmtTime(c.entry.date), c.entry.reason || "–") + "</span>" : t.revMiss(R.leaf.serial)) : "");
+      return '<tr class="' + (run && i === R.first ? "first" : "") + '"><td class="n">' + (i + 1) + '</td><td class="m">' + M(c.ok) + '</td><td class="t">' + t.checkN[c.id][0] + '<div class="note" style="font-weight:400">' + t.checkN[c.id][1] + '</div></td><td class="det">' + d + "</td></tr>";
     }).join("");
     document.getElementById("s4tab").innerHTML = rows;
-    document.getElementById("s4verdict").innerHTML = !R.err ? '<div class="verdict ok">' + mk(true) + t.allOK + "</div>"
-      : '<div class="verdict bad">' + mk(false) + t.rejected + ' <span class="mono">OpenSSL ' + R.err[1] + " (" + R.err[0] + "): " + R.err[2] + '</span> <span class="mono">Chrome: ' + R.err[3] + "</span></div>" +
+    const say = app.say4 && R.err ? ' <span class="mono">OpenSSL ' + R.err[1] + " (" + R.err[0] + "): " + R.err[2] + '</span> <span class="mono">Chrome: ' + R.err[3] + "</span>" : "";
+    document.getElementById("s4verdict").innerHTML = !run ? "" : !R.err ? '<div class="verdict ok">' + mk(true) + t.allOK + "</div>"
+      : '<div class="verdict bad">' + mk(false) + t.rejected + say + "</div>" +
         (R.first >= 0 ? '<p class="note" style="margin:8px 0 0">' + t.firstNote(R.first + 1) + "</p>" : "");
     updateMore();
   });
@@ -1716,7 +1950,35 @@ function render4() {
     '<div class="card" style="margin:0"><div class="cardhead"><h3>' + t.ocspT + '</h3><span class="tabs"><button data-action="r5st" data-v="0" aria-pressed="' + !app.r5stapled + '">' + t.ocspDirect +
       '</button><button data-action="r5st" data-v="1" aria-pressed="' + app.r5stapled + '">' + t.ocspStapled + '</button></span></div><div id="r5ocsp">…</div></div></div>' +
     '<div class="gap"></div><div class="card"><h3>' + t.r5tabT + '</h3><div class="schwrap"><table class="res" id="r5tab"></table></div><p class="note" style="margin:8px 0 0">' + t.r5tabNote + "</p></div>" +
+    '<div class="card"><h3>' + t.tlT + '</h3><p class="note" style="margin:0 0 6px">' + t.tlNote + '</p><div class="inputs" style="margin:0"><label>' + t.tlDay +
+      ' <input type="range" min="3" max="20" step="1" data-field="tl5" value="' + app.tl5 + '" style="width:340px"></label></div><div id="r5tl">' + tl5HTML() + "</div></div>" +
     '<div class="card"><h3>' + t.realT + '</h3><div class="two"><div id="r5we1"></div><div id="r5gh"></div></div></div>';
+}
+// a "good" OCSP answer for Carol that Mallory recorded on 7 November, valid until 14 November; the CA revoked Carol on 10 November
+const TL = { from: 3, to: 20, made: 7, next: 14, rev: 10 };
+function tl5HTML() {
+  const t = L(), d = app.tl5, X = day => 40 + (day - TL.from) * 46, W = X(TL.to) + 40;
+  let g = "";
+  for (let i = TL.from; i <= TL.to; i++) g += '<line x1="' + X(i) + '" y1="128" x2="' + X(i) + '" y2="134" stroke="var(--muted)"/><text x="' + X(i) + '" y="150" text-anchor="middle" font-size="12" fill="var(--muted)">' + i + "</text>";
+  g += '<line x1="' + X(TL.from) + '" y1="128" x2="' + X(TL.to) + '" y2="128" stroke="var(--muted)" stroke-width="2"/>';
+  const T = (x, y, txt, more) => '<text x="' + x + '" y="' + y + '" stroke="var(--surface)" stroke-width="4" paint-order="stroke" ' + (more || 'font-size="12.5"') + ' fill="var(--ink)">' + txt + "</text>";
+  // Mallory's window: revoked, but the recorded answer is still fresh
+  g += '<rect x="' + X(TL.rev) + '" y="8" width="' + (X(TL.next) - X(TL.rev)) + '" height="112" fill="var(--bad-bg)"/>';
+  // the recorded answer, and what the responder says now
+  g += '<rect x="' + X(TL.made) + '" y="40" width="' + (X(TL.next) - X(TL.made)) + '" height="30" rx="6" fill="var(--ok-bg)" fill-opacity=".85" stroke="var(--ok)" stroke-width="1.5"/>';
+  g += '<rect x="' + X(TL.from) + '" y="80" width="' + (X(TL.rev) - X(TL.from)) + '" height="26" rx="6" fill="var(--sunken)" fill-opacity=".85" stroke="var(--rule)"/>';
+  g += '<rect x="' + X(TL.rev) + '" y="80" width="' + (X(TL.to) - X(TL.rev)) + '" height="26" rx="6" fill="var(--bad-bg)" fill-opacity=".85" stroke="var(--bad)"/>';
+  g += '<line x1="' + X(TL.rev) + '" y1="8" x2="' + X(TL.rev) + '" y2="128" stroke="var(--bad)" stroke-width="2.5"/>';
+  g += '<line x1="' + X(d) + '" y1="4" x2="' + X(d) + '" y2="134" stroke="var(--chg)" stroke-width="3"/><circle cx="' + X(d) + '" cy="128" r="6" fill="var(--chg)"/>';
+  g += T((X(TL.rev) + X(TL.next)) / 2, 24, t.tlWin, 'text-anchor="middle" font-size="12.5" font-weight="700"');
+  g += T(X(TL.made) + 8, 60, "<tspan font-weight=\"700\">good</tspan> · " + t.tlAns);
+  g += T(X(TL.from) + 8, 98, t.tlNowGood, 'font-size="12"') + T(X(TL.rev) + 8, 98, t.tlNowRev, 'font-size="12"');
+  const svg = '<div class="schwrap"><svg viewBox="0 0 ' + W + ' 158" width="' + W + '" height="158" role="img" aria-label="' + esc(t.tlT) + '">' + g + "</svg></div>";
+  let v;
+  if (d < TL.rev) v = '<div class="verdict ok">' + mk(true) + "<span style=\"flex:1;min-width:0\">" + t.tlBefore + "</span></div>";
+  else if (d <= TL.next) v = '<div class="verdict bad">' + mk(false) + "<span style=\"flex:1;min-width:0\">" + t.tlDanger + "</span></div>";
+  else v = '<div class="verdict ok">' + mk(true) + "<span style=\"flex:1;min-width:0\">" + t.tlAfter + "</span></div>";
+  return svg + v + '<p class="note" style="margin:8px 0 0">' + t.tlLesson + "</p>";
 }
 function update4() {
   const t = L(), g = renderGen, c = CERT[R5CERT[app.r5cert]];
@@ -1751,7 +2013,7 @@ function update4() {
     } else {
       o = '<div class="wire"><span class="pill r-alice">Alice</span><span class="ln' + (app.r5block ? " cut" : "") + '"></span>' + (app.r5block ? '<span class="pill r-mal">' + EYE + "Mallory</span><span class=\"ln cut\"></span>" : "") + '<span class="pill r-ca">' + t.responder + "</span></div>";
       o += step(true, t.oc1(c.serial));
-      o += step(O.got, O.got ? t.oc2(O.resp.der.length) : t.noAnswer);
+      o += step(O.got, O.got ? t.oc2(Math.round(O.resp.der.length / 10) * 10) : t.noAnswer);
       if (O.got) { o += step(O.sigOK, t.oc3(O.sigOK)); o += step(O.resp.cert === "good", t.oc4(O.resp.cert, fmtTime(O.resp.thisUpdate), fmtTime(O.resp.nextUpdate))); }
       else o += '<div class="why">' + (app.r5hard ? t.hardNo : t.softNo) + "</div>";
       o += verdict(O.ok) + '<p class="note" style="margin:6px 0 0">' + t.ocspPriv + "</p>";
@@ -1853,12 +2115,15 @@ function update5() {
       return '<div class="cvbytes">' + seg("r-neu", t.seg1, "20 20 20 … 20") + seg("r-neu", t.seg2, "TLS 1.3, server CertificateVerify") + seg("r-neu", t.seg3, "00") +
         seg("r-neu", t.seg4, hex(hash)) + "</div><div class=\"note\">" + t.cvTotal(ct.length) + "</div>" +
         '<div style="margin-top:8px"><b>' + t.cvSigBy(who) + '</b><div class="sigbox">' + hex(sig) + "</div></div>" +
+        (!app.cvRun ? '<div class="btns"><button class="dark" data-action="cvrun">' + t.cvCheck + "</button></div>" :
         '<div class="verdict ' + (ok ? "ok" : "bad") + '">' + mk(ok) + (ok ? t.cvOK : t.cvBad) + ' <span class="mono">verify(' + t.bobKeyFromCert + ", content, signature)</span></div>" +
-        '<div class="why">' + t.cvWhy[app.cv] + "</div>" + (app.cv === "new" ? '<div class="btns"><button data-action="cvnew">' + t.cvAgain + "</button></div>" : "");
+        '<div class="why">' + t.cvWhy[app.cv] + "</div>") + (app.cv === "new" ? '<div class="btns"><button data-action="cvnew">' + t.cvAgain + "</button></div>" : "");
     })().then(h => { if (g !== renderGen) return; const el = document.getElementById("cvbox"); if (el) { el.innerHTML = h; updateMore(); } });
   }
   if (app.hs === 5) {
     (async () => {
+      const runBtn = '<div class="btns"><button class="dark" data-action="clirun">' + t.cliCheck + "</button></div>";
+      if (!app.cliRun) return (app.cli === "none" ? "" : ccardHTML(app.cli === "alice" ? CERT.alice : CERT.malAlice, {}, 0)) + runBtn;
       if (app.cli === "none") return '<div class="rstep">' + mk(false) + "<div>" + t.cliNoCert + '</div></div><div class="verdict bad">' + mk(false) + '<span class="mono">TLSV13_ALERT_CERTIFICATE_REQUIRED</span></div>';
       const c = app.cli === "alice" ? CERT.alice : CERT.malAlice, staff = CERT.staff;
       const nameOK = eqBytes(c.issuerDer, staff.subjectDer), sigOK = await certSignedBy(c, staff), eku = c.eku && c.eku.includes("1.3.6.1.5.5.7.3.2");
@@ -1875,11 +2140,15 @@ function update5() {
 
 /* ---------- step 7: pinning ---------- */
 const PIN_CERTS = ["api26", "apiSame", "apiNew", "apiBack"];
+const LOCK_BIG = open => '<svg viewBox="0 0 40 44" width="44" height="48" aria-hidden="true"><rect x="5" y="19" width="30" height="22" rx="4" fill="currentColor"/><path d="' +
+  (open ? "M6 12a8 8 0 0 1 16 0v1" : "M12 19V12a8 8 0 0 1 16 0v7") + '" fill="none" stroke="currentColor" stroke-width="4"/></svg>';
 function render6() {
   const t = L();
   return '<div class="card"><div class="cardhead"><h3>' + t.pinApp + '</h3><span class="tabs"><button data-action="pin" data-v="cert" aria-pressed="' + (app.pin === "cert") + '">' + t.pinCertMode +
     '</button><button data-action="pin" data-v="key" aria-pressed="' + (app.pin === "key") + '">' + t.pinKeyMode + '</button></span></div><div id="pinset">…</div></div>' +
-    '<div class="card"><h3>' + t.pinTabT + '</h3><div class="schwrap"><table class="ptab" id="pintab"></table></div><div id="pinwhy"></div></div>' +
+    '<div class="card"><h3>' + t.pinTabT + '</h3><p class="note" style="margin:0 0 8px">' + t.pinPick + '</p><div class="tabs">' +
+      PIN_CERTS.map((k, i) => '<button data-action="pin7" data-i="' + i + '" aria-pressed="' + (app.pin7 === i) + '">' + t.pinRows[i] + "</button>").join("") + '</div><div id="pinone"></div></div>' +
+    '<div class="card">' + (app.pinAll ? "<h3>" + t.pinAll + '</h3><div class="schwrap"><table class="ptab" id="pintab"></table></div>' : '<button data-action="pinall">' + t.pinAll + "</button>") + '<div id="pinwhy"></div></div>' +
     '<div class="card"><h3>' + t.pinHowT + '</h3><p class="note" style="margin:0 0 8px">' + t.pinHow + '</p><div id="pinhow"></div></div>' +
     '<div class="card"><h3>' + t.hpkpT + '</h3><p style="margin:0">' + t.hpkp + "</p></div>";
 }
@@ -1889,7 +2158,15 @@ function update6() {
     const P = {};
     for (const k of PIN_CERTS.concat(["covLeaf", "covWE1", "gtsR4"])) P[k] = { cert: await pinOf(CERT[k].der), key: await pinOf(CERT[k].spki), sig: await certSignedBy(CERT[k], CERT.int1) };
     const pins = app.pin === "cert" ? [P.api26.cert] : [P.api26.key, P.apiBack.key];
-    let s = '<div class="pinbox r-alice"><b>' + (app.pin === "cert" ? t.pinsCert : t.pinsKey) + "</b>" + pins.map((p, i) => '<span class="mono">sha256/' + p + (app.pin === "key" ? " · " + (i ? t.backup : t.current) : "") + "</span>").join("") + "</div>";
+    const s = '<div class="pinbox r-bob"><b>' + (app.pin === "cert" ? t.pinsCert : t.pinsKey) + "</b>" + pins.map((p, i) => '<span class="mono">sha256/' + p + (app.pin === "key" ? " · " + (i ? t.backup : t.current) : "") + "</span>").join("") + "</div>";
+    let one = "";
+    if (app.pin7 >= 0) {
+      const k = PIN_CERTS[app.pin7], c = CERT[k], mine = app.pin === "cert" ? P[k].cert : P[k].key, ok = pins.includes(mine);
+      const pinL = (lbl, v, used) => '<div><span class="note">' + lbl + '</span><div class="mono" style="font-size:12.5px;word-break:break-all"><span class="' + (used ? (ok ? "okline" : "badline") : "") + '">sha256/' + v + "</span></div></div>";
+      one = '<div class="two" style="margin-top:10px;align-items:center"><div class="pinbox r-bob" style="margin:0"><b>' + t.pinHas + ": " + esc(t.pinRows[app.pin7]) + '</b><span class="note">' + fmtDay(c.nb) + " → " + fmtDay(c.na) + ", serial 0x" + c.serial + " · " + mk(P[k].sig) + " " + t.chainOK2 + "</span>" +
+        pinL(t.pinCol[1], P[k].cert, app.pin === "cert") + pinL(t.pinCol[2], P[k].key, app.pin === "key") + "</div>" +
+        '<div style="display:flex;align-items:center;gap:14px;color:' + (ok ? "var(--ok)" : "var(--bad)") + '">' + LOCK_BIG(ok) + '<b style="font-size:15px">' + (ok ? t.pinOpen : t.pinShut) + "</b></div></div>";
+    }
     let tb = "<tr><th>" + t.pinCol[0] + "</th><th>" + t.pinCol[1] + "</th><th>" + t.pinCol[2] + "</th><th>" + t.pinCol[3] + "</th><th>" + t.pinCol[4] + "</th></tr>";
     PIN_CERTS.forEach((k, i) => {
       const c = CERT[k], mine = app.pin === "cert" ? P[k].cert : P[k].key, ok = pins.includes(mine);
@@ -1898,16 +2175,246 @@ function update6() {
     const how = '<table class="ptab"><tr><th></th><th>' + t.pinCol[1] + "</th><th>" + t.pinCol[2] + "</th></tr>" +
       ["covLeaf", "covWE1", "gtsR4"].map(k => "<tr><td><b>" + esc(CERT[k].cn) + '</b><div class="note">SPKI ' + CERT[k].spki.length + " " + t.bytesW + ", " + keyLabel(CERT[k]) + '</div></td><td class="mono">' + P[k].cert + '</td><td class="mono">' + P[k].key + "</td></tr>").join("") + "</table>" +
       '<div class="sigbox" style="margin-top:8px">openssl x509 -in leaf.pem -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | base64</div>';
-    return [s, tb, '<div class="why">' + (app.pin === "cert" ? t.pinWhyCert : t.pinWhyKey) + "</div>", how];
-  })().then(([a, b, c, d]) => {
+    const why = app.pin7 >= 0 || app.pinAll ? '<div class="why">' + (app.pin === "cert" ? t.pinWhyCert : t.pinWhyKey) + "</div>" : "";
+    return [s, one, tb, why, how];
+  })().then(([a, o, b, c, d]) => {
     if (g !== renderGen) return;
-    document.getElementById("pinset").innerHTML = a; document.getElementById("pintab").innerHTML = b; document.getElementById("pinwhy").innerHTML = c; document.getElementById("pinhow").innerHTML = d; updateMore();
+    const set = (id, h) => { const el = document.getElementById(id); if (el) el.innerHTML = h; };
+    set("pinset", a); set("pinone", o); set("pintab", b); set("pinwhy", c); set("pinhow", d); updateMore();
   });
 }
 
+/* ---------- step 8: Certificate Transparency ---------- */
+// sixteen log entries (made up, not the ones of Lecture 10, Task 7): the name in the certificate and the CA
+const CT_E = [["www.alice.example", "Trusty Issuing CA 1"], ["api.bob.example", "Trusty Issuing CA 1"], ["blog.eve.example", "Other CA"], ["www.dave.example", "Trusty Issuing CA 1"],
+  ["mail.alice.example", "Other CA"], ["vpn.carol.example", "Trusty Issuing CA 1"], ["www.eve.example", "Other CA"], ["files.bob.example", "Trusty Issuing CA 1"],
+  ["news.dave.example", "Other CA"], ["www.carol.example", "Trusty Issuing CA 1"], ["app.alice.example", "Other CA"], ["shop.eve.example", "Trusty Issuing CA 1"],
+  ["cdn.bob.example", "Other CA"], ["wiki.dave.example", "Trusty Issuing CA 1"], ["mx.carol.example", "Other CA"], ["test.alice.example", "Trusty Issuing CA 1"]];
+const CT_X = ["www.mallory.example", "Other CA"], CT_ALT = ["www.dave.example", "Shady CA"];
+const ctBytes = e => new TextEncoder().encode(e[0] + " | " + e[1]);
+// Mallory's log: entry 2 removed, a new one appended, so the size is the same
+const ctTampered = n => CT_E.slice(0, 2).concat(CT_E.slice(3, n), [CT_X]);
+const sh = (u, n) => hex(u).slice(0, n || 8);
+function ctEntries() {
+  const c = app.ct;
+  if (c.mode === 3 && c.tamper && c.n >= 3) return ctTampered(c.n);
+  const E = CT_E.slice(0, c.n);
+  if (c.mode === 2 && c.alter) E[c.k] = CT_ALT;
+  return E;
+}
+function render7() {
+  const t = L(), c = app.ct;
+  const tab = (m, l) => '<button data-action="ct" data-k="mode" data-v="' + m + '" aria-pressed="' + (c.mode === m) + '">' + l + "</button>";
+  let ctl = "";
+  if (c.mode === 1) ctl = '<button class="dark" data-action="ct" data-k="add"' + (c.n >= 16 ? " disabled" : "") + ">" + t.ctAdd + '</button><button data-action="ct" data-k="reset">' + t.ctReset + "</button>";
+  if (c.mode === 2) ctl = '<span class="note">' + t.ctPickK + '</span><span class="tabs">' + Array.from({ length: c.n }, (_, i) => '<button data-action="ct" data-k="k" data-v="' + i + '" aria-pressed="' + (c.k === i) + '">' + i + "</button>").join("") + "</span>" +
+    '<button class="tgl" data-action="ct" data-k="alter" aria-pressed="' + c.alter + '">' + EYE + t.ctAlter(c.k) + "</button>";
+  if (c.mode === 3) ctl = '<span class="note">' + t.ctPickM + '</span><span class="tabs">' + Array.from({ length: c.n - 1 }, (_, i) => '<button data-action="ct" data-k="m" data-v="' + (i + 1) + '" aria-pressed="' + (c.m === i + 1) + '">' + (i + 1) + "</button>").join("") + "</span>" +
+    '<button class="tgl" data-action="ct" data-k="tamper" aria-pressed="' + c.tamper + '">' + EYE + t.ctTamper + "</button>";
+  return '<div class="card"><div class="cardhead"><span class="tabs">' + tab(1, t.ctMode[0]) + tab(2, t.ctMode[1]) + tab(3, t.ctMode[2]) + '</span></div><p class="note" style="margin:0 0 4px">' + t.ctModeSub[c.mode - 1] + "</p>" +
+    '<div class="btns" style="margin-top:6px">' + ctl + "</div></div>" +
+    '<div class="card"><div class="schwrap" id="ctsvg">…</div><div id="ctents"></div>' + ctLegend() + '</div><div class="card" id="ctres"></div>';
+}
+function ctLegend() {
+  const t = L(), c = app.ct, it = (cls, l) => '<span style="border-color:' + cls[0] + ";background:" + cls[1] + '">' + l + "</span>";
+  const P = ["var(--chg)", "var(--chg-bg)"], Q = ["var(--bob-b)", "var(--bob-bg)"];
+  return '<div class="legend">' + (c.mode === 1 ? it(P, t.ctLgNew) : c.mode === 2 ? it(Q, t.ctLgProof) + it(P, t.ctLgPath) : it(Q, t.ctLgProof) + it(P, t.ctLgOld)) + "</div>";
+}
+// draw the tree: leaves at the bottom, a node above the middle of its children
+function ctSVG(T, mark) {
+  const n = T.b, LW = 58, NW = 52, NH = 24, RH = 54, top = 14, H = T.h, W = n * LW + 20, Y = h => top + (H - h) * RH, Hgt = Y(0) + NH + 6;
+  const X = nd => nd.l ? (X(nd.l) + X(nd.r)) / 2 : 10 + nd.a * LW + LW / 2;
+  let lines = "", boxes = "";
+  const walk = nd => {
+    const x = X(nd), y = Y(nd.h), m = mark(nd) || "";
+    if (nd.l) [nd.l, nd.r].forEach(k => { lines += '<line x1="' + x + '" y1="' + (y + NH) + '" x2="' + X(k) + '" y2="' + Y(k.h) + '" stroke="' + (m === "path" && mark(k) === "path" ? "var(--chg)" : "var(--rule)") + '" stroke-width="' + (m === "path" && mark(k) === "path" ? 3 : 1.6) + '"/>'; walk(k); });
+    const st = m === "proof" ? ["var(--bob-b)", "var(--bob-bg)"] : m === "path" || m === "new" ? ["var(--chg)", "var(--chg-bg)"] : m === "dim" ? ["var(--rule)", "var(--sunken)"] : ["var(--muted)", "var(--surface)"];
+    const leaf = !nd.l, act = leaf && app.ct.mode === 2 ? ' data-action="ct" data-k="k" data-v="' + nd.a + '" style="cursor:pointer"' : "";
+    boxes += "<g" + act + '><rect x="' + (x - NW / 2) + '" y="' + y + '" width="' + NW + '" height="' + NH + '" rx="5" fill="' + st[1] + '" stroke="' + st[0] + '" stroke-width="' + (m ? 2.4 : 1.4) + '"/>' +
+      '<text x="' + x + '" y="' + (y + 16) + '" text-anchor="middle" font-family="var(--mono)" font-size="11.5" fill="var(--ink)"' + (m === "dim" ? ' opacity=".5"' : "") + ">" + sh(nd.hash, 6) + "</text>" +
+      (leaf ? '<text x="' + x + '" y="' + (y + NH + 14) + '" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--muted)">' + nd.a + "</text>" : "") + "</g>";
+  };
+  walk(T);
+  let extra = "";
+  if (app.ct.mode === 3) {        // the old tree: the first m leaves
+    const x0 = 10 + 3, x1 = 10 + app.ct.m * LW - 3;
+    extra = '<rect x="' + x0 + '" y="' + (Y(0) - 8) + '" width="' + (x1 - x0) + '" height="' + (NH + 30) + '" rx="8" fill="none" stroke="var(--chg)" stroke-width="2" stroke-dasharray="6 4"/>';
+  }
+  const rootLbl = '<text x="' + (X(T) + NW / 2 + 8) + '" y="' + (Y(T.h) + 16) + '" font-size="12" font-weight="700" fill="var(--ink)">' + L().ctRoot(n) + "</text>";
+  return '<svg viewBox="0 0 ' + (W + 120) + " " + (Hgt + 14) + '" width="' + (W + 120) + '" height="' + (Hgt + 14) + '" role="img" aria-label="Merkle tree">' + lines + extra + boxes + rootLbl + "</svg>";
+}
+const rk = r => r[0] + "-" + r[1];
+async function update7() {
+  const t = L(), c = app.ct, g = renderGen;
+  const E = ctEntries(), T = await mtree(E.map(ctBytes));
+  let mark = () => "", res = "", entCls = () => "";
+  if (c.mode === 1) {
+    const prev = c.n > 1 ? await mtree(CT_E.slice(0, c.n - 1).map(ctBytes)) : null, old = new Set();
+    const coll = nd => { if (!nd) return; old.add(hex(nd.hash)); coll(nd.l); coll(nd.r); };
+    coll(prev);
+    mark = nd => old.has(hex(nd.hash)) ? "" : "new";
+    entCls = i => i === c.n - 1 ? "new" : "";
+    let kept = 0; const cnt = nd => { if (!nd) return; if (old.has(hex(nd.hash))) kept++; else { cnt(nd.l); cnt(nd.r); } }; cnt(T);
+    res = "<h3>" + t.ctSthT + '</h3><div class="pinbox r-ca"><span class="mono">tree_size = ' + c.n + "<br>sha256_root_hash = " + hex(T.hash) + "<br>" + t.ctSigned + "</span></div>" +
+      '<div class="why">' + t.ctGrow(c.n) + "</div>";
+  } else if (c.mode === 2) {
+    const rng = auditPath(c.k, 0, c.n), sib = rng.map(r => subtree(T, r[0], r[1]));
+    const honest = await mtree(CT_E.slice(0, c.n).map(ctBytes));        // the root the log signed
+    const pk = new Set(rng.map(rk)), path = new Set();
+    let nd = T; while (nd) { if (nd.a <= c.k && c.k < nd.b) path.add(rk([nd.a, nd.b])); nd = nd.l ? (c.k < nd.r.a ? nd.l : nd.r) : null; }
+    mark = x => pk.has(rk([x.a, x.b])) ? "proof" : path.has(rk([x.a, x.b])) ? "path" : "";
+    entCls = i => i === c.k ? (c.alter ? "bad" : "path") : "";
+    const leaf = subtree(T, c.k, c.k + 1).hash;
+    const V = await verifyInclusion(c.k, c.n, leaf, sib.map(s => s.hash), honest.hash);
+    res = "<h3>" + t.ctInclT(c.k, c.n) + '</h3><p class="note" style="margin:0 0 8px">' + t.ctInclSub(sib.length, c.n) + "</p>" +
+      '<table class="res"><tr><td>' + t.ctLeaf + '</td><td class="mono">H(0x00 ‖ "' + esc(E[c.k][0] + " | " + E[c.k][1]) + '")</td><td class="mono">' + sh(leaf, 16) + "…</td></tr>" +
+      V.steps.map((s, i) => "<tr><td>" + t.ctUp(i + 1) + '</td><td class="mono">H(0x01 ‖ ' + (s.left ? '<b style="color:var(--bob-b)">' + sh(sib[i].hash) + "</b> ‖ r" : 'r ‖ <b style="color:var(--bob-b)">' + sh(sib[i].hash) + "</b>") + ')</td><td class="mono">' + sh(s.r, 16) + "…</td></tr>").join("") +
+      "<tr><td>" + t.ctSigned2 + '</td><td></td><td class="mono">' + sh(honest.hash, 16) + "…</td></tr></table>" +
+      '<div class="verdict ' + (V.ok ? "ok" : "bad") + '">' + mk(V.ok) + (V.ok ? t.ctInclOK : t.ctInclBad) + "</div>";
+  } else {
+    const oldT = await mtree(CT_E.slice(0, c.m).map(ctBytes));          // what the monitor saved earlier, from the honest log
+    const rng = consProof(c.m, c.n), pk = new Set(rng.map(rk));
+    mark = x => pk.has(rk([x.a, x.b])) ? "proof" : "";
+    entCls = i => c.tamper && i === c.n - 1 ? "bad" : i < c.m ? "old" : "";
+    const V = await verifyConsistency(c.m, c.n, oldT.hash, T.hash, rng.map(r => subtree(T, r[0], r[1]).hash));
+    res = "<h3>" + t.ctConsT(c.m, c.n) + '</h3><p class="note" style="margin:0 0 8px">' + t.ctConsSub(rng.length, (c.m & (c.m - 1)) === 0) + "</p>" +
+      '<table class="res"><tr><th></th><th>' + t.ctFromProof + "</th><th>" + t.ctKnown + "</th><th></th></tr>" +
+      "<tr><td>" + t.ctOldRoot(c.m) + '</td><td class="mono">' + (V.fr ? sh(V.fr, 16) + "…" : "–") + '</td><td class="mono">' + sh(oldT.hash, 16) + "… " + '<span class="note">' + t.ctSaved + "</span></td><td>" + mk(!!V.fr && eqBytes(V.fr, oldT.hash)) + "</td></tr>" +
+      "<tr><td>" + t.ctNewRoot(c.n) + '</td><td class="mono">' + (V.sr ? sh(V.sr, 16) + "…" : "–") + '</td><td class="mono">' + sh(T.hash, 16) + "… " + '<span class="note">' + t.ctSigned3 + "</span></td><td>" + mk(!!V.sr && eqBytes(V.sr, T.hash)) + "</td></tr></table>" +
+      '<div class="verdict ' + (V.ok ? "ok" : "bad") + '">' + mk(V.ok) + (V.ok ? t.ctConsOK : t.ctConsBad) + "</div>" + (c.tamper ? '<div class="why">' + (V.ok ? t.ctTamperSmall : t.ctTamperWhy) + "</div>" : "");
+  }
+  if (g !== renderGen) return;
+  document.getElementById("ctsvg").innerHTML = ctSVG(T, mark);
+  const st = { new: "var(--chg)", path: "var(--chg)", bad: "var(--mal-b)", old: "var(--chg)" };
+  document.getElementById("ctents").innerHTML = '<div class="sanl" style="margin-top:6px">' + E.map((e, i) => { const k = entCls(i); return '<span style="' + (k ? "border-color:" + st[k] + (k === "old" ? ";border-style:dashed" : ";background:" + (k === "bad" ? "var(--mal-bg)" : "var(--chg-bg)")) : "") + '">' + i + " · " + esc(e[0]) + ' <small class="note">' + esc(e[1]) + "</small></span>"; }).join("") + "</div>";
+  document.getElementById("ctres").innerHTML = res;
+  updateMore();
+}
+function ctAction(d) {
+  const c = app.ct;
+  if (d.k === "mode") c.mode = +d.v;
+  else if (d.k === "add") c.n = Math.min(16, c.n + 1);
+  else if (d.k === "reset") c.n = 8;
+  else if (d.k === "k") { c.k = +d.v; c.alter = false; }
+  else if (d.k === "alter") c.alter = !c.alter;
+  else if (d.k === "m") c.m = +d.v;
+  else if (d.k === "tamper") c.tamper = !c.tamper;
+  if (c.k >= c.n) c.k = c.n - 1;
+  if (c.m >= c.n) c.m = c.n - 1;
+  render();
+}
+
+/* ---------- step 9: getting a certificate by ACME ---------- */
+const ACME_N = 5, ACME_HOST = "www.bob.example";
+const newKey = () => SUBTLE.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+const newToken = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
+async function acmeKeys() {
+  const A = app.acme;
+  if (A.keys) return A.keys;
+  const K = { bobAcc: await newKey(), bobSite: await newKey(), malAcc: await newKey(), malSite: await newKey() };
+  K.bobJwk = await SUBTLE.exportKey("jwk", K.bobAcc.publicKey); K.malJwk = await SUBTLE.exportKey("jwk", K.malAcc.publicKey);
+  K.bobTh = await jwkThumb(K.bobJwk); K.malTh = await jwkThumb(K.malJwk);
+  K.csrBob = await makeCSR(ACME_HOST, K.bobSite); K.csrMal = await makeCSR(ACME_HOST, K.malSite);
+  A.token = newToken(); A.malToken = newToken();
+  return (A.keys = K);
+}
+// Bob's CSR with one letter of the name changed: www.bob.example -> www.cob.example
+function csrChanged(u) {
+  const v = u.slice(), w = new TextEncoder().encode("www.bob");
+  for (let i = 0; i + w.length <= v.length; i++) { let hit = true; for (let j = 0; j < w.length; j++) if (v[i + j] !== w[j]) { hit = false; break; } if (hit) { v[i + 4] = 0x63; break; } }
+  return v;
+}
+function render8() {
+  const t = L(), k = app.acme.k, A = app.acme;
+  const mal = k === 4 && A.who !== "bob";
+  const M = [   // [part, from, to, label]
+    [1, 0, 2, t.amAcc], [2, 0, 2, t.amOrder(ACME_HOST)], [2, 2, 0, t.amChal], [3, 0, 1, t.amFile], [4, 0, 2, t.amReady],
+    [4, 2, 1, "GET /.well-known/acme-challenge/…"], [4, 1, 2, A.who === "noaccess" ? "404 Not Found" : t.amKa], [5, 0, 2, t.amCSR], [5, 2, 0, t.amCert]];
+  const XS = [130, 430, 730], W = 860, RH = 34, top = 62, Hh = top + M.length * RH + 10;
+  let g = "";
+  const act = [[mal ? t.amMalClient : t.amClient, mal ? "mal" : "bob"], [t.amWeb(ACME_HOST), "bob"], [t.amCA, "ca"]];
+  act.forEach((a, i) => {
+    g += '<rect x="' + (XS[i] - 125) + '" y="6" width="250" height="40" rx="10" fill="var(--' + a[1] + '-bg)" stroke="var(--' + a[1] + '-b)" stroke-width="1.6"/><text x="' + XS[i] + '" y="31" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--ink)">' + esc(a[0]) + "</text>";
+    g += '<line x1="' + XS[i] + '" y1="46" x2="' + XS[i] + '" y2="' + Hh + '" stroke="var(--rule)" stroke-width="2" stroke-dasharray="5 4"/>';
+  });
+  M.forEach((m, i) => {
+    if (m[0] > k) return;
+    const y = top + i * RH + 18, x1 = XS[m[1]], x2 = XS[m[2]], d = x2 > x1 ? 1 : -1, on = m[0] === k;
+    const col = on ? (mal && m[1] === 0 ? "var(--mal-b)" : "var(--chg)") : "var(--muted)";
+    g += '<line x1="' + (x1 + 4 * d) + '" y1="' + y + '" x2="' + (x2 - 10 * d) + '" y2="' + y + '" stroke="' + col + '" stroke-width="' + (on ? 3 : 1.8) + '"/><path d="M' + x2 + " " + y + " l" + (-11 * d) + " -6 v12 z" + '" fill="' + col + '"/>';
+    g += '<text x="' + ((x1 + x2) / 2) + '" y="' + (y - 6) + '" text-anchor="middle" stroke="var(--surface)" stroke-width="5" paint-order="stroke" font-size="12.5" font-weight="' + (on ? 700 : 500) + '" fill="' + (on ? "var(--ink)" : "var(--muted)") + '">' + esc(m[3]) + "</text>";
+  });
+  let dots = "";
+  for (let i = 1; i <= ACME_N; i++) dots += '<button data-action="acme" data-k="go" data-v="' + i + '" class="' + (i === k ? "on" : i < k ? "past" : "") + '" aria-label="' + t.storyOf(i, ACME_N) + '"></button>';
+  const bar = '<div class="explain story"><div class="storyhead"><span class="storyk"><span>' + t.storyOf(k, ACME_N) + '</span><span class="dots">' + dots + "</span></span>" +
+    '<span class="btns"><button data-action="acme" data-k="go" data-v="1"' + (k <= 1 ? " disabled" : "") + ">" + t.sFirst + '</button><button data-action="acme" data-k="go" data-v="' + (k - 1) + '"' + (k <= 1 ? " disabled" : "") + ">" + t.sPrev +
+    '</button><button class="dark" data-action="acme" data-k="go" data-v="' + (k + 1) + '"' + (k >= ACME_N ? " disabled" : "") + ">" + t.sNext + "</button></span></div><b>" + t.amTitle[k - 1] + '</b><div class="sttext">' + t.amText[k - 1] + "</div></div>";
+  return bar + '<div class="card"><div class="schwrap"><svg viewBox="0 0 ' + W + " " + Hh + '" width="' + W + '" height="' + Hh + '" role="img" aria-label="ACME">' + g + "</svg></div>" + legendHTML(["bob", "mal", "ca", "pub"]) + "</div>" +
+    '<div class="card" id="acmedet">…</div>';
+}
+// a line of text with the parts in colour: [text, role class]
+const segs = parts => '<div class="mono" style="font-size:13px;word-break:break-all;line-height:1.7">' + parts.map(p => p[1] ? '<span class="' + p[1] + '" style="border:1.5px solid;border-radius:4px;padding:0 3px">' + esc(p[0]) + "</span>" : esc(p[0])).join("") + "</div>";
+async function update8() {
+  const t = L(), g = renderGen, A = app.acme, k = A.k;
+  const K = await acmeKeys();
+  let h = "";
+  if (k === 1) {
+    h = "<h3>" + t.adAccT + '</h3><p style="margin:0 0 8px">' + t.adAcc + "</p>" +
+      '<div class="pinbox r-pub"><b>' + t.adJwk + '</b><span class="mono">{"crv":"P-256","kty":"EC","x":"' + K.bobJwk.x + '","y":"' + K.bobJwk.y + '"}</span></div>' +
+      '<div class="pinbox r-pub"><b>' + t.adThumb + '</b><span class="mono">' + K.bobTh + "</span></div>" +
+      '<p class="note" style="margin:8px 0 0">' + t.adAccNote + '</p><div class="btns"><button data-action="acme" data-k="newkeys">' + t.adNewKeys + "</button></div>";
+  } else if (k === 2) {
+    h = "<h3>" + t.adTokT + '</h3><p style="margin:0 0 8px">' + t.adTok + "</p>" + segs([[A.token, "r-prv"]]) +
+      '<p class="note" style="margin:8px 0 0">' + t.adTokNote + '</p><div class="btns"><button data-action="acme" data-k="newtoken">' + t.adNewTok + "</button></div>";
+  } else if (k === 3) {
+    h = "<h3>" + t.adFileT + '</h3><p style="margin:0 0 8px">' + t.adFile + "</p>" +
+      '<div class="note">URL</div>' + segs([["http://" + ACME_HOST + "/.well-known/acme-challenge/", ""], [A.token, "r-prv"]]) +
+      '<div class="note" style="margin-top:8px">' + t.adContent + "</div>" + segs([[A.token, "r-prv"], [".", ""], [K.bobTh, "r-pub"]]) +
+      '<p class="note" style="margin:8px 0 0">' + t.adFileNote + "</p>";
+  } else if (k === 4) {
+    const opt = (v, l) => '<button data-action="acme" data-k="who" data-v="' + v + '" aria-pressed="' + (A.who === v) + '">' + l + "</button>";
+    const tok = A.who === "noaccess" ? A.malToken : A.token, th = A.who === "bob" ? K.bobTh : K.malTh;
+    const got = A.who === "noaccess" ? null : A.token + "." + K.bobTh, want = tok + "." + th, ok = got === want;
+    h = "<h3>" + t.adChkT + '</h3><div class="tabs">' + opt("bob", t.adWho.bob) + opt("token", t.adWho.token) + opt("noaccess", t.adWho.noaccess) + '</div><p style="margin:8px 0">' + t.adWhoText[A.who] + "</p>" +
+      '<div class="note">' + t.adFetched("http://" + ACME_HOST + "/.well-known/acme-challenge/" + tok.slice(0, 8) + "…") + "</div>" +
+      (got ? segs([[A.token, "r-prv"], [".", ""], [K.bobTh, "r-pub"]]) : '<div class="mono badline">404 Not Found</div>') +
+      '<div class="note" style="margin-top:8px">' + t.adExpect(A.who === "bob" ? "Bob" : "Mallory") + "</div>" + segs([[tok, "r-prv"], [".", ""], [th, A.who === "bob" ? "r-pub" : "r-mal"]]);
+    h += !A.run4 ? '<div class="btns"><button class="dark" data-action="acme" data-k="run4">' + t.adRun4 + "</button></div>"
+      : '<div class="verdict ' + (ok ? "ok" : "bad") + '">' + mk(ok) + '<span class="mono">' + (ok ? "status: valid" : "status: invalid") + "</span> " + (ok ? t.adValid : t.adInvalid[A.who]) + "</div>";
+  } else {
+    const opt = (v, l) => '<button data-action="acme" data-k="csr" data-v="' + v + '" aria-pressed="' + (A.csr === v) + '">' + l + "</button>";
+    const raw = A.csr === "mal" ? K.csrMal : A.csr === "changed" ? csrChanged(K.csrBob) : K.csrBob, C = parseCSR(raw), sOK = await csrSigOK(C);
+    const issue = sOK && A.csr === "bob";
+    const cut = C.cut, part = (a, b, cls, l) => '<div class="seg ' + cls + '"><b>' + l + '</b><span class="mono">' + hexU(raw.subarray(a, b), " ") + "</span></div>";
+    h = "<h3>" + t.adCsrT + '</h3><p style="margin:0 0 8px">' + t.adCsr + '</p><div class="tabs">' + opt("bob", t.adCsrOpt.bob) + opt("changed", t.adCsrOpt.changed) + opt("mal", t.adCsrOpt.mal) + "</div>" +
+      '<div class="cvbytes">' + part(cut[0], cut[1], "r-bob", t.adCsrName(C.cn)) + part(cut[2], cut[3], A.csr === "mal" ? "r-mal" : "r-pub", t.adCsrKey(A.csr === "mal" ? "Mallory" : "Bob")) + part(cut[4], raw.length, A.csr === "mal" ? "r-mal" : "r-bob", t.adCsrSig) + "</div>" +
+      '<div class="note">' + t.adCsrLen(raw.length) + "</div>";
+    h += !A.run5 ? '<div class="btns"><button class="dark" data-action="acme" data-k="run5">' + t.adRun5 + "</button></div>"
+      : '<div class="rstep">' + mk(sOK) + "<div>" + (sOK ? t.adCsrSigOK : t.adCsrSigBad) + "</div></div>" +
+        '<div class="rstep">' + mk(A.csr === "mal" ? false : sOK ? true : null) + "<div>" + t.adCsrAuthz[A.csr] + "</div></div>" +
+        '<div class="verdict ' + (issue ? "ok" : "bad") + '">' + mk(issue) + (issue ? t.adIssued : t.adRefused) + "</div>" + '<div class="why">' + t.adCsrWhy[A.csr] + "</div>" +
+        (issue ? '<div class="btns">' + goBtn(7, t.adGoCT) + goBtn(1, t.adGoCert) + "</div>" : "");
+    h += '<details style="margin-top:8px"><summary class="note">PEM (openssl req -in bob.csr -noout -text -verify)</summary><div class="sigbox" style="white-space:pre">-----BEGIN CERTIFICATE REQUEST-----\n' + (b64e(raw).match(/.{1,64}/g) || []).join("\n") + "\n-----END CERTIFICATE REQUEST-----</div></details>";
+  }
+  if (g !== renderGen) return;
+  const el = document.getElementById("acmedet");
+  if (el) { el.innerHTML = h; updateMore(); }
+}
+function acmeAction(d) {
+  const A = app.acme;
+  if (d.k === "go") { A.k = Math.max(1, Math.min(ACME_N, +d.v)); A.run4 = false; A.run5 = false; }
+  else if (d.k === "who") { A.who = d.v; A.run4 = false; }
+  else if (d.k === "csr") { A.csr = d.v; A.run5 = false; }
+  else if (d.k === "run4") A.run4 = true;
+  else if (d.k === "run5") A.run5 = true;
+  else if (d.k === "newkeys") A.keys = null;
+  else if (d.k === "newtoken") { A.token = newToken(); A.malToken = newToken(); }
+  render();
+}
+
 /* ---------- frame, navigation ---------- */
-const RENDER = [render0, render1, render2, render3, render4, render5, render6];
-const UPDATE = [update0, update1, update2, update3, update4, update5, update6];
+const RENDER = [render0, render1, render2, render3, render4, render5, render6, render7, render8];
+const UPDATE = [update0, update1, update2, update3, update4, update5, update6, update7, update8];
 let SELF = null;                     // null while the self-test runs, then the list of failures
 function buildSide() {
   const t = L();
@@ -1921,10 +2428,10 @@ function showSelf() {
   st.textContent = SELF.length ? t.selfBad(SELF.join(", ")) : t.selfOk;
   st.className = SELF.length ? "badt" : "okt";
 }
-// #1.4 story step 4; #2.3 the third certificate, #2.3.san with its SAN; #3.5, #4.2, #6.3, #7.1 a choice inside the step
+// #1.4 story step 4; #2.3 the third certificate, #2.3.san with its SAN; #3.5, #4.2, #6.3, #7.1 a choice inside the step; #8.2 a tab of step 8; #9.4 part 4 of step 9
 function hashStr() {
   const l = app.level;
-  const sub = l === 0 ? app.story : l === 1 ? app.c2 + 1 : l === 2 ? app.s3 + 1 : l === 3 ? app.s4 + 1 : l === 4 ? null : l === 5 ? app.hs : app.pin === "cert" ? 1 : 2;
+  const sub = l === 0 ? app.story : l === 1 ? app.c2 + 1 : l === 2 ? app.s3 + 1 : l === 3 ? app.s4 + 1 : l === 4 ? null : l === 5 ? app.hs : l === 6 ? (app.pin === "cert" ? 1 : 2) : l === 7 ? app.ct.mode : app.acme.k;
   return "#" + (l + 1) + (sub ? "." + sub : "") + (l === 1 && app.f2 !== "subject" ? "." + app.f2 : "");
 }
 function render() {
@@ -1944,7 +2451,7 @@ function render() {
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
   document.getElementById("mhSub").textContent = t.steps[app.level][1];
   const ex = t.explain[app.level];
-  const head = app.level === 0 ? storyBarHTML() : app.level === 5 ? "" : '<div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>";
+  const head = app.level === 0 ? storyBarHTML() : app.level === 5 || app.level === 8 ? "" : '<div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>";
   const keep = view.scrollTop;
   view.innerHTML = '<div class="fade">' + head + RENDER[app.level]() + "</div>";
   view.scrollTop = keep;
@@ -1991,24 +2498,35 @@ view.addEventListener("click", e => {
   else if (a === "story") storyGo(d.k === "next" ? app.story + 1 : d.k === "prev" ? app.story - 1 : +d.k);
   else if (a === "try") { app.tryCard = d.c === "bob" ? CARD_BOB : CARD_MAL; app.trySig = d.s; render(); }
   else if (a === "trysig") { app.trySig = d.s; render(); }
-  else if (a === "cert2") { app.c2 = +d.i; render(); }
+  else if (a === "cert2") { app.c2 = +d.i; app.fp2 = false; app.flip2 = false; render(); }
+  else if (a === "all2") { app.all2 = !app.all2; render(); }
+  else if (a === "fp2") { app.fp2 = true; render(); }
+  else if (a === "flip2") { app.flip2 = true; render(); }
   else if (a === "field") { app.f2 = d.f; render(); }
   else if (a === "view2") { app.view2 = d.v; render(); }
-  else if (a === "s3") { app.s3 = +d.i; app.aia3 = false; app.cur3 = 999; render(); }
+  else if (a === "s3") { app.s3 = +d.i; app.aia3 = false; app.cur3 = 0; render(); }
   else if (a === "c3") { if (d.k === "reset") app.cur3 = 0; else if (d.k === "all") app.cur3 = 999; else app.cur3 = app.cur3 >= 999 ? 1 : app.cur3 + 1; update2(); }
   else if (a === "aia3") { app.aia3 = true; update2(); }
-  else if (a === "s4") { app.s4 = +d.i; app.host4 = SCN4[app.s4].host; render(); }
-  else if (a === "reset4") { app.host4 = SCN4[app.s4].host; app.date4 = "2026-11-15"; app.rev4 = true; render(); }
+  else if (a === "s4") { app.s4 = +d.i; app.host4 = SCN4[app.s4].host; app.run4 = false; app.say4 = false; render(); }
+  else if (a === "reset4") { app.host4 = SCN4[app.s4].host; app.date4 = "2026-11-15"; app.rev4 = true; app.run4 = false; app.say4 = false; render(); }
+  else if (a === "run4") { app.run4 = true; render(); }
+  else if (a === "say4") { app.say4 = true; render(); }
   else if (a === "r5cert") { app.r5cert = d.v; render(); }
   else if (a === "r5hard") { app.r5hard = d.v === "1"; render(); }
   else if (a === "r5block") { app.r5block = !app.r5block; render(); }
   else if (a === "r5crl") { app.r5crl = d.v; render(); }
   else if (a === "r5st") { app.r5stapled = d.v === "1"; render(); }
   else if (a === "hs") hsGo(d.k === "next" ? app.hs + 1 : d.k === "prev" ? app.hs - 1 : +d.k);
-  else if (a === "cv") { app.cv = d.v; render(); }
-  else if (a === "cvnew") { app.cvHash = null; render(); }
-  else if (a === "cli") { app.cli = d.v; render(); }
+  else if (a === "cv") { app.cv = d.v; app.cvRun = false; render(); }
+  else if (a === "cvnew") { app.cvHash = null; app.cvRun = false; render(); }
+  else if (a === "cvrun") { app.cvRun = true; update5(); }
+  else if (a === "cli") { app.cli = d.v; app.cliRun = false; render(); }
+  else if (a === "clirun") { app.cliRun = true; update5(); }
   else if (a === "pin") { app.pin = d.v; render(); }
+  else if (a === "pin7") { app.pin7 = +d.i; render(); }
+  else if (a === "pinall") { app.pinAll = true; render(); }
+  else if (a === "ct") ctAction(d);
+  else if (a === "acme") acmeAction(d);
 });
 view.addEventListener("input", e => {
   const f = e.target.dataset.field;
@@ -2020,6 +2538,7 @@ view.addEventListener("input", e => {
   else if (f === "host") { app.host4 = v; update3(); }
   else if (f === "date") { app.date4 = v; update3(); }
   else if (f === "rev") { app.rev4 = e.target.checked; update3(); }
+  else if (f === "tl5") { app.tl5 = +v; const el = document.getElementById("r5tl"); if (el) el.innerHTML = tl5HTML(); }
 });
 document.getElementById("steps").addEventListener("click", e => {
   const b = e.target.closest("[data-step]");
@@ -2040,6 +2559,8 @@ document.addEventListener("keydown", e => {
   if (app.level === 0 && (e.key === "p" || e.key === "P")) { e.preventDefault(); storyGo(app.story - 1); return; }
   if (app.level === 5 && (e.key === "n" || e.key === "N" || e.key === " ")) { e.preventDefault(); hsGo(app.hs + 1); return; }
   if (app.level === 5 && (e.key === "p" || e.key === "P")) { e.preventDefault(); hsGo(app.hs - 1); return; }
+  if (app.level === 8 && (e.key === "n" || e.key === "N" || e.key === " ")) { e.preventDefault(); acmeAction({ k: "go", v: app.acme.k + 1 }); return; }
+  if (app.level === 8 && (e.key === "p" || e.key === "P")) { e.preventDefault(); acmeAction({ k: "go", v: app.acme.k - 1 }); return; }
   if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); zoomIn(); }
   else if (e.key === "ArrowLeft" || e.key === "Escape") { e.preventDefault(); zoomOut(); }
 });
@@ -2055,6 +2576,8 @@ function readHash() {
     else if (app.level === 3) { app.s4 = Math.max(0, Math.min(SCN4.length - 1, s - 1)); app.host4 = null; }
     else if (app.level === 5) app.hs = Math.max(1, Math.min(HS_N, s));
     else if (app.level === 6) app.pin = s === 1 ? "cert" : "key";
+    else if (app.level === 7) app.ct.mode = Math.max(1, Math.min(3, s));
+    else if (app.level === 8) app.acme.k = Math.max(1, Math.min(ACME_N, s));
   }
   if (app.level === 1 && m[3]) {
     app.f2 = m[3];

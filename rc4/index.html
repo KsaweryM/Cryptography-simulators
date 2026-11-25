@@ -99,6 +99,9 @@ select{font-family:var(--sans)}
 /* cards and the explanation box */
 .card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 18px;margin-bottom:14px}
 .card h3{margin:0 0 10px;font-size:15.5px;font-weight:600}
+details.fold>summary{cursor:pointer;list-style:none}details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary h3{display:inline}details.fold>summary::before{content:"▸ ";color:var(--chg)}details.fold[open]>summary::before{content:"▾ "}
+details.fold[open]>summary{margin-bottom:10px}
 .explain{background:var(--sunken);border-left:4px solid var(--ink);border-radius:8px;padding:12px 16px;margin:0 0 14px}
 .explain b{display:block;font-size:15px;margin-bottom:2px}
 .note{font-size:13px;color:var(--muted)}
@@ -767,13 +770,13 @@ const T = {
     explain: [
       ["One input, one keystream", "RC4 takes only a key, 1 to 256 bytes, and turns it into a keystream as long as we need. Encrypting is XOR of the plaintext with the keystream, byte by byte. There is no nonce input: the same key always gives the same keystream. Click the RC4 box to look inside."],
       ["Step 1: prepare", "The table S starts in order: 0, 1, 2, …, 255. The helper table T holds the key, repeated. For i = 0 to 255 the key decides j, and S[i] and S[j] change places. This runs once, before the first byte. Then click PRGA."],
-      ["Step 2: produce", "PRGA starts with the S from the KSA and i = j = 0. Every loop moves i by one, lets j jump by S[i], swaps S[i] and S[j], and outputs S[(S[i] + S[j]) mod 256]. One loop gives one keystream byte, and S changes every time."],
-      ["Count it yourself", "After the KSA, S[0] still equals key[0] far more often than chance allows. Run many random keys and count."],
-      ["Fill the histogram", "Fill the histogram with many random keys. A uniform keystream gives flat bars. The second byte of RC4 does not."],
+      ["Step 2: produce", "PRGA starts with the S from the KSA and i = j = 0. Every loop moves i by one, lets j jump by S[i], swaps S[i] and S[j], and outputs S[(S[i] + S[j]) mod 256]. One loop gives one keystream byte, and S changes every time. The state keeps changing, so the keystream does not fall into a short loop like the cheap generator of Task 6."],
+      ["Count it yourself", "After the KSA, how often does S[0] still equal key[0]? A fair shuffle gives about 1 chance in 256. Run many random keys and count."],
+      ["Fill the histogram", "Fill the histogram with many random keys. A uniform keystream gives flat bars. Pick a byte, run, and look at the bars."],
       ["One order, many keys", "The president sends one order to all the soldiers. Every soldier has their own RC4 key, so every copy is encrypted differently, and Eve has none of the keys. She knows only that the order names one of two places, and that the two names differ in the second letter. The bias of 4.2 is enough to tell which one."],
       ["One IV, one keystream", "WEP puts a public 3-byte IV in front of the shared key. When an IV comes back, its keystream comes back too. See what a repeated IV gives away and how soon an IV repeats."],
       ["The key itself leaks", "Some IVs let the weak mixing of the KSA (4.1) show through: the first keystream byte then tells one secret key byte. First one packet, step by step. Then thousands of packets vote."]],
-    subs: [["S remembers the key", "the KSA mixes too little"], ["The second byte", "the value 0 comes twice as often"], ["The president's order", "the second byte in a real attack"], ["The IV repeats (WEP)", "same IV, same keystream"], ["The key leaks (WEP)", "the FMS attack"]],
+    subs: [["S after the KSA", "does S[0] remember key[0]?"], ["The first bytes", "is the keystream uniform?"], ["The president's order", "one order, many keys"], ["The IV repeats (WEP)", "same IV, same keystream"], ["The key leaks (WEP)", "the FMS attack"]],
     stepOfSub: k => "Step 4 of 4 · part " + k + " of 5 · RC4",
     selfOk: "✓ checked against RFC 6229, the slides and a Python run", selfWait: "checking against RFC 6229, the slides and a Python run …", selfBad: f => "✗ self-test failed: " + f,
     moreBelow: "More below", keys: "→ / Enter: next · ← / Esc: back", fixFirst: "Fix the key in step 1.",
@@ -786,7 +789,7 @@ const T = {
     xorHint: "Point at a byte to see how it is encrypted.", xorByte: (i, p, z, c) => "byte " + i + ":  " + p + " XOR " + z + " = " + c,
     more: k => "… and " + k + " more byte" + (k === 1 ? "" : "s") + ".", typeMsg: "Type a message to encrypt it.",
     errKey: "The key must be 1 to 256 bytes, written as hex: 2 hex digits per byte.",
-    cardChange: "One small change in the key", keyA: "the key", keyB: "the last byte + 1",
+    cardChange: "One small change in the key", chgOpen: "open it after Task 2", keyA: "the key", keyB: "the last byte + 1",
     sameN: (k, n) => "The same bytes: " + k + " of " + n + ".", changeNote: "One small change in the key changes the whole keystream (Task 2, TODO 3).",
     cardInside: "Inside the RC4 box", fKey: "key", fKSA_s: "step 1: prepare, once", fState: "S, i, j", fState_s: "internal state", fPRGA_s: "step 2: produce, every byte", fZ: "keystream", clickGo: "click",
     bReset: "⏮ reset", bPrev: "◀ previous", bNext: "next ▶", bEnd: "to the end ⏭", bByte: "next byte ⏭", b16: "+16 bytes",
@@ -802,7 +805,6 @@ const T = {
     lgI: "i", lgJ: "j", lgSw: "swap", lgIdle: "never moved", lgT: "T[x] (key)", lgTp: "t: the output cell",
     lgMv: "how far the value in a cell is from its start:", lgMv0: "at its start", lgMv1: "1 to 15 places", lgMv2: "16 to 63", lgMv3: "64 or more",
     mvN: (a, b, c, d) => "at its start " + a + " · 1 to 15: " + b + " · 16 to 63: " + c + " · 64+: " + d,
-    s0key: (s0, k0) => "S[0] = " + s0 + ", key[0] = " + k0 + (s0 === k0 ? ": still the same (weakness 4.1)." : "."),
     arrI: "S[i]", arrJ: "S[j]",
     noteKey: k => "The key here: " + k + ". Change it in step 1.",
     prgaPos: (n, s) => "byte " + n + " · step " + s + " of 5",
@@ -827,7 +829,7 @@ const T = {
     m1note: "A fair shuffle is the baseline: about 1 chance in 256. Your numbers change a little with every run (Task 7).",
     m1wep: "This is how WEP lost its key: a public IV goes into this weak mixer (<a href='#4.5'>4.5</a>).",
     uniform: "uniform: 1/256",
-    m2h: "The second keystream byte over many keys",
+    m2h: "The first keystream bytes over many keys", m2recOpen: "open it after Task 9",
     m2keys: "keys:", m2run: "Run", m2running: (k, n) => fmtInt(k) + " of " + fmtInt(n) + " keys …",
     m2pos: "keystream byte:", m2byte: b => "byte " + b,
     m2zero: (b, p, k) => "Byte " + b + " was 0 in " + p + " of the keys (" + fmtInt(k) + " times).",
@@ -950,13 +952,13 @@ const T = {
     explain: [
       ["Jedno wejście, jeden keystream", "RC4 przyjmuje tylko klucz, od 1 do 256 bajtów, i robi z niego keystream tak długi, jak trzeba. Szyfrowanie to XOR tekstu jawnego z keystreamem, bajt po bajcie. Nie ma wejścia na nonce: ten sam klucz zawsze daje ten sam keystream. Kliknij pole RC4, żeby zajrzeć do środka."],
       ["Krok 1: przygotowanie", "Tablica S zaczyna po kolei: 0, 1, 2, …, 255. Tablica pomocnicza T to klucz powtarzany w kółko. Dla i = 0 do 255 klucz wyznacza j, a S[i] i S[j] zamieniają się miejscami. To dzieje się raz, przed pierwszym bajtem. Potem kliknij PRGA."],
-      ["Krok 2: wytwarzanie", "PRGA zaczyna od S z KSA oraz i = j = 0. W każdym obiegu i idzie o jeden, j skacze o S[i], S[i] i S[j] zamieniają się, a na wyjście idzie S[(S[i] + S[j]) mod 256]. Jeden obieg daje jeden bajt keystreamu, a S zmienia się za każdym razem."],
-      ["Policz sam", "Po KSA S[0] nadal równa się key[0] dużo częściej, niż pozwala przypadek. Uruchom wiele losowych kluczy i policz."],
-      ["Wypełnij histogram", "Wypełnij histogram wieloma losowymi kluczami. Jednostajny keystream daje równe słupki. Drugi bajt RC4 nie."],
+      ["Krok 2: wytwarzanie", "PRGA zaczyna od S z KSA oraz i = j = 0. W każdym obiegu i idzie o jeden, j skacze o S[i], S[i] i S[j] zamieniają się, a na wyjście idzie S[(S[i] + S[j]) mod 256]. Jeden obieg daje jeden bajt keystreamu, a S zmienia się za każdym razem. Stan ciągle się zmienia, więc keystream nie wpada w krótką pętlę jak tani generator z Task 6."],
+      ["Policz sam", "Jak często po KSA S[0] nadal równa się key[0]? Uczciwe tasowanie daje około 1 szansę na 256. Uruchom wiele losowych kluczy i policz."],
+      ["Wypełnij histogram", "Wypełnij histogram wieloma losowymi kluczami. Jednostajny keystream daje równe słupki. Wybierz bajt, uruchom i popatrz na słupki."],
       ["Jeden rozkaz, wiele kluczy", "Prezydent wysyła jeden rozkaz wszystkim żołnierzom. Każdy żołnierz ma własny klucz RC4, więc każda kopia jest zaszyfrowana inaczej, a Eve nie zna żadnego klucza. Wie tylko, że rozkaz wskazuje jedno z dwóch miejsc i że ich nazwy różnią się drugą literą. Skrzywienie z 4.2 wystarczy, żeby rozstrzygnąć które."],
       ["Jeden IV, jeden keystream", "WEP dokleja jawny 3-bajtowy IV przed wspólny klucz. Gdy IV wraca, wraca też jego keystream. Zobacz, co zdradza powtórzony IV i jak szybko IV się powtarza."],
       ["Wycieka sam klucz", "Przy niektórych IV słabe mieszanie KSA (4.1) przebija na wyjście: pierwszy bajt keystreamu zdradza wtedy jeden bajt tajnego klucza. Najpierw jeden pakiet, krok po kroku. Potem głosują tysiące pakietów."]],
-    subs: [["S pamięta klucz", "KSA miesza za mało"], ["Drugi bajt", "wartość 0 wypada dwa razy za często"], ["Rozkaz prezydenta", "drugi bajt w prawdziwym ataku"], ["IV się powtarza (WEP)", "ten sam IV, ten sam keystream"], ["Klucz wycieka (WEP)", "atak FMS"]],
+    subs: [["S po KSA", "czy S[0] pamięta key[0]?"], ["Pierwsze bajty", "czy keystream jest jednostajny?"], ["Rozkaz prezydenta", "jeden rozkaz, wiele kluczy"], ["IV się powtarza (WEP)", "ten sam IV, ten sam keystream"], ["Klucz wycieka (WEP)", "atak FMS"]],
     stepOfSub: k => "Krok 4 z 4 · część " + k + " z 5 · RC4",
     selfOk: "✓ sprawdzone z RFC 6229, slajdami i przebiegiem w Pythonie", selfWait: "sprawdzam z RFC 6229, slajdami i przebiegiem w Pythonie …", selfBad: f => "✗ samotest nie przeszedł: " + f,
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: dalej · ← / Esc: wstecz", fixFirst: "Popraw klucz w kroku 1.",
@@ -969,7 +971,7 @@ const T = {
     xorHint: "Najedź na bajt, żeby zobaczyć, jak jest szyfrowany.", xorByte: (i, p, z, c) => "bajt " + i + ":  " + p + " XOR " + z + " = " + c,
     more: k => "… i jeszcze " + k + " " + plN(k, "bajt", "bajty", "bajtów") + ".", typeMsg: "Wpisz wiadomość, żeby ją zaszyfrować.",
     errKey: "Klucz musi mieć od 1 do 256 bajtów zapisanych w hex: 2 cyfry hex na bajt.",
-    cardChange: "Mała zmiana w kluczu", keyA: "klucz", keyB: "ostatni bajt + 1",
+    cardChange: "Mała zmiana w kluczu", chgOpen: "otwórz po Task 2", keyA: "klucz", keyB: "ostatni bajt + 1",
     sameN: (k, n) => "Te same bajty: " + k + " z " + n + ".", changeNote: "Mała zmiana w kluczu zmienia cały keystream (Task 2, TODO 3).",
     cardInside: "Wnętrze pudełka RC4", fKey: "klucz", fKSA_s: "krok 1: przygotowanie, raz", fState: "S, i, j", fState_s: "stan wewnętrzny", fPRGA_s: "krok 2: wytwarzanie, co bajt", fZ: "keystream", clickGo: "kliknij",
     bReset: "⏮ od nowa", bPrev: "◀ poprzedni", bNext: "następny ▶", bEnd: "do końca ⏭", bByte: "następny bajt ⏭", b16: "+16 bajtów",
@@ -985,7 +987,6 @@ const T = {
     lgI: "i", lgJ: "j", lgSw: "zamiana", lgIdle: "nieruszone", lgT: "T[x] (klucz)", lgTp: "t: komórka wyjścia",
     lgMv: "jak daleko wartość w komórce jest od swojego startu:", lgMv0: "na starcie", lgMv1: "1 do 15 miejsc", lgMv2: "16 do 63", lgMv3: "64 i więcej",
     mvN: (a, b, c, d) => "na starcie " + a + " · 1 do 15: " + b + " · 16 do 63: " + c + " · 64+: " + d,
-    s0key: (s0, k0) => "S[0] = " + s0 + ", key[0] = " + k0 + (s0 === k0 ? ": nadal to samo (słabość 4.1)." : "."),
     arrI: "S[i]", arrJ: "S[j]",
     noteKey: k => "Klucz: " + k + ". Zmień go w kroku 1.",
     prgaPos: (n, s) => "bajt " + n + " · krok " + s + " z 5",
@@ -1010,7 +1011,7 @@ const T = {
     m1note: "Uczciwe tasowanie to punkt odniesienia: około 1 szansa na 256. Liczby zmieniają się trochę przy każdym uruchomieniu (Task 7).",
     m1wep: "Tak WEP stracił klucz: jawny IV wchodzi do tego słabego miksera (<a href='#4.5'>4.5</a>).",
     uniform: "jednostajnie: 1/256",
-    m2h: "Drugi bajt keystreamu dla wielu kluczy",
+    m2h: "Pierwsze bajty keystreamu dla wielu kluczy", m2recOpen: "otwórz po Task 9",
     m2keys: "klucze:", m2run: "Uruchom", m2running: (k, n) => fmtInt(k) + " z " + fmtInt(n) + " kluczy …",
     m2pos: "bajt keystreamu:", m2byte: b => "bajt " + b,
     m2zero: (b, p, k) => "Bajt " + b + " był równy 0 dla " + p + " kluczy (" + fmtInt(k) + " razy).",
@@ -1083,20 +1084,20 @@ const T = {
     fmsH: "Klucz wycieka: atak FMS",
     fmsSame: "Teraz wiele pakietów: 15 000 przechwyconych pakietów ze słabymi IV (A+3, 255, x), po 3 000 na każdy bajt klucza K[A]. Każdy słaby pakiet głosuje dokładnie tak jak wyżej. Większość głosów to szum, ale trafne padają zawsze na tę samą wartość.",
     f1H: "Jeden słaby pakiet, krok po kroku",
-    f1Lead: x => "Jeden pakiet z IV 03 FF " + x + ". Klucz RC4 to ten IV, a za nim tajny klucz Wi-Fi. Ewa widzi IV w eterze; tajnej części nie zna.",
+    f1Lead: x => "Jeden pakiet z IV 03 FF " + x + ". Klucz RC4 to ten IV, a za nim tajny klucz Wi-Fi. Eve widzi IV w eterze; tajnej części nie zna.",
     f1Key: "klucz RC4 tego pakietu:", f1Pub: "IV, jawny", f1Sec: "tajny",
     f1Pos: k => "krok " + k + " z 6",
     f1Another: "inny słaby IV", f1Stay: "IV, przy którym komórki zostają",
-    f1Cap: ["kopia S u Ewy", "kopia S u Ewy", "kopia S u Ewy", "kopia S u Ewy", "kopia S u Ewy", "naprawdę, po całym KSA (Ewa tego nie widzi)", "kopia S u Ewy, jak po kroku 3"],
+    f1Cap: ["kopia S u Eve", "kopia S u Eve", "kopia S u Eve", "kopia S u Eve", "kopia S u Eve", "naprawdę, po całym KSA (Eve tego nie widzi)", "kopia S u Eve, jak po kroku 3"],
     f1Text: [
-      () => "KSA zaczyna od S po kolei: 0, 1, 2, …, 255. Pierwsze 3 bajty klucza to IV, więc Ewa sama wykona 3 pierwsze obiegi KSA. Naciśnij dalej.",
-      () => "Obieg i = 0 używa key[0] = 03, bajtu jawnego. Ewa liczy go sama.",
-      () => "Obieg i = 1 używa key[1] = FF, bajtu jawnego. Ewa liczy go sama.",
-      () => "Obieg i = 2 używa key[2], ostatniego bajtu IV. Ewa zna teraz dokładnie S i j. Spójrz na komórki 0 i 1: S[0] = 3 i S[1] = 0. WEP losuje IV; Ewa po prostu czeka na pakiety, których IV zaczyna się od 03 FF, bo to one zastawiają tę pułapkę.",
-      () => "Obieg i = 3 używa key[3] = K[0], pierwszego tajnego bajtu. Ewa nie policzy już j. Wie jednak jedno: zamiana przenosi wartość z komórki j do komórki 3. Jeśli Ewa kiedyś pozna wartość, która trafiła do komórki 3, to zna j, a z j wylicza K[0].",
+      () => "KSA zaczyna od S po kolei: 0, 1, 2, …, 255. Pierwsze 3 bajty klucza to IV, więc Eve sama wykona 3 pierwsze obiegi KSA. Naciśnij dalej.",
+      () => "Obieg i = 0 używa key[0] = 03, bajtu jawnego. Eve liczy go sama.",
+      () => "Obieg i = 1 używa key[1] = FF, bajtu jawnego. Eve liczy go sama.",
+      () => "Obieg i = 2 używa key[2], ostatniego bajtu IV. Eve zna teraz dokładnie S i j. Spójrz na komórki 0 i 1: S[0] = 3 i S[1] = 0. WEP losuje IV; Eve po prostu czeka na pakiety, których IV zaczyna się od 03 FF, bo to one zastawiają tę pułapkę.",
+      () => "Obieg i = 3 używa key[3] = K[0], pierwszego tajnego bajtu. Eve nie policzy już j. Wie jednak jedno: zamiana przenosi wartość z komórki j do komórki 3. Jeśli Eve kiedyś pozna wartość, która trafiła do komórki 3, to zna j, a z j wylicza K[0].",
       (stay, z) => stay ? "Pozostałe 252 obiegi nie ruszyły komórek 0, 1 i 3 (przerywana ramka). Pierwszy obieg PRGA bierze wtedy i = 1, j = S[1] = 0, zamienia i wypisuje komórkę S[1] + S[0] = 3. Pierwszy bajt keystreamu to więc wartość, którą obieg 3 włożył do komórki 3: " + z + "."
                       : "Tym razem pozostałe 252 obiegi ruszyły komórkę 0, 1 albo 3 (przerywana ramka). Pierwszy bajt keystreamu (" + z + ") nie ma już nic wspólnego z obiegiem 3. Ten pakiet też zagłosuje, ale jego głos to szum.",
-      () => "Ewa zna pierwszy bajt keystreamu: każdy pakiet zaczyna się od AA, więc Z1 = C1 XOR AA. Szuka tej wartości w swojej kopii S. Jej komórka to j z obiegu 3, a wzór obiegu 3 daje K[0]."],
+      () => "Eve zna pierwszy bajt keystreamu: każdy pakiet zaczyna się od AA, więc Z1 = C1 XOR AA. Szuka tej wartości w swojej kopii S. Jej komórka to j z obiegu 3, a wzór obiegu 3 daje K[0]."],
     f1Calc: {
       start: "j = 0",
       loop: (i, jo, si, ki, j) => "obieg i = " + i + ":\nj = (j + S[" + i + "] + key[" + i + "]) mod 256\n  = (" + jo + " + " + si + " + " + ki + ") mod 256 = " + j + "\nzamiana S[" + i + "] i S[" + j + "]",
@@ -1134,12 +1135,12 @@ const L = () => T[lang];
 const app = {
   level: 0,
   keyText: "01 02 03 04 05", key: parseKeyHex(SLIDE_KEY), keyErr: false,
-  msg: "Meet me at the library at 5.",
+  msg: "Hello Bob, this is RC4 at work.",
   ksaPos: 0,     // 0 = start; 2i+1 = loop i, j computed; 2i+2 = loop i, after the swap
   prgaPos: 0,    // 0 = start; 5b + s = byte b+1, sub-step s (1..5)
   iv1: "4F 12 A0", iv2: "21 E8 55",
   fp: 0, fx: 0,   // 4.5: the step (0 .. 6) and the last IV byte x of the weak IV 03 FF x
-  s1: null, s2: null, s2n: 100000, s2pos: 1, ivN: 2000,
+  s1: null, s2: null, s2n: 100000, s2pos: 0, ivN: 2000,
   bN: 1000, bPtr: 1000,   // 4.3: the soldiers of one battle; the slider on the chart
 };
 // the pages: steps 1, 2, 3, then the weaknesses 4.1 to 4.5 (app.level = index here)
@@ -1196,7 +1197,7 @@ function render0() {
       '<div class="node sg-pt"><div class="nh">' + t.nodePt + '</div><textarea data-field="msg" rows="3" spellcheck="false">' + esc(app.msg) + "</textarea></div>" +
     "</div></div></div>" +
     '<div class="card"><h3>' + t.cardDetails + '</h3><div id="l0out"></div></div>' +
-    '<div class="card"><h3>' + t.cardChange + '</h3><div id="l0chg"></div><p class="note" style="margin:6px 0 0">' + t.changeNote + "</p></div>";
+    '<details class="card fold"><summary><h3>' + t.cardChange + ' <span class="note">(' + t.chgOpen + ')</span></h3></summary><div id="l0chg"></div><p class="note" style="margin:6px 0 0">' + t.changeNote + "</p></details>";
 }
 function updateL0() {
   const out = document.getElementById("l0out");
@@ -1284,7 +1285,7 @@ function codeHTML(lines, cur, act) {
 }
 
 /* ---------- step 2: KSA ---------- */
-const KSA_CODE = ["S = list(range(256))", "T = [key[i % len(key)] for i in range(256)]", "j = 0", "for i in range(256):", "    j = (j + S[i] + T[i]) % 256", "    S[i], S[j] = S[j], S[i]"];
+const KSA_CODE = ["S = [0] * 256", "T = [0] * 256", "for i in range(256):", "    S[i] = i", "    T[i] = key[i % len(key)]", "j = 0", "for i in range(256):", "    j = (j + S[i] + T[i]) % 256", "    S[i], S[j] = S[j], S[i]"];
 function render1() {
   const t = L();
   if (app.keyErr) return '<div class="card"><p class="err">' + t.fixFirst + "</p></div>";
@@ -1308,7 +1309,7 @@ function renderL1Body() {
   if (p === 0) {
     st = ksaAt(app.key, 0);
     marks = { idle: true, mv: true };
-    cur = [0, 1, 2]; calc = t.ksaStart; note = "";
+    cur = [0, 1, 2, 3, 4, 5]; calc = t.ksaStart; note = "";
     document.getElementById("ksapos").textContent = "j = 0";
   } else {
     const i = (p - 1) >> 1, after = p % 2 === 0;
@@ -1317,13 +1318,13 @@ function renderL1Body() {
     if (!after) {
       st = pre;
       marks = { idle: true, mv: true, i: i, j: r.j, sw: [i, r.j] };
-      cur = [4];
+      cur = [7];
       calc = t.ksaCalc(r.jOld, r.si, r.ti, r.j);
       note = t.ksaSwap(i, r.j, pre.S[i], pre.S[r.j]);
     } else {
       st = ksaAt(app.key, i + 1);
       marks = { idle: true, mv: true, i: i, j: r.j, sw: [i, r.j] };
-      cur = [5];
+      cur = [8];
       calc = t.ksaCalc(r.jOld, r.si, r.ti, r.j);
       note = i === 255 ? t.ksaDone(r.j) : t.ksaAfter(i, r.j);
     }
@@ -1332,11 +1333,10 @@ function renderL1Body() {
   const mv = [0, 0, 0, 0];
   for (let x = 0; x < 256; x++) { const d = Math.abs(st.S[x] - x); mv[d === 0 ? 0 : d < 16 ? 1 : d < 64 ? 2 : 3]++; }
   g.innerHTML = sgridHTML(st.S, Ttab, marks);
-  document.getElementById("ksacode").innerHTML = codeHTML(KSA_CODE, cur, [3, 4, 5]);
+  document.getElementById("ksacode").innerHTML = codeHTML(KSA_CODE, cur, [6, 7, 8]);
   document.getElementById("ksacalc").textContent = calc;
   document.getElementById("ksacalc").style.whiteSpace = "pre-wrap";
   document.getElementById("ksanote").innerHTML = (note ? "<b>" + esc(note) + "</b><br>" : "") + esc(t.mvN(mv[0], mv[1], mv[2], mv[3])) +
-    (p > 0 ? "<br>" + esc(t.s0key(st.S[0], app.key[0])) : "") +
     (isPermutation(st.S) ? '<br><span class="okline">✓ ' + esc(t.perm) + "</span>" : "");
   const sl = view.querySelector('input[data-field="ksapos"]'); if (sl) sl.value = p;
   document.getElementById("flowZ").textContent = bytesHex(keystream(app.key, 4), " ") + " …";
@@ -1489,12 +1489,9 @@ function renderM1() {
     const S = ksa(app.key);
     mine = '<p style="margin:0 0 8px">' + esc(t.m1you(S[0], app.key[0], S[0] === app.key[0])) + "</p>";
   }
-  const p = Math.pow(255 / 256, 255);
   return '<div class="card">' + mine +
-    '<div class="why" style="margin:0 0 12px">' + t.m1why(fmtPct(p, 1)) + "</div>" +
     "<b>" + t.m1q + '</b><div class="btns" style="margin-top:6px"><button class="dark" data-action="run1">' + t.m1run(10000) + '</button></div><div class="prog"><span id="prog1"></span></div>' +
-    '<div id="m1out"></div><p class="note">' + t.m1note + "</p>" +
-    '<p style="margin:8px 0 0">' + t.m1wep + "</p></div>";
+    '<div id="m1out"></div><p class="note">' + t.m1note + "</p></div>";
 }
 function updateM1() {
   const o = document.getElementById("m1out");
@@ -1506,7 +1503,9 @@ function updateM1() {
   const pk = s.ksa / Math.max(1, s.n), ps = s.shuffle / Math.max(1, s.n);
   o.innerHTML = barsHTML([
     { l: t.m1ksa, v: pk, txt: fmtPct(pk) + " (" + t.m1res(s.ksa, s.n) + ")", hl: true },
-    { l: t.m1shuf, v: ps, txt: fmtPct(ps) + " (" + t.m1res(s.shuffle, s.n) + ")" }], 0.5, 1 / 256, t.uniform + " = " + fmtPct(1 / 256));
+    { l: t.m1shuf, v: ps, txt: fmtPct(ps) + " (" + t.m1res(s.shuffle, s.n) + ")" }], 0.5, 1 / 256, t.uniform + " = " + fmtPct(1 / 256)) +
+    (s.n === s.total ? '<div class="why" style="margin:12px 0 0">' + t.m1why(fmtPct(Math.pow(255 / 256, 255), 1)) + "</div>" +
+      '<p style="margin:8px 0 0">' + t.m1wep + "</p>" : "");
 }
 let RUN1 = 0;
 function run1() {
@@ -1533,8 +1532,8 @@ function renderM2() {
     '<div class="btns"><label>' + t.m2keys + ' <select data-field="s2n">' + opts + '</select></label><button class="dark" data-action="run2">' + t.m2run + '</button>' +
     '<span style="margin-left:14px">' + t.m2pos + '</span><span class="posbtns">' + pos + '</span><span class="note" id="m2status"></span></div>' +
     '<div class="prog"><span id="prog2"></span></div><div id="m2out" style="margin-top:8px"></div>' +
-    '<p class="note" style="margin:6px 0 0">' + t.m2theory(fmtPct(2 / 256)) + "</p></div>" +
-    '<div class="card"><h3>' + t.m2rec + "</h3><p style=\"margin:0 0 6px\">" + t.m2recP + '</p><div id="m2rec"></div></div>';
+    '<p class="note" id="m2th" style="margin:6px 0 0"></p></div>' +
+    '<details class="card fold"><summary><h3>' + t.m2rec + ' <span class="note">(' + t.m2recOpen + ')</span></h3></summary><p style="margin:0 0 6px">' + t.m2recP + '</p><div id="m2rec"></div></details>';
 }
 function updateM2() {
   const o = document.getElementById("m2out"), rc = document.getElementById("m2rec");
@@ -1544,6 +1543,8 @@ function updateM2() {
   if (!s) { o.innerHTML = '<p class="note">' + t.m2wait + "</p>"; rc.innerHTML = '<p class="note">' + t.m2wait + "</p>"; if (pg) pg.style.width = "0"; if (stt) stt.textContent = ""; return; }
   if (pg) pg.style.width = (100 * s.n / s.total) + "%";
   if (stt) stt.textContent = s.n < s.total ? " " + t.m2running(s.n, s.total) : "";
+  const th = document.getElementById("m2th");
+  if (th) th.innerHTML = s.n === s.total ? t.m2theory(fmtPct(2 / 256)) : "";
   const b = app.s2pos, hist = s.hist[b], n = Math.max(1, s.n);
   const share = new Float64Array(256);
   for (let v = 0; v < 256; v++) share[v] = hist[v] / n;

@@ -288,7 +288,7 @@ input.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 
 /* ===================== Diffie-Hellman and ElGamal core ===================== */
 // CORE-BEGIN
-// The 2048-bit MODP group 14 from RFC 3526, section 3 (generator 2). The same prime is used in Task 2 to Task 6.
+// The 2048-bit MODP group 14 from RFC 3526, section 3 (generator 2). The same prime is used in Task 2 to Task 7.
 const RFC3526_P = BigInt("0x" +
   "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74" +
   "020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437" +
@@ -380,6 +380,12 @@ function mitmExchange(p, g, a, b, m) {
            sAlice: modPow(M, a, p), sBob: modPow(M, b, p),        // what Alice and Bob compute
            sMalAlice: modPow(A, m, p), sMalBob: modPow(B, m, p) }; // what Mallory computes
 }
+// Mallory sends a bad value v (1 or p - 1) to both instead of A and B: Alice computes v^a, Bob v^b (all mod p)
+function badValueExchange(p, g, a, b, v) {
+  return { A: modPow(g, a, p), B: modPow(g, b, p), sAlice: modPow(v, a, p), sBob: modPow(v, b, p) };
+}
+// the check of RFC 8446, section 4.2.8.1: 1 < Y < p - 1
+function checkPublic(p, y) { return 1n < y && y < p - 1n; }
 // ElGamal: Bob's keys x (private) and y = g^x (public)
 function egEncrypt(p, g, y, M, k) {
   const C1 = modPow(g, k, p), mask = modPow(y, k, p);
@@ -389,14 +395,14 @@ function egDecrypt(p, x, C1, C2) {
   const s = modPow(C1, x, p), sInv = modInv(s, p);
   return { s: s, sInv: sInv, M: sInv === null ? null : C2 * sInv % p };
 }
-// k used twice: with M1 known, mask = C2 * M1^-1, then M2 = C2' * mask^-1 (Task 6)
+// k used twice: with M1 known, mask = C2 * M1^-1, then M2 = C2' * mask^-1 (Task 7)
 function reuseAttack(p, M1, C2first, C2second) {
   const M1inv = modInv(M1, p);
   const mask = C2first * M1inv % p;
   const maskInv = modInv(mask, p);
   return { M1inv: M1inv, mask: mask, maskInv: maskInv, M2: C2second * maskInv % p };
 }
-// text <-> number as in Task 5 and Task 6: the UTF-8 bytes, big-endian
+// text <-> number as in Task 6 and Task 7: the UTF-8 bytes, big-endian
 function textToNumber(t) {
   let n = 0n;
   for (const byte of new TextEncoder().encode(t)) n = n * 256n + BigInt(byte);
@@ -433,7 +439,7 @@ const TASK3 = [
   { bits: 24, p: 10684799n, g: 4n, A: 3257080n, a: 3465539 },
   { bits: 28, p: 187882979n, g: 4n, A: 180535483n, a: 60546499 },
 ];
-// Task 6 (Lecture04-Diffie-Hellman/Task6/reuse.py): the two C2 values made with the same k, and the known first message.
+// Task 7 (Lecture04-Diffie-Hellman/Task7/reuse.py): the two C2 values made with the same k, and the known first message.
 const T6_C2_FIRST = BigInt("17820659653148686588981613431381401602338807636448641636557539969989079266470094767791290151347641772835341521272590277844038759273736740109775394763045946043357584143813958366465947046481088203901083588487565111310736886959428846242843136709721514298149799398810415931257319402763030697580887445454186676481821210043900939781667096968233565976944450452864268937452405051087863751271873726893476433159107620587812601006046492393571768390521271045234984636680630256469863267946906051482029061786181086487495160925475482529037553761789909493550158493611184753225224405977782190972435244310787203655277951438229896472711");
 const T6_C2_SECOND = BigInt("19065383106845731582829648274560051127274696256521695015617218040716493399461653572206501287874153207841981209918152699682968402361651022384060390963480874821947201382141386544742648800358290006944342897409554171758370687391410985653695877218256561225668235642938327116369583644095655756582580003919405026788024857401902118119027888979388964662401331494491306787903557061280936196209507538563809128460880888389126651820588177143654150203510899094274070153352444664772035299369551534811104340301900379791447046879345426933251113192572227115613436031218116913459430958023934055288540782966171068680103342464402443305847");
 const T6_FIRST = "Payment approved: 250 EUR, order 1187.";
@@ -484,6 +490,14 @@ function selfTest() {
   // 8. Mallory with m = 9 on the slide numbers: M = 11; Alice gets 9 = A^m, Bob gets 10 = B^m (Python 3).
   const mi = mitmExchange(23n, 5n, 6n, 15n, 9n);
   eq("MITM", [mi.M, mi.sAlice, mi.sMalAlice, mi.sBob, mi.sMalBob].join(), "11,9,9,10,10");
+  // 8b. Mallory sends 1 or p - 1 (slides "Mallory sends 1", "Mallory sends p - 1", Python 3):
+  //     1^6 = 1^15 = 1; 22^6 mod 23 = 1, 22^15 mod 23 = 22; the check refuses 1 and 22, keeps 2 and 21 and g^m = 11.
+  const b1 = badValueExchange(23n, 5n, 6n, 15n, 1n), b22 = badValueExchange(23n, 5n, 6n, 15n, 22n);
+  eq("Mallory sends 1", [b1.sAlice, b1.sBob].join(), "1,1");
+  eq("Mallory sends p - 1", [b22.sAlice, b22.sBob].join(), "1,22");
+  eq("check 1 < y < p - 1", [1n, 22n, 2n, 21n, 11n].map(v => checkPublic(23n, v)).join(), "false,false,true,true,true");
+  // 8c. Slide "A cycle of 22 gives away one bit": 8^11 mod 23 = 1 (a = 6 even), 19^11 mod 23 = 22 (b = 15 odd).
+  eq("parity from A^11", [modPow(8n, 11n, 23n), modPow(19n, 11n, 23n)].join(), "1,22");
   // 9. RFC 3526 group 14: 2048 bits, 617 digits; an exchange with two fixed 256-bit secrets,
   //    the first 20 digits computed independently with Python 3 (pow).
   eq("RFC 3526 size", RFC3526_P.toString(2).length + "/" + RFC3526_P.toString().length, "2048/617");
@@ -494,7 +508,7 @@ function selfTest() {
   // 10. k used twice on small numbers (step 6 defaults): M = 7 known, M2 = 4, the same k = 3 -> Eve gets 4.
   const c6a = egEncrypt(23n, 5n, y, 7n, 3n), c6b = egEncrypt(23n, 5n, y, 4n, 3n);
   eq("k used twice, small", reuseAttack(23n, 7n, c6a.C2, c6b.C2).M2, 4n);
-  // 10b. Task 6 at real size: the known first message gives away the second one.
+  // 10b. Task 7 at real size: the known first message gives away the second one.
   const r6 = reuseAttack(RFC3526_P, textToNumber(T6_FIRST), T6_C2_FIRST, T6_C2_SECOND);
   eq("k used twice, real size", numberToText(r6.M2), "New door code for the server room: 4096.");
   // 11. Task 3: the search finds the answers of Task3/solution/dlog.py (16 and 20 bits here, to stay fast).
@@ -529,7 +543,7 @@ const T = {
     explain: [
       ["A secret in public", "Alice and Bob agree on a number without sending it. Eve hears everything on the channel: p, g, A and B. Both sides end with the same secret s, Eve does not. Change any number, everything is computed again. Click a dark box to look inside."],
       ["Why Eve cannot go back", "The powers of g modulo p jump around the clock with no order. Going forward (a to A) is fast. Going back (A to a) is the discrete logarithm: Eve has to try exponents one by one. Real p has 2048 bits."],
-      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own public value g^m (m is her secret). Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons."],
+      ["Mallory changes the messages", "Eve only listens. Mallory sits on the cable and replaces A and B with her own public value g^m (m is her secret). Alice and Bob end with two different secrets, and Mallory knows both. Step through the attack with the buttons. Below the picture: let Mallory send 1 or p - 1 instead, and let Alice and Bob check what they receive."],
       ["Diffie-Hellman with a message", "Bob publishes y = g^x once. To send a number M, Alice picks a new secret k, sends C1 = g^k (her half of an exchange) and C2 = M × y^k (the message hidden by the shared value). Bob divides by the same value and gets M back."],
       ["One modular power", "How does Alice compute g^a mod p when a has 256 bits? Not by multiplying a times. Square-and-multiply goes through the bits of the exponent: square for every bit, multiply once more for every 1."],
       ["The same k for two messages", "ElGamal hides every message with the mask y^k. If the sender uses the same k twice, both messages get the same mask. Eve knows one of the messages: can she read the other one without Bob's private key x?"]],
@@ -562,11 +576,11 @@ const T = {
     expo: "exponent e", play: "▶ play", stop: "■ stop",
     distinctAll: (n, p) => "g reaches all " + n + " numbers from 1 to " + (p - 1) + ": a good g.",
     distinctFew: (n, p) => "g reaches only " + n + " different numbers, then they repeat: a bad g, fewer for Eve to try.",
-    distinctHalf: (n, p) => "g reaches " + n + " different numbers, half of 1 to " + (p - 1) + ": still fine, only 1 bit less for Eve. Real standards (RFC 3526) choose g like this.",
+    distinctHalf: (n, p) => "g reaches " + n + " different numbers, half of 1 to " + (p - 1) + ". Only 1 bit less for Eve, and " + n + (isPrimeSmall(BigInt(n)) ? " is a prime: the cycle has no small pieces that would give away bits of a (with the full cycle " + (p - 1) + " = 2 × " + n + ", A^" + n + " tells Eve whether a is even). Real standards (RFC 3526) choose g like this." : " is not a prime, so the cycle still splits into small pieces."),
     distinctBig: "p is too big to count all the powers here.",
     distinctRfc: "For this group g = 2 reaches (p - 1)/2 different numbers: about 2^2047.",
     noClock: "The clock is drawn for p up to 61. Below: the first powers.",
-    tryG: "Try another g:", goodG: "g = 5 (good)", badG: "g = 22 (bad)",
+    tryG: "Try another g:", goodG: "g = 5 (good)", badG: "g = 22 (bad)", primeG: "g = 2 (prime cycle, as in RFC 3526)",
     rowE: "e", rowV: "g^e mod p",
     fwdTitle: "Forward: easy", backTitle: "Back: hard",
     fwdText: (n, bits) => "Alice knows a and computes A in " + n + " " + (n === 1 ? "multiplication" : "multiplications") + " (square-and-multiply). A 2048-bit p with a 256-bit a needs at most about 512, a few milliseconds.",
@@ -586,8 +600,19 @@ const T = {
     malOn: "Mallory sits on the cable", malStepLbl: k => "attack, step " + k + " of 4",
     malSteps: ["Alice sends A. Mallory keeps it and sends her own public value g^m to Bob.", "Bob sends B. Mallory keeps it and sends g^m to Alice.",
                "Alice shares a secret with Mallory. Bob shares another one with Mallory.", "Alice sends a message. Mallory decrypts it, reads it, encrypts it again for Bob."],
+    malStepsBad: v => ["Alice sends A. Mallory keeps it and sends " + v + " to Bob.", "Bob sends B. Mallory keeps it and sends " + v + " to Alice.",
+               "Alice computes " + v + "^a, Bob computes " + v + "^b. Mallory needs no secret: she knows the few possible results.", "Alice sends a message. Mallory tries the possible keys and reads it."],
+    sendsLbl: "Mallory sends:", sendGm: "her own g^m", sendOne: "1", sendPm1: "p - 1",
+    checkOn: "Alice and Bob check 1 < value < p - 1 (RFC 8446)",
+    failCheck: "✗ not 1 < v < p - 1",
+    malKnowsOne: "= 1 (1 to any power is 1)", malKnowsPm1: p => "= 1 or " + p + " (two tries)",
+    res3one: "Alice and Bob both have 1: the same secret, so even comparing their keys shows nothing wrong. Mallory knows it without any computation, reads every message and passes it on unchanged.",
+    res3pm1: (sa, sb, p) => "(p - 1)^e is 1 for even e and " + p + " for odd e. Alice has " + sa + ", Bob has " + sb + ". Mallory does not know a or b, but she has only two keys to try.",
+    res3check: "Bob refuses the value he got instead of A, Alice the one she got instead of B: neither is between 1 and p - 1. The exchange stops before anyone computes a secret.",
+    res3checkGm: "Note: g^m passes the check, because it is a proper value. The check stops bad values, not a stranger. For that you need the seal.",
+    malReadsSame: "Mallory opens it with the key from 1, reads, passes it on unchanged",
     mLbl: "m: Mallory's secret", malM: "her public value g^m mod p, sent to both", malWithA: "key with Alice: A^m", malWithB: "key with Bob: B^m",
-    recvAsB: "\"from Bob\" (really g^m)", recvAsA: "\"from Alice\" (really g^m)",
+    recvAsB: "\"from Bob\" (really from Mallory)", recvAsA: "\"from Alice\" (really from Mallory)",
     sealOn: "Alice and Bob check a seal (authentication)",
     noSealB: "no seal of Bob: rejected", noSealA: "no seal of Alice: rejected", stopped: "exchange stopped",
     res3: (sa, sb) => "Alice has " + sa + ", Bob has " + sb + ": two different secrets, and Mallory knows both. Without Mallory both would have the same secret (step 1).",
@@ -599,7 +624,7 @@ const T = {
     msgNote: "The key comes from the secret through SHA-256. Here we only show which key locks which envelope. Both sides see correct messages: nothing looks wrong.",
     msgStopped: "Nothing is sent: the exchange was stopped.",
     fixTitle: "The fix: authenticate the exchange",
-    fixText: "Bob adds to his B a seal that only his long-term private key (not b) can make. Alice checks the seal with Bob's public key, which comes vouched for by someone she already trusts. Mallory can replace B, but she cannot seal her g^m as Bob. How such a seal works is a topic of its own, not covered here. Turn on the check above to see the effect.",
+    fixText: "Bob adds to his B a seal that only his long-term private key (not b) can make. Alice checks the seal with Bob's public key, which comes vouched for by someone she already trusts. Mallory can replace B, but she cannot seal her g^m as Bob. How such a seal works is a topic of its own, not covered here. Turn on the seal check above to see the effect.",
     // step 4
     keysTitle: "Bob's keys",
     xLbl: "x: Bob's private key", yLbl: "y = g^x mod p: Bob's public key, on a notice board", pgNow: (p, g) => "p = " + p + ", g = " + g + " (change them in step 1)",
@@ -649,7 +674,7 @@ const T = {
     explain: [
       ["Sekret na oczach wszystkich", "Alice i Bob ustalają liczbę, nie wysyłając jej. Eve słyszy wszystko w kanale: p, g, A i B. Obie strony kończą z tym samym sekretem s, Eve go nie zna. Zmień dowolną liczbę, wszystko przeliczy się od nowa. Kliknij ciemne pole, żeby zajrzeć do środka."],
       ["Dlaczego Eve nie cofnie potęgi", "Potęgi g modulo p skaczą po tarczy zegara bez żadnego porządku. W przód (z a do A) jest szybko. Wstecz (z A do a) to logarytm dyskretny: Eve musi próbować wykładników po kolei. Prawdziwe p ma 2048 bitów."],
-      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość publiczną g^m (m to jej sekret). Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami."],
+      ["Mallory podmienia wiadomości", "Eve tylko słucha. Mallory siedzi na kablu i podmienia A i B na swoją wartość publiczną g^m (m to jej sekret). Alice i Bob kończą z dwoma różnymi sekretami, a Mallory zna oba. Przejdź atak krok po kroku przyciskami. Pod rysunkiem: Mallory może wysłać 1 albo p - 1, a Alice i Bob mogą sprawdzać, co dostają."],
       ["Diffie-Hellman z wiadomością", "Bob raz publikuje y = g^x. Żeby wysłać liczbę M, Alice losuje nowe tajne k i wysyła C1 = g^k (swoją połowę wymiany) oraz C2 = M × y^k (wiadomość zakrytą wspólną wartością). Bob dzieli przez tę samą wartość i odzyskuje M."],
       ["Jedna potęga modulo", "Jak Alice liczy g^a mod p, gdy a ma 256 bitów? Na pewno nie mnożąc a razy. Metoda „kwadrat i mnożenie” idzie po bitach wykładnika: dla każdego bitu podnosi do kwadratu, a dla każdej jedynki mnoży jeszcze raz."],
       ["To samo k dla dwóch wiadomości", "ElGamal zakrywa każdą wiadomość maską y^k. Jeśli nadawca użyje tego samego k dwa razy, obie wiadomości dostaną tę samą maskę. Eve zna jedną z wiadomości: czy przeczyta drugą bez klucza prywatnego x Boba?"]],
@@ -679,11 +704,11 @@ const T = {
     expo: "wykładnik e", play: "▶ odtwórz", stop: "■ stop",
     distinctAll: (n, p) => "g dochodzi do wszystkich " + n + " liczb od 1 do " + (p - 1) + ": dobre g.",
     distinctFew: (n, p) => "g daje tylko " + n + " " + plN(n, "różną liczbę", "różne liczby", "różnych liczb") + ", potem się powtarzają: złe g, Eve ma mniej do sprawdzenia.",
-    distinctHalf: (n, p) => "g daje " + n + " różnych liczb, połowę z 1 do " + (p - 1) + ": to nadal dobrze, Eve zyskuje tylko 1 bit. Prawdziwe standardy (RFC 3526) wybierają g właśnie tak.",
+    distinctHalf: (n, p) => "g daje " + n + " różnych liczb, połowę z 1 do " + (p - 1) + ". Eve zyskuje tylko 1 bit, a " + n + (isPrimeSmall(BigInt(n)) ? " to liczba pierwsza: cykl nie ma małych kawałków, które zdradzałyby bity a (przy pełnym cyklu " + (p - 1) + " = 2 × " + n + " wartość A^" + n + " mówi Eve, czy a jest parzyste). Prawdziwe standardy (RFC 3526) wybierają g właśnie tak." : " nie jest liczbą pierwszą, więc cykl nadal rozpada się na małe kawałki."),
     distinctBig: "p jest za duże, żeby tu policzyć wszystkie potęgi.",
     distinctRfc: "W tej grupie g = 2 daje (p - 1)/2 różnych liczb: około 2^2047.",
     noClock: "Tarcza jest rysowana dla p do 61. Niżej: pierwsze potęgi.",
-    tryG: "Wypróbuj inne g:", goodG: "g = 5 (dobre)", badG: "g = 22 (złe)",
+    tryG: "Wypróbuj inne g:", goodG: "g = 5 (dobre)", badG: "g = 22 (złe)", primeG: "g = 2 (cykl pierwszej długości, jak w RFC 3526)",
     rowE: "e", rowV: "g^e mod p",
     fwdTitle: "W przód: łatwo", backTitle: "Wstecz: trudno",
     fwdText: (n, bits) => "Alice zna a i liczy A w " + n + " " + plN(n, "mnożeniu", "mnożeniach", "mnożeniach") + " (kwadrat i mnożenie). Przy p o 2048 bitach i a o 256 bitach to najwyżej około 512, kilka milisekund.",
@@ -702,8 +727,19 @@ const T = {
     malOn: "Mallory siedzi na kablu", malStepLbl: k => "atak, krok " + k + " z 4",
     malSteps: ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi swoją wartość publiczną g^m.", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice g^m.",
                "Alice ma wspólny sekret z Mallory. Bob ma inny wspólny sekret z Mallory.", "Alice wysyła wiadomość. Mallory ją odszyfrowuje, czyta i szyfruje na nowo dla Boba."],
-    mLbl: "m: sekret Mallory", malM: "jej wartość publiczna g^m mod p, wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
-    recvAsB: "„od Boba” (naprawdę g^m)", recvAsA: "„od Alice” (naprawdę g^m)",
+    malStepsBad: v => ["Alice wysyła A. Mallory je zatrzymuje i wysyła Bobowi " + v + ".", "Bob wysyła B. Mallory je zatrzymuje i wysyła Alice " + v + ".",
+               "Alice liczy " + v + "^a, Bob liczy " + v + "^b. Mallory nie potrzebuje sekretu: zna kilka możliwych wyników.", "Alice wysyła wiadomość. Mallory próbuje możliwych kluczy i ją czyta."],
+    sendsLbl: "Mallory wysyła:", sendGm: "swoje g^m", sendOne: "1", sendPm1: "p - 1",
+    checkOn: "Alice i Bob sprawdzają 1 < wartość < p - 1 (RFC 8446)",
+    failCheck: "✗ nie 1 < v < p - 1",
+    malKnowsOne: "= 1 (1 do każdej potęgi to 1)", malKnowsPm1: p => "= 1 albo " + p + " (dwie próby)",
+    res3one: "Alice i Bob mają oboje 1: ten sam sekret, więc nawet porównanie kluczy niczego nie wykaże. Mallory zna go bez żadnych obliczeń, czyta każdą wiadomość i przekazuje ją bez zmian.",
+    res3pm1: (sa, sb, p) => "(p - 1)^e to 1 dla parzystego e i " + p + " dla nieparzystego. Alice ma " + sa + ", Bob ma " + sb + ". Mallory nie zna a ani b, ale ma tylko dwa klucze do wypróbowania.",
+    res3check: "Bob odrzuca wartość, którą dostał zamiast A, a Alice tę zamiast B: żadna nie leży między 1 a p - 1. Wymiana staje, zanim ktokolwiek policzy sekret.",
+    res3checkGm: "Uwaga: g^m przechodzi sprawdzenie, bo to porządna liczba. Sprawdzenie zatrzymuje złe wartości, a nie obcego. Na obcego potrzebna jest pieczęć.",
+    malReadsSame: "Mallory otwiera kluczem z 1, czyta, przekazuje bez zmian",
+    mLbl: "m: sekret Mallory", malM: "jej g^m mod p, wysyła obojgu", malWithA: "klucz z Alice: A^m", malWithB: "klucz z Bobem: B^m",
+    recvAsB: "„od Boba” (naprawdę od Mallory)", recvAsA: "„od Alice” (naprawdę od Mallory)",
     sealOn: "Alice i Bob sprawdzają pieczęć (uwierzytelnienie)",
     noSealB: "brak pieczęci Boba: odrzucone", noSealA: "brak pieczęci Alice: odrzucone", stopped: "wymiana przerwana",
     res3: (sa, sb) => "Alice ma " + sa + ", Bob ma " + sb + ": dwa różne sekrety, a Mallory zna oba. Bez Mallory oboje mieliby ten sam sekret (krok 1).",
@@ -715,7 +751,7 @@ const T = {
     msgNote: "Klucz powstaje z sekretu przez SHA-256. Tutaj pokazujemy tylko, który klucz zamyka którą kopertę. Obie strony widzą poprawne wiadomości: nic nie wygląda podejrzanie.",
     msgStopped: "Nic nie zostaje wysłane: wymiana została przerwana.",
     fixTitle: "Ratunek: uwierzytelnić wymianę",
-    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego długoterminowy klucz prywatny (nie b). Alice sprawdza pieczęć kluczem publicznym Boba, za który poręczył ktoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje swojego g^m jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie wyżej, żeby zobaczyć efekt.",
+    fixText: "Bob dokłada do swojego B pieczęć, którą może zrobić tylko jego długoterminowy klucz prywatny (nie b). Alice sprawdza pieczęć kluczem publicznym Boba, za który poręczył ktoś, komu Alice już ufa. Mallory może podmienić B, ale nie opieczętuje swojego g^m jako Bob. Jak działa taka pieczęć, to osobny temat, którego tu nie omawiamy. Włącz sprawdzanie pieczęci wyżej, żeby zobaczyć efekt.",
     keysTitle: "Klucze Boba",
     xLbl: "x: klucz prywatny Boba", yLbl: "y = g^x mod p: klucz publiczny Boba, na tablicy ogłoszeń", pgNow: (p, g) => "p = " + p + ", g = " + g + " (zmienisz je w kroku 1)",
     MLbl: "M: wiadomość, liczba od 1 do p - 1", kLbl: "k: nowy losowy sekret",
@@ -765,6 +801,8 @@ const app = {
   level: 0,
   f: { p: "23", g: "5", a: "6", b: "15", m: "9", x: "15", M: "7", k: "3", k2: "7", M2: "4" },
   malStep: 1, seal: false, reuseSame: true,
+  malSend: "gm",    // step 3: what Mallory sends instead of A and B: "gm" (her own g^m), "one" (1), "pm1" (p - 1)
+  check: false,     // step 3: Alice and Bob check 1 < value < p - 1
   clockE: 6, playing: null,
   eve: null,        // Eve's search: { key, e, v, found, done, running }
   t3: null,         // the four searches: results
@@ -929,7 +967,7 @@ function render1() {
   const isRfc = P.p === RFC3526_P;
   let h = '<div class="card"><h3 id="c_title"></h3>' +
     '<div class="btns" style="margin-bottom:6px"><span class="lbl">' + t.tryG + '</span><label class="inl" style="font-weight:600">g = ' + inp("g") + "</label>" +
-    (P.p === 23n ? '<button data-action="setg" data-g="5">' + t.goodG + '</button><button data-action="setg" data-g="22">' + t.badG + "</button>" : "") + "</div>" +
+    (P.p === 23n ? '<button data-action="setg" data-g="5">' + t.goodG + '</button><button data-action="setg" data-g="22">' + t.badG + '</button><button data-action="setg" data-g="2">' + t.primeG + "</button>" : "") + "</div>" +
     '<div class="clockrow"><div id="c_clock"></div><div class="clockside">' +
       (isRfc ? "" : '<div class="ctl"><span class="lbl">' + t.expo + '</span><button data-action="ce" data-d="-1">&minus;</button>' +
         '<input type="range" min="1" max="1" value="1" data-field="clockE" id="c_range"><button data-action="ce" data-d="1">+</button>' +
@@ -1152,7 +1190,8 @@ function render2() {
   const k = app.malStep, st = n => (k < n ? " todo" : " mfaded");
   let h = '<div class="card"><div class="btns" style="margin-bottom:10px">' +
     '<button data-action="mal" data-d="-1">' + t.bPrev + '</button><button class="dark" data-action="mal" data-d="1">' + t.bNext + "</button>" +
-    " <b>" + t.malStepLbl(k) + '</b> <span class="opnow" style="font-family:var(--sans)">' + supTxt(t.malSteps[k - 1]) + "</span></div>" +
+    " <b>" + t.malStepLbl(k) + '</b> <span class="opnow" style="font-family:var(--sans)">' +
+      supTxt((app.malSend === "gm" ? t.malSteps : t.malStepsBad(app.malSend === "one" ? "1" : "(p - 1)"))[k - 1]) + "</span></div>" +
     '<div class="schwrap"><div class="sch" style="width:' + W + "px;height:" + H + 'px">' +
     '<svg class="arrows" width="' + W + '" height="' + H + '" aria-hidden="true">' + MARKERS +
       ln("160,110 160,124", "ink") + '<g class="' + st(2) + '">' + ln("160,274 160,300", "ink") + "</g>" +
@@ -1184,7 +1223,11 @@ function render2() {
     '<div class="wlbl' + st(2) + '" style="left:689px;top:128px;color:var(--pub-t);font-size:12px" id="mw_B"></div>' +
     '<div class="wlbl' + st(2) + '" style="left:302px;top:216px;color:var(--mal-t);font-size:12px" id="mw_M2"></div>' +
     "</div></div>" +
-    '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:600"><input type="checkbox" data-field="seal"' + (app.seal ? " checked" : "") + "> " + t.sealOn + "</label>" +
+    '<div class="btns" style="margin-top:10px"><span class="lbl">' + t.sendsLbl + '</span><span class="tabs">' +
+      [["gm", t.sendGm], ["one", t.sendOne], ["pm1", t.sendPm1]].map(o => '<button data-action="malsend" data-v="' + o[0] + '" aria-pressed="' + (app.malSend === o[0]) + '">' + supTxt(o[1]) + "</button>").join("") +
+      "</span></div>" +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:600"><input type="checkbox" data-field="check"' + (app.check ? " checked" : "") + "> " + t.checkOn + "</label>" +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:4px;font-weight:600"><input type="checkbox" data-field="seal"' + (app.seal ? " checked" : "") + "> " + t.sealOn + "</label>" +
     '<div id="m_res" class="' + st(3) + '"></div>' + legend(["pub", "sec", "sh", "mal"]) + "</div>" +
     '<div class="card' + st(4) + '"><h3>' + t.msgTitle + '</h3><label style="font-size:12.5px;font-weight:600">' + t.msgLbl +
       '<input data-field="mmsg" spellcheck="false" style="display:block;width:100%;max-width:640px;font-family:var(--sans);margin-top:3px" value="' + esc(app.mmsg) + '"></label>' +
@@ -1207,7 +1250,26 @@ function update2() {
   setHTML("m_kA", "= " + powEq("A", "m", r.A, m.v, P.p, r.sMalAlice));
   setHTML("m_kB", "= " + powEq("B", "m", r.B, m.v, P.p, r.sMalBob));
   setHTML("mw_A", "A = " + sh(r.A)); setHTML("mw_B", "B = " + sh(r.B));
-  setHTML("mw_M1", "g<sup>m</sup> = " + sh(r.M)); setHTML("mw_M2", "g<sup>m</sup> = " + sh(r.M));  // r.M is Mallory's g^m
+  // what Mallory sends instead of A and B: her own g^m, or a bad value (1 or p - 1)
+  const bad = app.malSend !== "gm";
+  const v = app.malSend === "one" ? 1n : app.malSend === "pm1" ? P.p - 1n : r.M;
+  const vName = app.malSend === "one" ? "1" : app.malSend === "pm1" ? "(p - 1)" : "(g<sup>m</sup>)";
+  const wire = app.malSend === "gm" ? "g<sup>m</sup> = " + sh(r.M) : sh(v);
+  // Mallory's own g^m is not sent when she sends a bad value: fade its box
+  const mBox = document.getElementById("m_M"); if (mBox) mBox.parentElement.style.opacity = bad ? "0.35" : "";
+  setHTML("mw_M1", wire); setHTML("mw_M2", wire);  // r.M is Mallory's g^m
+  if (bad) {
+    setHTML("m_kA", esc(app.malSend === "one" ? t.malKnowsOne : t.malKnowsPm1(sh(P.p - 1n))));
+    setHTML("m_kB", esc(app.malSend === "one" ? t.malKnowsOne : t.malKnowsPm1(sh(P.p - 1n))));
+  }
+  if (app.check && bad && !app.seal) {
+    setHTML("m_rA", '= <b>' + sh(v) + '</b><span class="stamp">' + t.failCheck + "</span>");
+    setHTML("m_rB", '= <b>' + sh(v) + '</b><span class="stamp">' + t.failCheck + "</span>");
+    setHTML("m_sA", '<span class="err">' + t.stopped + "</span>"); setHTML("m_sB", '<span class="err">' + t.stopped + "</span>");
+    setHTML("m_res", '<div class="banner good">' + supTxt(t.res3check) + "</div>");
+    setHTML("m_msg", '<p class="err" style="margin:0">' + t.msgStopped + "</p>");
+    return;
+  }
   if (app.seal) {
     setHTML("m_rA", '= <b>' + sh(r.M) + '</b><span class="stamp">' + t.noSealB + "</span>");
     setHTML("m_rB", '= <b>' + sh(r.M) + '</b><span class="stamp">' + t.noSealA + "</span>");
@@ -1216,20 +1278,25 @@ function update2() {
     setHTML("m_msg", '<p class="err" style="margin:0">' + t.msgStopped + "</p>");
     return;
   }
-  setHTML("m_rA", "= <b>" + sh(r.M) + "</b>");
-  setHTML("m_rB", "= <b>" + sh(r.M) + "</b>");
-  setHTML("m_sA", "= " + powEq("(g<sup>m</sup>)", "a", r.M, P.a, P.p, r.sAlice));
-  setHTML("m_sB", "= " + powEq("(g<sup>m</sup>)", "b", r.M, P.b, P.p, r.sBob));
-  setHTML("m_res", '<div class="banner bad">' + esc(r.sAlice === r.sBob ? t.res3same(sh(r.sAlice)) : t.res3(sh(r.sAlice), sh(r.sBob))) + "</div>");
+  const okStamp = app.check ? '<span class="stamp ok">1 &lt; ' + (lang === "pl" ? "wartość" : "value") + " &lt; p - 1 ✓</span>" : "";
+  const e = bad ? badValueExchange(P.p, P.g, P.a, P.b, v) : r;
+  setHTML("m_rA", "= <b>" + sh(v) + "</b>" + okStamp);
+  setHTML("m_rB", "= <b>" + sh(v) + "</b>" + okStamp);
+  setHTML("m_sA", "= " + powEq(vName, "a", v, P.a, P.p, e.sAlice));
+  setHTML("m_sB", "= " + powEq(vName, "b", v, P.b, P.p, e.sBob));
+  const resTxt = app.malSend === "one" ? t.res3one : app.malSend === "pm1" ? t.res3pm1(sh(e.sAlice), sh(e.sBob), sh(P.p - 1n)) :
+    (r.sAlice === r.sBob ? t.res3same(sh(r.sAlice)) : t.res3(sh(r.sAlice), sh(r.sBob)));
+  setHTML("m_res", '<div class="banner bad">' + supTxt(resTxt) + "</div>" +
+    (app.check && !bad ? '<div class="banner neutral">' + supTxt(t.res3checkGm) + "</div>" : ""));
   const msg = esc(app.mmsg);
   const env = (lbl, c, sub) => '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 104px;text-align:center">' + ENV_SVG(c) +
     '<span style="font-size:12.5px;font-weight:600">' + LOCK_SVG + " " + lbl + "</span>" + (sub ? '<span class="note">' + sub + "</span>" : "") + "</div>";
   const arr = '<span style="font-size:22px;color:var(--muted)">→</span>';
   setHTML("m_msg", '<div style="display:flex;align-items:center;gap:6px">' +
     '<div class="chip role-msg" style="position:relative;flex:1 1 0;min-width:0"><small>' + t.aliceSends + "</small><br>" + msg + "</div>" + arr +
-    env(esc(t.lockedWith(1, sh(r.sAlice))), "var(--ctx-b)") + arr +
-    '<div class="chip role-mal" style="position:relative;flex:1.15 1 0;min-width:0"><small>' + t.malReads + "</small><br>" + msg + "</div>" + arr +
-    env(esc(t.lockedWith(2, sh(r.sBob))), "var(--ctx-b)") + arr +
+    env(esc(t.lockedWith(1, sh(e.sAlice))), "var(--ctx-b)") + arr +
+    '<div class="chip role-mal" style="position:relative;flex:1.15 1 0;min-width:0"><small>' + (app.malSend === "one" ? t.malReadsSame : t.malReads) + "</small><br>" + msg + "</div>" + arr +
+    env(esc(t.lockedWith(app.malSend === "one" ? 1 : 2, sh(e.sBob))), "var(--ctx-b)") + arr +
     '<div class="chip role-msg" style="position:relative;flex:1 1 0;min-width:0"><small>' + t.bobReads + ' <span class="stamp ok">✓</span></small><br>' + msg + "</div></div>");
 }
 
@@ -1548,6 +1615,7 @@ view.addEventListener("click", e => {
   else if (a === "t3run") runTask3();
   else if (a === "t3open") { app.t3open = true; render(); scrollToT3(); }
   else if (a === "twiceopen") { app.twiceOpen = true; render(); scrollToTwice(); }
+  else if (a === "malsend") { app.malSend = el.dataset.v; render(); }
   else if (a === "mal") { app.malStep = Math.max(1, Math.min(4, app.malStep + +el.dataset.d)); render(); }
   else if (a === "reuse") { app.reuseSame = el.dataset.v === "1"; view.querySelectorAll('[data-action="reuse"]').forEach(b => b.setAttribute("aria-pressed", String(b === el))); update5(); }
   else if (a === "real6") { app.real6 = true; showReal6(); }
@@ -1558,6 +1626,7 @@ view.addEventListener("input", e => {
   const f = e.target.dataset.field;
   if (!f) return;
   if (f === "seal") { app.seal = e.target.checked; update2(); return; }
+  if (f === "check") { app.check = e.target.checked; update2(); return; }
   if (f === "mmsg") { app.mmsg = e.target.value; update2(); return; }
   if (f === "clockE") { app.clockE = +e.target.value; update1(); return; }
   if (f === "pwb" || f === "pwe" || f === "pwm") { app.pw[f.slice(2)] = e.target.value; app.pw.origin = null; app.pw.step = 0; update4(); return; }

@@ -199,6 +199,19 @@ input[type=range]{accent-color:var(--chg)}
 .rlab{font-family:var(--mono);font-weight:700;font-size:16px;min-width:13em}
 svg.chart text{font-family:var(--sans);font-size:11px;fill:var(--muted)}
 
+/* Merkle tree, length extension, sponge */
+svg.tree text{font-size:11px}
+.cells span.s{border-color:var(--sec-b);background:var(--sec-bg);font-weight:600}
+.sgrid{display:grid;gap:2px;margin-top:4px}
+.sgrid.rate{grid-template-columns:repeat(17,26px)}
+.sgrid.cap{grid-template-columns:repeat(8,26px)}
+.sgrid span{height:20px;font-family:var(--mono);font-size:10.5px;line-height:18px;text-align:center;border-radius:3px;border:1.2px solid}
+.sgrid.rate span{border-color:var(--msg-b);background:var(--surface)}
+.sgrid.cap span{border-color:var(--const-b);background:var(--const-bg);color:var(--muted)}
+.sgrid span.c{background:var(--chg-bg);border-color:var(--chg)}
+.sgrid span.o{background:var(--dg-bg);border-color:var(--dg-b);border-width:2.5px;font-weight:700}
+.ratel{color:var(--msg-b)} .capl{color:var(--muted)}
+
 /* guessing */
 .prog{height:12px;border-radius:6px;background:var(--sunken);overflow:hidden;max-width:560px;margin:8px 0 4px}
 .prog span{display:block;height:100%;background:var(--eve)}
@@ -341,6 +354,91 @@ function shortHash(data, k) {
   const first32 = ((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]) >>> 0;
   return k === 32 ? first32 : first32 >>> (32 - k);
 }
+/* ---------- Merkle tree (step 7): leaf = SHA-256(data), parent = SHA-256(left || right) ---------- */
+function cat(a, b) { const o = new Uint8Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; }
+// all the levels, from the leaves [0] up to the root [last]; the number of leaves is a power of 2
+function merkleLevels(leafData) {
+  const levels = [leafData.map(d => sha256(d))];
+  while (levels[levels.length - 1].length > 1) {
+    const lv = levels[levels.length - 1], up = [];
+    for (let i = 0; i < lv.length; i += 2) up.push(sha256(cat(lv[i], lv[i + 1])));
+    levels.push(up);
+  }
+  return levels;
+}
+// the inclusion proof of leaf idx: on every level the sibling, and whether it stands on the left
+function merkleProof(levels, idx) {
+  const proof = [];
+  for (let k = 0; k < levels.length - 1; k++) { const s = idx ^ 1; proof.push({ left: s < idx, h: levels[k][s] }); idx >>= 1; }
+  return proof;
+}
+// from the data of one leaf and its proof up to a root; returns every digest on the way
+function merkleWalk(data, proof) {
+  const path = [sha256(data)];
+  for (const p of proof) { const h = path[path.length - 1]; path.push(sha256(p.left ? cat(p.h, h) : cat(h, p.h))); }
+  return path;
+}
+
+/* ---------- length extension (step 8) ---------- */
+// the 8 words of the state from a 32-byte digest
+function bytesToState(d) { const s = []; for (let i = 0; i < 8; i++) s.push(((d[4 * i] << 24) | (d[4 * i + 1] << 16) | (d[4 * i + 2] << 8) | d[4 * i + 3]) >>> 0); return s; }
+// extra, then the padding of a whole message of done + extra.length bytes
+function padContinued(extra, done) {
+  const n = done + extra.length, p = pad(new Uint8Array(n));      // only its length and its tail matter
+  const tail = p.slice(done); tail.set(extra, 0);
+  return tail;
+}
+// Mallory: from the digest of an unknown message of len bytes to the digest of message || glue || extra
+function extendDigest(digest, len, extra) {
+  const glue = pad(new Uint8Array(len)).slice(len);
+  const tail = padContinued(extra, len + glue.length);
+  let s = bytesToState(digest);
+  for (let off = 0; off < tail.length; off += 64) s = compress(s, tail, off);
+  return { glue: glue, tail: tail, digest: stateToBytes(s) };
+}
+
+/* ---------- SHA-3 (FIPS 202): Keccak-f[1600] on a 200-byte state, rate 136 bytes for SHA3-256 and SHAKE256 ---------- */
+const KRC = [0x0000000000000001n, 0x0000000000008082n, 0x800000000000808An, 0x8000000080008000n, 0x000000000000808Bn,
+  0x0000000080000001n, 0x8000000080008081n, 0x8000000000008009n, 0x000000000000008An, 0x0000000000000088n,
+  0x0000000080008009n, 0x000000008000000An, 0x000000008000808Bn, 0x800000000000008Bn, 0x8000000000008089n,
+  0x8000000000008003n, 0x8000000000008002n, 0x8000000000000080n, 0x000000000000800An, 0x800000008000000An,
+  0x8000000080008081n, 0x8000000000008080n, 0x0000000080000001n, 0x8000000080008008n];
+const KROT = [0, 1, 62, 28, 27, 36, 44, 6, 55, 20, 3, 10, 43, 25, 39, 41, 45, 15, 21, 8, 18, 2, 61, 56, 14];
+const M64 = (1n << 64n) - 1n;
+const rotl64 = (x, n) => n === 0 ? x : ((x << BigInt(n)) | (x >> BigInt(64 - n))) & M64;
+// the permutation, in place, on 200 bytes (25 lanes of 64 bits, little-endian)
+function keccakF(st) {
+  const A = new Array(25);
+  for (let i = 0; i < 25; i++) { let v = 0n; for (let j = 7; j >= 0; j--) v = (v << 8n) | BigInt(st[8 * i + j]); A[i] = v; }
+  for (let r = 0; r < 24; r++) {
+    const C = [], D = [];
+    for (let x = 0; x < 5; x++) C[x] = A[x] ^ A[x + 5] ^ A[x + 10] ^ A[x + 15] ^ A[x + 20];
+    for (let x = 0; x < 5; x++) D[x] = C[(x + 4) % 5] ^ rotl64(C[(x + 1) % 5], 1);
+    for (let i = 0; i < 25; i++) A[i] ^= D[i % 5];
+    const B = new Array(25);
+    for (let x = 0; x < 5; x++) for (let y = 0; y < 5; y++) B[y + 5 * ((2 * x + 3 * y) % 5)] = rotl64(A[x + 5 * y], KROT[x + 5 * y]);
+    for (let x = 0; x < 5; x++) for (let y = 0; y < 5; y++) A[x + 5 * y] = B[x + 5 * y] ^ ((~B[(x + 1) % 5 + 5 * y] & M64) & B[(x + 2) % 5 + 5 * y]);
+    A[0] ^= KRC[r];
+  }
+  for (let i = 0; i < 25; i++) { let v = A[i]; for (let j = 0; j < 8; j++) { st[8 * i + j] = Number(v & 255n); v >>= 8n; } }
+}
+const RATE = 136;
+// the padding of FIPS 202: the domain bits (0x06 for SHA3-256, 0x1F for SHAKE), zeros, the last bit 0x80
+function sha3Pad(msg, dom) {
+  const total = (Math.floor(msg.length / RATE) + 1) * RATE, p = new Uint8Array(total);
+  p.set(msg); p[msg.length] ^= dom; p[total - 1] ^= 0x80;
+  return p;
+}
+// the sponge: absorb every block into the rate, then squeeze outLen bytes
+function sponge(msg, dom, outLen) {
+  const st = new Uint8Array(200), p = sha3Pad(msg, dom);
+  for (let off = 0; off < p.length; off += RATE) { for (let i = 0; i < RATE; i++) st[i] ^= p[off + i]; keccakF(st); }
+  const out = new Uint8Array(outLen);
+  for (let o = 0; o < outLen; o++) { if (o > 0 && o % RATE === 0) keccakF(st); out[o] = st[o % RATE]; }
+  return out;
+}
+const sha3_256 = m => sponge(m, 0x06, 32);
+const shake256 = (m, n) => sponge(m, 0x1F, n);
 // CORE-END
 
 const enc = new TextEncoder();
@@ -358,6 +456,9 @@ const dec = (x, d) => { const v = x.toFixed(d); return lang === "pl" ? v.replace
 const FOX = "The quick brown fox jumps over the lazy dog, then over the lazy cat, then home.";   // 79 bytes, two blocks
 const PHRASE = "Alice: the door code is 0886";
 const MSG3 = (FOX + " " + FOX).slice(0, 150);
+// step 7: the 8 leaves of the Merkle tree (transactions); step 8: Carol's secret note (42 bytes) and Mallory's bytes
+const MERKLE_TX = ["Alice pays Bob 5", "Bob pays Carol 3", "Carol pays Dave 7", "Dave pays Alice 2", "Alice pays Carol 1", "Bob pays Dave 4", "Carol pays Bob 6", "Dave pays Bob 8"];
+const LE_NOTE = "Carol's diary: I hid the cake in the oven.";
 // differing state bits after rounds 1..9, 11, 17, 33, 64 for pad("abc") and the lowest bit of byte 0 flipped
 const ROUND_DIFFS = [[1, 3], [2, 23], [3, 48], [4, 80], [5, 109], [6, 120], [7, 135], [8, 132], [9, 122], [11, 122], [17, 109], [33, 132], [64, 132]];
 
@@ -393,6 +494,18 @@ function selfTest() {
   for (const [r, d] of ROUND_DIFFS) if (diffBits(r1.rounds[r - 1], r2.rounds[r - 1]) !== d) { fails.push("round " + r); break; }
   const h = new Hasher(); h.update(utf8(MSG3.slice(0, 7))); h.update(utf8(MSG3.slice(7, 107))); h.update(utf8(MSG3.slice(107)));
   if (hex(h.digest().digest) !== hex(sha256(utf8(MSG3)))) fails.push("update() in pieces");
+  // step 7 (python3 hashlib: the root of the 8 leaves), step 8 (python3 hashlib with the padding of Task 10), step 9 (FIPS 202)
+  const lvT = merkleLevels(MERKLE_TX.map(x => utf8(x)));
+  if (hex(lvT[3][0]) !== "21e56334b836f350813410e220a460e0a1d1e9cd9a549d9e0dbf830196472ab1") fails.push("Merkle root");
+  for (let i = 0; i < 8; i++) { const w = merkleWalk(utf8(MERKLE_TX[i]), merkleProof(lvT, i)); if (hex(w[3]) !== hex(lvT[3][0])) { fails.push("proof " + i); break; } }
+  const leN = utf8(LE_NOTE), leD = sha256(leN);
+  if (hex(leD) !== "1e82bddd147d99ebca3203fc0e6f00dde027293ba3f19f4033b5b5ada078b95f") fails.push("note digest");
+  if (hex(extendDigest(leD, leN.length, utf8(" P.S. Mallory ate it.")).digest) !== "244f664d4de5f29d2d41409e90d2da2e934b5782d65023547f4f897156947f00") fails.push("length extension");
+  if (hex(sha3_256(utf8("abc"))) !== "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532") fails.push("SHA3-256 abc");
+  if (hex(sha3_256(new Uint8Array(0))) !== "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a") fails.push("SHA3-256 empty");
+  if (hex(sha3_256(utf8("a".repeat(200)))) !== "cce34485baf2bf2aca99b94833892a4f52896d3d153f7b840cc4f9fe695f1387") fails.push("SHA3-256 200 bytes");
+  if (hex(shake256(utf8("Hello, Bob!"), 16)) !== "40f5cc49590a8d989f17be9eca705de2") fails.push("SHAKE256 16");
+  if (hex(shake256(utf8("Hello, Bob!"), 200)).slice(-16) !== "901237154731aac6") fails.push("SHAKE256 200");
   return fails;
 }
 // the longer checks run after the page is drawn: one million "a" and the short-hash numbers of the slides
@@ -412,27 +525,31 @@ function slowTests(done) {
 const T = {
   en: {
     title: "Hash function explorer",
-    intro: "SHA-256 step by step: the avalanche, the padding, the chain of blocks, the rounds, and what an attacker can do.",
+    intro: "SHA-256 step by step: the avalanche, the padding, the chain of blocks, the rounds, what an attacker can do; then Merkle trees, length extension and the sponge of SHA-3.",
     home: "All simulators",
-    stepOf: n => "Step " + n + " of 6 · SHA-256",
+    stepOf: n => "Step " + n + " of 9 · " + (n === 9 ? "SHA-3" : "SHA-256"),
     steps: [["Black box", "any length in, always 32 bytes out"], ["Avalanche lab", "one bit in, about half of the digest out"], ["Padding and the chain", "0x80, zeros, the length; one f per block"],
             ["update() in pieces", "a 64-byte buffer and a 32-byte state"], ["One bit through the rounds", "two runs of f side by side"],
-            ["Guessing a short hash", "about 2^k tries for k bits"]],
+            ["Guessing a short hash", "about 2^k tries for k bits"], ["A Merkle tree", "one root, a proof of log2 n digests"],
+            ["Length extension", "continue a digest without the message"], ["The sponge of SHA-3", "rate, capacity; absorb, squeeze"]],
     explain: [
       ["Any length in, always 32 bytes out", "Type a message, or make it longer with the buttons: the message bar grows, the digest stays 32 bytes. Then type the same text in the second field: the same input always gives the same digest, and one different character gives a completely different one."],
       ["Change one bit, watch the digest", "Type a message. Below it, every byte is shown as 8 bits: click any bit to flip it. The grid shows the 256 bits of the new digest; red bits are the ones that changed. Then let thousands of random pairs run non-stop."],
       ["How any length becomes 64-byte blocks", "Slide the message length and watch the padding: the message, the end marker 80, zeros, and the length in bits in the last 8 bytes. Then follow the state from block to block: the last state is the digest."],
       ["The same digest, whatever the pieces", "The hash object keeps a 32-byte state and a buffer for at most 63 waiting bytes. Feed a 150-byte message in pieces of your choice: f runs every time the buffer fills up. digest() pads the rest. The digest never depends on the pieces."],
       ["Inside f: one bit spreads", "Two runs of the compression function on two blocks that differ in one bit. Each run shows the 8 words A to H as 32 bits; red bits differ between the runs. Move through the 64 rounds, then the final addition of the old state."],
-      ["The generic attack on a k-bit digest", "Keep only the first k bits of SHA-256. Mallory tries the inputs 0, 1, 2, ... until the short code matches. Watch the counter against 2^k, run 100 targets to see the spread, then extrapolate to 256 bits."]],
-    selfOk: "✓ checked against FIPS 180-4 and the slide values", selfBad: f => "✗ self-test failed: " + f, selfWait: "checking the long test values…",
+      ["The generic attack on a k-bit digest", "Keep only the first k bits of SHA-256. Mallory tries the inputs 0, 1, 2, ... until the short code matches. Watch the counter against 2^k, run 100 targets to see the spread, then extrapolate to 256 bits."],
+      ["One root for many leaves", "Eight transactions are the leaves; each pair of digests is hashed into its parent, up to one root. Click a leaf: the orange path goes up to the root, and the three teal digests next to it are the proof. Then, below, let Mallory change one leaf."],
+      ["The digest is the last state", "Carol published the SHA-256 of a secret note and its length. Mallory loads the digest as the state of SHA-256 and hashes her own bytes after it. The result is the digest of note + glue + her bytes, and she never saw the note."],
+      ["Absorb, then squeeze", "The state of SHA-3 has 200 bytes: 136 bytes of rate (violet) and 64 bytes of capacity (grey). Step through: each block is XORed into the rate only, then the whole state is permuted. At the end the digest is read from the rate. Below: SHAKE256 reads as many bytes as you ask for."]],
+    selfOk: "✓ checked against FIPS 180-4, FIPS 202 and the slide values", selfBad: f => "✗ self-test failed: " + f, selfWait: "checking the long test values…",
     moreBelow: "More below", keys: "→ / Enter: next step · ← / Esc: back",
     // gates
     gateBtn: "I have predicted: show it",
     gate: ["", "Predict first: if one bit of the message changes, how many of the 256 digest bits change? Always the same number?",
            "Predict first: how many 64-byte blocks does a message of 3, 55, 56 or 64 bytes need after padding?",
            "", "",
-           "Predict first: 12 bits need about 4096 tries. How many for 16 bits? For 20 bits?"],
+           "Predict first: 12 bits need about 4096 tries. How many for 16 bits? For 20 bits?", "", "", ""],
     // black box
     bbMsg: "message", bbDg: "SHA-256 digest", bbIn: n => "in: " + fmtBytes(n), bbOut: "out: 32 bytes, 64 hex digits",
     bbX10: "× 10 longer", bbBook: "a 1 MB file", bbReset: "back to the short message", bbTitle: "One box: any message in, 32 bytes out",
@@ -481,29 +598,57 @@ const T = {
     extraTitle: "From k bits to 256 bits", extraNote: "With the speed measured above (start a search first):",
     years: (bits, y) => "2^" + bits + " tries: about " + y + " years", universe: "the universe is about 1.4 × 10^10 years old",
     noRate: "Run a search above to measure the speed of this browser.",
+    // step 7
+    mkRoot: "root", mkT1: "Click a leaf: its inclusion proof", mkN1: "Bob has one transaction and the root. The proof gives him the digest next to his node on every level: 3 digests for 8 leaves.",
+    mkLegLeaf: "leaf data", mkLegProof: "the proof (sent to Bob)", mkLegPath: "orange frame: computed by Bob",
+    mkOk: k => "✓ Bob reaches the root with " + k + " digests from the proof",
+    mkT2: "Mallory changes the chosen leaf", mkN2: "Edit the text of the leaf you chose above. Red nodes no longer match Alice's tree.",
+    mkEditLbl: "Mallory's version of the leaf", mkUndo: "undo", mkAliceRoot: "Alice's root (published)", mkNowRoot: "the root of the changed tree",
+    mkSame: "✓ unchanged: the same root", mkDiff: ok => "✗ the root changed; the old proof with the changed leaf " + "no longer reaches Alice's root",
+    // step 8
+    leT1: "Carol: the note, its padding, one f, the published digest", leLegNote: n => "the secret note, " + n + " bytes: Mallory sees only ??", leLegGlue: "the glue: 80, zeros, the length",
+    lePublished: "SHA-256 of the note (published)",
+    leT2: "Mallory: the digest as the state, then her bytes", leExtraLbl: "Mallory's bytes",
+    leGlue: (g, d) => "The glue has " + g + " bytes; it depends only on the length. The note and the glue together: " + d + " bytes, whole blocks, already done.",
+    leAsState: "the digest as the state", leForged: "Mallory's digest",
+    leT3: "The check: SHA-256 of the whole long message", leCheckNote: n => "Only the check knows the note. It hashes all " + n + " bytes from the start: note + glue + Mallory's bytes.",
+    leReal: "SHA-256(note + glue + Mallory's bytes)", leSame: "✓ the same: Mallory computed it without the note", leShowBtn: "show the note", leHide: "hide the note",
+    // step 9
+    spLong: "200 bytes (two blocks)", spNext: "next ▶", spRate: "rate: 136 bytes", spCap: "capacity: 64 bytes",
+    spCapNote: "The input is never XORed here and the output is never read from here. This hidden part makes the sponge safe: no attack on the sponge itself costs less than about 2^256, half of its 512 bits.",
+    spLbl: (s, B, n) => s.kind === "start" ? "start: 200 zero bytes · the message: " + n + " bytes, after padding " + B + (B === 1 ? " block" : " blocks") + " of 136 bytes" :
+      s.kind === "xor" ? "absorb: block " + s.b + " XORed into the rate (orange: changed)" : s.kind === "perm" ? "permute: Keccak-f, 24 rounds, the whole state changes" : "squeeze: the digest = the first 32 bytes of the rate",
+    spDigest: "SHA3-256 digest", spOk: "✓ the same as SHA3-256 of the message",
+    shLbl: n => "SHAKE256: " + n + " bytes of output", shNote: "Each shaded piece is 136 bytes read from the rate; between two pieces the state is permuted once more.",
+    shPerms: p => p === 0 ? "no extra permutation" : p + " extra " + (p === 1 ? "permutation" : "permutations") + " while squeezing",
+    sh32: "SHAKE256, 32 bytes", shDiff: "Different: SHA3-256 and SHAKE256 start their padding with different bits (01 or 1111), so their outputs are unrelated.",
   },
   pl: {
     title: "Funkcja skrótu krok po kroku",
-    intro: "SHA-256 krok po kroku: lawina, dopełnienie, łańcuch bloków, rundy i to, co może zrobić atakujący.",
+    intro: "SHA-256 krok po kroku: lawina, dopełnienie, łańcuch bloków, rundy, to, co może zrobić atakujący; potem drzewa Merkle'a, przedłużanie skrótu i gąbka SHA-3.",
     home: "Wszystkie symulatory",
-    stepOf: n => "Krok " + n + " z 6 · SHA-256",
+    stepOf: n => "Krok " + n + " z 9 · " + (n === 9 ? "SHA-3" : "SHA-256"),
     steps: [["Czarna skrzynka", "dowolna długość na wejściu, zawsze 32 bajty"], ["Laboratorium lawiny", "jeden bit na wejściu, połowa skrótu na wyjściu"], ["Dopełnienie i łańcuch", "0x80, zera, długość; jedno f na blok"],
             ["update() kawałkami", "bufor 64 bajtów i stan 32 bajtów"], ["Jeden bit przez rundy", "dwa przebiegi f obok siebie"],
-            ["Zgadywanie krótkiego skrótu", "około 2^k prób dla k bitów"]],
+            ["Zgadywanie krótkiego skrótu", "około 2^k prób dla k bitów"], ["Drzewo Merkle'a", "jeden korzeń, dowód z log2 n skrótów"],
+            ["Przedłużanie skrótu", "length extension: dalej bez wiadomości"], ["Gąbka SHA-3", "rate, capacity; wchłanianie, wyciskanie"]],
     explain: [
       ["Dowolna długość na wejściu, zawsze 32 bajty na wyjściu", "Wpisz wiadomość albo wydłuż ją przyciskami: pasek wiadomości rośnie, skrót ma zawsze 32 bajty. Potem wpisz ten sam tekst w drugim polu: to samo wejście zawsze daje ten sam skrót, a jeden inny znak daje zupełnie inny."],
       ["Zmień jeden bit, patrz na skrót", "Wpisz wiadomość. Pod nią każdy bajt jako 8 bitów: kliknij dowolny bit, żeby go odwrócić. Siatka pokazuje 256 bitów nowego skrótu; czerwone bity to te, które się zmieniły. Potem puść tysiące losowych par bez przerwy."],
       ["Jak dowolna długość staje się blokami po 64 bajty", "Przesuwaj długość wiadomości i patrz na dopełnienie: wiadomość, znacznik końca 80, zera i długość w bitach w ostatnich 8 bajtach. Potem prześledź stan od bloku do bloku: ostatni stan to skrót."],
       ["Ten sam skrót, niezależnie od kawałków", "Obiekt skrótu trzyma stan 32 bajtów i bufor na najwyżej 63 czekające bajty. Podawaj 150-bajtową wiadomość kawałkami, jakimi chcesz: f działa za każdym razem, gdy bufor się zapełni. digest() dopełnia resztę. Skrót nigdy nie zależy od kawałków."],
       ["Wewnątrz f: jeden bit się rozlewa", "Dwa przebiegi funkcji kompresji na dwóch blokach różniących się jednym bitem. Każdy przebieg pokazuje 8 słów A do H jako 32 bity; czerwone bity różnią się między przebiegami. Przejdź przez 64 rundy, a potem przez końcowe dodanie starego stanu."],
-      ["Atak ogólny na k-bitowy skrót", "Zostaw tylko pierwsze k bitów SHA-256. Mallory próbuje wejść 0, 1, 2, ..., aż krótki kod się zgodzi. Porównaj licznik z 2^k, puść 100 celów, żeby zobaczyć rozrzut, a potem przelicz na 256 bitów."]],
-    selfOk: "✓ sprawdzone z FIPS 180-4 i liczbami ze slajdów", selfBad: f => "✗ autotest nie przeszedł: " + f, selfWait: "sprawdzam długie wartości testowe…",
+      ["Atak ogólny na k-bitowy skrót", "Zostaw tylko pierwsze k bitów SHA-256. Mallory próbuje wejść 0, 1, 2, ..., aż krótki kod się zgodzi. Porównaj licznik z 2^k, puść 100 celów, żeby zobaczyć rozrzut, a potem przelicz na 256 bitów."],
+      ["Jeden korzeń dla wielu liści", "Osiem transakcji to liście; każdą parę skrótów hashujemy w rodzica, aż do jednego korzenia. Kliknij liść: pomarańczowa ścieżka idzie do korzenia, a trzy turkusowe skróty obok niej to dowód. Niżej Mallory zmienia jeden liść."],
+      ["Skrót to ostatni stan", "Carol opublikowała SHA-256 tajnej notatki i jej długość. Mallory ładuje skrót jako stan SHA-256 i hashuje za nim własne bajty. Wynik to skrót notatki + kleju + jej bajtów, a notatki nigdy nie widziała."],
+      ["Wchłoń, potem wyciśnij", "Stan SHA-3 ma 200 bajtów: 136 bajtów rate (fiolet) i 64 bajty capacity (szare). Przechodź krok po kroku: każdy blok wchodzi XOR-em tylko do rate, potem cały stan jest permutowany. Na końcu skrót czyta się z rate. Niżej: SHAKE256 czyta tyle bajtów, ile chcesz."]],
+    selfOk: "✓ sprawdzone z FIPS 180-4, FIPS 202 i liczbami ze slajdów", selfBad: f => "✗ autotest nie przeszedł: " + f, selfWait: "sprawdzam długie wartości testowe…",
     moreBelow: "Niżej jest więcej", keys: "→ / Enter: następny krok · ← / Esc: wstecz",
     gateBtn: "Przewidziałem(-am): pokaż",
     gate: ["", "Najpierw przewidź: jeśli zmieni się jeden bit wiadomości, ile z 256 bitów skrótu się zmieni? Zawsze tyle samo?",
            "Najpierw przewidź: ile bloków po 64 bajty ma po dopełnieniu wiadomość 3, 55, 56 i 64 bajtów?",
            "", "",
-           "Najpierw przewidź: 12 bitów to ok. 4096 prób. Ile dla 16 bitów? Dla 20?"],
+           "Najpierw przewidź: 12 bitów to ok. 4096 prób. Ile dla 16 bitów? Dla 20?", "", "", ""],
     // czarna skrzynka
     bbMsg: "wiadomość", bbDg: "skrót SHA-256", bbIn: n => "wejście: " + fmtBytes(n), bbOut: "wyjście: 32 bajty, 64 cyfry szesnastkowe",
     bbX10: "× 10 dłuższa", bbBook: "plik 1 MB", bbReset: "z powrotem krótka wiadomość", bbTitle: "Jedna skrzynka: dowolna wiadomość na wejściu, 32 bajty na wyjściu",
@@ -547,6 +692,27 @@ const T = {
     extraTitle: "Od k bitów do 256 bitów", extraNote: "Przy szybkości zmierzonej wyżej (najpierw uruchom szukanie):",
     years: (bits, y) => "2^" + bits + " prób: ok. " + y + " lat", universe: "Wszechświat ma ok. 1,4 × 10^10 lat",
     noRate: "Uruchom szukanie wyżej, żeby zmierzyć szybkość tej przeglądarki.",
+    mkRoot: "korzeń", mkT1: "Kliknij liść: jego dowód przynależności", mkN1: "Bob ma jedną transakcję i korzeń. Dowód daje mu na każdym poziomie skrót obok jego węzła: 3 skróty dla 8 liści.",
+    mkLegLeaf: "dane liścia", mkLegProof: "dowód (wysłany Bobowi)", mkLegPath: "pomarańczowa ramka: liczy Bob",
+    mkOk: k => "✓ Bob dochodzi do korzenia z " + k + " skrótami z dowodu",
+    mkT2: "Mallory zmienia wybrany liść", mkN2: "Zmień tekst liścia wybranego wyżej. Czerwone węzły nie zgadzają się już z drzewem Alice.",
+    mkEditLbl: "wersja liścia od Mallory", mkUndo: "cofnij", mkAliceRoot: "korzeń Alice (opublikowany)", mkNowRoot: "korzeń zmienionego drzewa",
+    mkSame: "✓ bez zmian: ten sam korzeń", mkDiff: ok => "✗ korzeń się zmienił; stary dowód ze zmienionym liściem " + "nie prowadzi już do korzenia Alice",
+    leT1: "Carol: notatka, jej dopełnienie, jedno f, opublikowany skrót", leLegNote: n => "tajna notatka, " + n + " B: Mallory widzi tylko ??", leLegGlue: "klej: 80, zera, długość",
+    lePublished: "SHA-256 notatki (opublikowany)",
+    leT2: "Mallory: skrót jako stan, potem jej bajty", leExtraLbl: "bajty Mallory",
+    leGlue: (g, d) => "Klej ma " + g + " B; zależy tylko od długości. Notatka z klejem: " + d + " B, pełne bloki, już policzone.",
+    leAsState: "skrót jako stan", leForged: "skrót Mallory",
+    leT3: "Sprawdzenie: SHA-256 całej długiej wiadomości", leCheckNote: n => "Notatkę zna tylko sprawdzenie. Hashuje wszystkie " + n + " B od początku: notatka + klej + bajty Mallory.",
+    leReal: "SHA-256(notatka + klej + bajty Mallory)", leSame: "✓ to samo: Mallory policzyła to bez notatki", leShowBtn: "pokaż notatkę", leHide: "ukryj notatkę",
+    spLong: "200 bajtów (dwa bloki)", spNext: "dalej ▶", spRate: "rate: 136 bajtów", spCap: "capacity: 64 bajty",
+    spCapNote: "Tu wejście nigdy nie trafia XOR-em i stąd nigdy nie czyta się wyjścia. Ta ukryta część daje bezpieczeństwo: żaden atak na samą gąbkę nie kosztuje mniej niż ok. 2^256, połowa jej 512 bitów.",
+    spLbl: (s, B, n) => s.kind === "start" ? "start: 200 bajtów zerowych · wiadomość: " + n + " B, po dopełnieniu " + B + (B === 1 ? " blok" : B < 5 ? " bloki" : " bloków") + " po 136 B" :
+      s.kind === "xor" ? "wchłanianie: blok " + s.b + " XOR-em do rate (pomarańczowe: zmienione)" : s.kind === "perm" ? "permutacja: Keccak-f, 24 rundy, zmienia się cały stan" : "wyciskanie: skrót = pierwsze 32 bajty rate",
+    spDigest: "skrót SHA3-256", spOk: "✓ to samo co SHA3-256 wiadomości",
+    shLbl: n => "SHAKE256: " + n + " B wyjścia", shNote: "Każdy zacieniony kawałek to 136 bajtów odczytanych z rate; między kawałkami stan jest jeszcze raz permutowany.",
+    shPerms: p => p === 0 ? "bez dodatkowej permutacji" : "dodatkowe permutacje przy wyciskaniu: " + p,
+    sh32: "SHAKE256, 32 bajty", shDiff: "Różne: SHA3-256 i SHAKE256 zaczynają dopełnienie od innych bitów (01 albo 1111), więc ich wyniki nie mają ze sobą związku.",
   },
 };
 
@@ -555,11 +721,11 @@ let lang = "en";
 /* one language setting for all the simulators on the site */
 try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
 const L = () => T[lang];
-const NSTEPS = 6;
+const NSTEPS = 9;
 
 const app = {
   level: 0, card: 1,
-  open: [true, false, false, true, true, false],      // the "predict first" gates
+  open: [true, false, false, true, true, false, true, true, true],      // the "predict first" gates
   // step 1
   msg: "Pay Bob 100 GBP", flips: new Set(),
   // black box
@@ -573,6 +739,8 @@ const app = {
   msg4: "abc", flipByte: 0, flipBit: 0, round: 0, playing: null,   // flipBit 0: the lowest bit of byte 0, as on the slide
   // step 5
   k: 12, search: null, rate: 0, hundred: null, k2: 12,
+  // steps 7 to 9
+  mkSel: 5, mkEdit: null, leExtra: " P.S. Mallory ate it.", leShow: false, spMsg: "abc", spPhase: 0, shLen: 32,
 };
 let SELF_FAILS = selfTest();
 let SLOW_DONE = false;
@@ -1010,9 +1178,157 @@ function drawExtra() {
     '<p class="note">' + t.universe + "</p>";
 }
 
+/* ---------- step 7: a Merkle tree ---------- */
+function mkData(edited) { const d = MERKLE_TX.map(s => utf8(s)); if (edited && app.mkEdit !== null) d[app.mkSel] = utf8(app.mkEdit); return d; }
+// the tree as SVG: hl.path / hl.proof are sets "level:index"; diff: the levels to compare with (red where different)
+function treeSVG(levels, hl, diff, clickable, labels) {
+  const W = 780, X = (k, i) => 52 + (i + 0.5) * Math.pow(2, k) * 92 - 46, Y = k => 250 - 64 * k;
+  let s = '<svg class="chart tree" width="' + W + '" height="300" viewBox="0 0 ' + W + ' 300">';
+  for (let k = 1; k < levels.length; k++) for (let i = 0; i < levels[k].length; i++)
+    for (const c of [2 * i, 2 * i + 1]) s += '<line x1="' + X(k, i) + '" y1="' + (Y(k) + 13) + '" x2="' + X(k - 1, c) + '" y2="' + (Y(k - 1) - 13) + '" stroke="var(--const-b)" stroke-width="1.5"/>';
+  for (let k = 0; k < levels.length; k++) for (let i = 0; i < levels[k].length; i++) {
+    const key = k + ":" + i, inPath = hl.path.has(key), inProof = hl.proof.has(key);
+    const changed = diff && hex(diff[k][i]) !== hex(levels[k][i]);
+    const fill = changed ? "var(--flip-bg)" : inProof ? "var(--bob-bg)" : "var(--dg-bg)";
+    const stroke = changed ? "var(--flip)" : inProof ? "var(--bob)" : inPath ? "var(--chg)" : "var(--dg-b)";
+    const sw = changed || inProof || inPath ? 3 : 1.3;
+    s += '<g' + (clickable && k === 0 ? ' data-action="mkleaf" data-i="' + i + '" style="cursor:pointer"' : "") + '><rect x="' + (X(k, i) - 40) + '" y="' + (Y(k) - 13) + '" width="80" height="26" rx="4" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+      '<text x="' + X(k, i) + '" y="' + (Y(k) + 4) + '" text-anchor="middle" style="font-family:var(--mono);font-size:11.5px;fill:var(--ink)">' + hex(levels[k][i]).slice(0, 8) + "</text></g>";
+  }
+  for (let i = 0; i < 8; i++) {
+    const words = (labels ? labels[i] : MERKLE_TX[i]).split(" ");
+    s += '<g data-action="mkleaf" data-i="' + i + '" style="cursor:pointer"><rect x="' + (X(0, i) - 42) + '" y="270" width="84" height="28" rx="4" fill="var(--msg-bg)" stroke="var(--msg-b)" stroke-width="' + (i === app.mkSel ? 3 : 1.3) + '"/>' +
+      '<text x="' + X(0, i) + '" y="282" text-anchor="middle" style="font-size:10px;fill:var(--ink)">' + esc(words.slice(0, 2).join(" ")) + '</text><text x="' + X(0, i) + '" y="294" text-anchor="middle" style="font-size:10px;fill:var(--ink)">' + esc(words.slice(2).join(" ")) + "</text></g>";
+  }
+  s += '<text x="' + (X(3, 0) + 50) + '" y="' + (Y(3) + 4) + '">' + L().mkRoot + "</text>";
+  return s + "</svg>";
+}
+function render6() {
+  const t = L();
+  return '<div class="card"><h3>' + t.mkT1 + '</h3><p class="note" style="margin:0">' + t.mkN1 + '</p><div id="mk1"></div><div class="log" id="mkw"></div><div id="mkok"></div></div>' +
+    '<div class="card"><h3>' + t.mkT2 + '</h3><p class="note" style="margin:0">' + t.mkN2 + '</p><div class="flow"><label class="vbox r-eve"><small class="who-m">' + t.mkEditLbl + '</small><input type="text" data-field="mkedit" size="30" id="mkin"></label><button data-action="mkundo">' + t.mkUndo + '</button></div><div id="mk2"></div><div id="mk2r"></div></div>';
+}
+function update6() {
+  const t = L(), el = document.getElementById("mk1");
+  if (!el) return;
+  const lv = merkleLevels(mkData(false)), proof = merkleProof(lv, app.mkSel);
+  const path = new Set(), pr = new Set();
+  let idx = app.mkSel;
+  for (let k = 0; k < lv.length; k++) { path.add(k + ":" + idx); if (k < lv.length - 1) pr.add(k + ":" + (idx ^ 1)); idx >>= 1; }
+  el.innerHTML = treeSVG(lv, { path: path, proof: pr }, null, true) +
+    '<div class="legend"><span class="r-msg">' + t.mkLegLeaf + '</span><span class="r-bob">' + t.mkLegProof + '</span><span class="r-mark" style="background:var(--surface)">' + t.mkLegPath + "</span></div>";
+  const walk = merkleWalk(utf8(MERKLE_TX[app.mkSel]), proof);
+  let w = "h = H(\"" + esc(MERKLE_TX[app.mkSel]) + "\") = " + hex(walk[0]).slice(0, 16) + "…";
+  for (let k = 0; k < proof.length; k++) w += "<br>" + (proof[k].left ? "h = H(<b style='color:var(--bob-ink)'>" + hex(proof[k].h).slice(0, 8) + "…</b> ‖ h)" : "h = H(h ‖ <b style='color:var(--bob-ink)'>" + hex(proof[k].h).slice(0, 8) + "…</b>)") + " = " + hex(walk[k + 1]).slice(0, 16) + "…";
+  document.getElementById("mkw").innerHTML = w;
+  const ok = hex(walk[walk.length - 1]) === hex(lv[lv.length - 1][0]);
+  document.getElementById("mkok").innerHTML = '<div class="' + (ok ? "okline" : "badline") + '" style="margin-top:6px">' + (ok ? t.mkOk(proof.length) : "✗") + "</div>";
+  // card 2: Mallory changes the chosen leaf
+  const inp = document.getElementById("mkin");
+  if (document.activeElement !== inp) inp.value = app.mkEdit !== null ? app.mkEdit : MERKLE_TX[app.mkSel];
+  const lv2 = merkleLevels(mkData(true));
+  document.getElementById("mk2").innerHTML = treeSVG(lv2, { path: new Set(), proof: new Set() }, lv, false, MERKLE_TX.map((x, i) => i === app.mkSel && app.mkEdit !== null ? app.mkEdit : x));
+  const r1 = hex(lv[lv.length - 1][0]), r2 = hex(lv2[lv2.length - 1][0]);
+  const walk2 = merkleWalk(mkData(true)[app.mkSel], proof);
+  document.getElementById("mk2r").innerHTML = '<div class="flow">' + vbox("r-dg", t.mkAliceRoot, r1.slice(0, 32) + "<br>" + r1.slice(32)) + vbox(r1 === r2 ? "r-dg" : "r-eve", t.mkNowRoot, r2.slice(0, 32) + "<br>" + r2.slice(32)) + "</div>" +
+    '<div class="' + (r1 === r2 ? "okline" : "badline") + '">' + (r1 === r2 ? t.mkSame : t.mkDiff(hex(walk2[walk2.length - 1]) === r1)) + "</div>";
+}
+
+/* ---------- step 8: length extension ---------- */
+function cellsHTML(bytes, cls, label) {
+  let s = '<div class="blk"><span class="lbl">' + label + '</span><div class="cells">';
+  for (let i = 0; i < bytes.length; i++) s += '<span class="' + cls(i) + '">' + (cls(i) === "s" && !app.leShow ? "??" : bytes[i].toString(16).padStart(2, "0")) + "</span>";
+  return s + "</div></div>";
+}
+function render7() {
+  const t = L();
+  return '<div class="card"><h3 class="who-a">' + t.leT1 + '</h3><div id="le1"></div></div>' +
+    '<div class="card"><h3 class="who-m">' + t.leT2 + '</h3><div class="flow"><label class="vbox r-msg"><small>' + t.leExtraLbl + '</small><input type="text" data-field="leextra" maxlength="100" size="40" value="' + esc(app.leExtra) + '"></label></div><div id="le2"></div></div>' +
+    '<div class="card"><div class="cardhead"><h3>' + t.leT3 + '</h3><button data-action="leshow" id="leshow"></button></div><div id="le3"></div></div>';
+}
+function update7() {
+  const t = L(), el = document.getElementById("le1");
+  if (!el) return;
+  const note = utf8(LE_NOTE), n = note.length, p = pad(note), d = sha256(note);
+  const cls1 = i => i < n ? "s" : i === n ? "e" : i >= p.length - 8 ? "l" : "z";
+  let s = "";
+  for (let b = 0; b < p.length / 64; b++) s += cellsHTML(p.slice(64 * b, 64 * b + 64), i => cls1(64 * b + i), t.blockLbl(b + 1));
+  s += '<div class="legend"><span class="r-sec">' + t.leLegNote(n) + '</span><span class="r-mark">' + t.leLegGlue + "</span></div>";
+  s += '<div class="flow" style="margin-top:8px"><div class="st r-neu"><small>IV</small>' + w8(IV[0]) + '…</div><span class="arr">→</span><div class="mech">f</div><span class="arr">→</span>' + vbox("r-dg", t.lePublished, hex(d).slice(0, 32) + "<br>" + hex(d).slice(32)) + "</div>";
+  el.innerHTML = s;
+  const ex = extendDigest(d, n, utf8(app.leExtra)), done = n + ex.glue.length, ne = utf8(app.leExtra).length;
+  const cls2 = i => i < ne ? "m" : i === ne ? "e" : i >= ex.tail.length - 8 ? "l" : "z";
+  let s2 = '<div class="note">' + t.leGlue(ex.glue.length, done) + "</div>";
+  for (let b = 0; b < ex.tail.length / 64; b++) s2 += cellsHTML(ex.tail.slice(64 * b, 64 * b + 64), i => cls2(64 * b + i), t.blockLbl(p.length / 64 + b + 1));
+  s2 += '<div class="flow" style="margin-top:8px">' + vbox("r-dg", t.leAsState, w8(bytesToState(d)[0]) + "…") + '<span class="arr">→</span><div class="mech">f × ' + (ex.tail.length / 64) + '</div><span class="arr">→</span>' + vbox("r-eve", t.leForged, hex(ex.digest).slice(0, 32) + "<br>" + hex(ex.digest).slice(32)) + "</div>";
+  document.getElementById("le2").innerHTML = s2;
+  const real = sha256(cat(cat(note, ex.glue), utf8(app.leExtra)));
+  const ok = hex(real) === hex(ex.digest);
+  document.getElementById("le3").innerHTML = '<p class="note" style="margin:0">' + t.leCheckNote(done + ne) + '</p>' + (app.leShow ? '<div class="note mono">"' + esc(LE_NOTE) + '"</div>' : "") +
+    '<div class="flow">' + vbox("r-dg", t.leReal, hex(real).slice(0, 32) + "<br>" + hex(real).slice(32)) + "</div>" +
+    '<div class="' + (ok ? "okline" : "badline") + '">' + (ok ? t.leSame : "✗") + "</div>";
+  document.getElementById("leshow").textContent = app.leShow ? t.leHide : t.leShowBtn;
+}
+
+/* ---------- step 9: the sponge ---------- */
+// the snapshots of the SHA3-256 sponge: after every XOR of a block, after every permutation, and the squeeze
+function spongeSteps(msg) {
+  const st = new Uint8Array(200), p = sha3Pad(msg, 0x06), steps = [{ st: st.slice(), ch: new Set(), kind: "start" }];
+  for (let off = 0, b = 1; off < p.length; off += RATE, b++) {
+    const ch = new Set();
+    for (let i = 0; i < RATE; i++) { const v = st[i] ^ p[off + i]; if (v !== st[i]) ch.add(i); st[i] = v; }
+    steps.push({ st: st.slice(), ch: ch, kind: "xor", b: b });
+    const before = st.slice(); keccakF(st);
+    const ch2 = new Set(); for (let i = 0; i < 200; i++) if (st[i] !== before[i]) ch2.add(i);
+    steps.push({ st: st.slice(), ch: ch2, kind: "perm", b: b });
+  }
+  steps.push({ st: st.slice(), ch: new Set(), kind: "squeeze" });
+  return { steps: steps, blocks: p.length / RATE, padded: p };
+}
+function stateHTML(snap) {
+  const t = L(), sq = snap.kind === "squeeze";
+  const cell = i => '<span class="' + (snap.ch.has(i) ? "c " : "") + (sq && i < 32 ? "o" : "") + '">' + snap.st[i].toString(16).padStart(2, "0") + "</span>";
+  let r = '<div><b class="ratel">' + t.spRate + '</b><div class="sgrid rate">';
+  for (let i = 0; i < RATE; i++) r += cell(i);
+  r += '</div></div><div><b class="capl">' + t.spCap + '</b><div class="sgrid cap">';
+  for (let i = RATE; i < 200; i++) r += cell(i);
+  return '<div class="two">' + r + '</div><div class="note" style="max-width:250px;margin-top:6px">' + t.spCapNote + "</div></div></div>";
+}
+function render8() {
+  const t = L();
+  return '<div class="card"><div class="flow"><label class="vbox r-msg"><small>' + t.msg + '</small><input type="text" data-field="spmsg" maxlength="400" size="40" value="' + esc(app.spMsg) + '"></label><button data-action="splong">' + t.spLong + '</button></div>' +
+    '<div class="btns"><button data-action="spprev">◀</button><button class="dark" data-action="spnext">' + t.spNext + '</button><button data-action="spreset">' + t.reset + '</button><b id="splbl" style="margin-left:8px"></b></div>' +
+    '<div id="spst" style="margin-top:8px"></div><div id="spout"></div></div>' +
+    '<div class="card"><div class="rctl"><b id="shlbl"></b><input type="range" min="1" max="300" data-field="shlen" value="' + app.shLen + '"></div><p class="note" style="margin:0">' + t.shNote + '</p><div id="shout"></div></div>';
+}
+function update8() {
+  const t = L(), el = document.getElementById("spst");
+  if (!el) return;
+  const m = utf8(app.spMsg), S = spongeSteps(m);
+  if (app.spPhase >= S.steps.length) app.spPhase = S.steps.length - 1;
+  const snap = S.steps[app.spPhase];
+  document.getElementById("splbl").textContent = t.spLbl(snap, S.blocks, m.length);
+  el.innerHTML = stateHTML(snap);
+  const o = document.getElementById("spout");
+  if (snap.kind === "squeeze") {
+    const d = snap.st.slice(0, 32), ok = hex(d) === hex(sha3_256(m));
+    o.innerHTML = '<div class="flow" style="margin-top:8px">' + vbox("r-dg", t.spDigest, hex(d).slice(0, 32) + "<br>" + hex(d).slice(32)) + '</div><div class="' + (ok ? "okline" : "badline") + '">' + (ok ? t.spOk : "✗") + "</div>";
+  } else o.innerHTML = "";
+  // card 2: SHAKE256 of any length
+  const n = app.shLen, out = hex(shake256(m, n));
+  document.getElementById("shlbl").textContent = t.shLbl(n);
+  let h = '<div class="mono" style="word-break:break-all;font-size:13px;margin-top:8px">';
+  for (let c = 0; c * RATE < n; c++) h += '<span style="background:' + (c % 2 ? "var(--dg-bg)" : "var(--sunken)") + ';border-bottom:3px solid var(--dg-b)">' + out.slice(2 * RATE * c, 2 * RATE * (c + 1)) + "</span>";
+  h += "</div>";
+  const perms = Math.ceil(n / RATE) - 1, a = hex(sha3_256(m)), b = hex(shake256(m, 32));
+  h += '<div class="note">' + t.shPerms(perms) + "</div>" +
+    '<div class="flow" style="margin-top:8px">' + vbox("r-dg", "SHA3-256", a.slice(0, 32) + "<br>" + a.slice(32)) + vbox("r-dg", t.sh32, b.slice(0, 32) + "<br>" + b.slice(32)) + '</div><div class="note">' + t.shDiff + "</div>";
+  document.getElementById("shout").innerHTML = h;
+}
+
 /* ---------- frame, navigation ---------- */
-const RENDER = [renderBB, render0, render1, render2, render3, render4];
-const UPDATE = [updateBB, update0, update1, update2, update3, update4];
+const RENDER = [renderBB, render0, render1, render2, render3, render4, render6, render7, render8];
+const UPDATE = [updateBB, update0, update1, update2, update3, update4, update6, update7, update8];
 function buildSide() {
   const t = L();
   document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
@@ -1108,7 +1424,13 @@ view.addEventListener("click", e => {
   else if (a === "search") startSearch();
   else if (a === "k2") { app.k2 = +el.dataset.k; view.querySelectorAll('[data-action="k2"]').forEach(b => b.classList.toggle("on", +b.dataset.k === app.k2)); drawHundred(); }
   else if (a === "hundred") startHundred();
-  else if (a === "reset6") { app.stored = 100; app.heard = []; app.wire = []; app.backShown = false; update5(); }
+  else if (a === "mkleaf") { app.mkSel = +el.dataset.i; app.mkEdit = null; update6(); }
+  else if (a === "mkundo") { app.mkEdit = null; update6(); }
+  else if (a === "leshow") { app.leShow = !app.leShow; update7(); }
+  else if (a === "splong") { app.spMsg = "Alice's long message. ".repeat(10).slice(0, 200); app.spPhase = 0; const inp = view.querySelector('input[data-field="spmsg"]'); if (inp) inp.value = app.spMsg; update8(); }
+  else if (a === "spnext") { app.spPhase++; update8(); }
+  else if (a === "spprev") { if (app.spPhase > 0) app.spPhase--; update8(); }
+  else if (a === "spreset") { app.spPhase = 0; update8(); }
 });
 view.addEventListener("input", e => {
   const f = e.target.dataset.field;
@@ -1121,6 +1443,10 @@ view.addEventListener("input", e => {
   else if (f === "msg4") { app.msg4 = v; if (app.flipByte > 63) app.flipByte = 0; update3(); }
   else if (f === "round") { app.round = +v; update3(); }
   else if (f === "k") { app.k = +v; searchRun++; app.search = null; update4(); }
+  else if (f === "mkedit") { app.mkEdit = v; update6(); }
+  else if (f === "leextra") { app.leExtra = v; update7(); }
+  else if (f === "spmsg") { app.spMsg = v; app.spPhase = 0; update8(); }
+  else if (f === "shlen") { app.shLen = +v; update8(); }
 });
 document.getElementById("steps").addEventListener("click", e => {
   const b = e.target.closest("[data-step]");
