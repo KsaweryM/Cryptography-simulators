@@ -22,8 +22,8 @@ Interactive pages that show how cryptographic algorithms work, from the outside 
 - **Elliptic curves** (`elliptic-curves/`): black box, adding points, from real numbers to modulo 17 (four parts), the curve modulo 17 (multiples of G, double and add, with play), one addition as a line that wraps around the grid, fake points (the invalid-curve attack).
 - **Hash functions** (`hash/`): black box, the avalanche, padding and the chain of blocks, `update()` in pieces, one bit through the rounds, guessing a short hash, a Merkle tree, length extension, the sponge of SHA-3.
 - **Collisions and passwords** (`passwords/`): the birthday paradox, a collision search without a table (rho), one MD5 collision gives many, four ways to store a password, a rainbow table, the cost of bcrypt.
-- **Certificates and PKI** (`pki/`): black box (Mallory swaps a key, a CA signature stops her), inside a certificate (X.509 fields, DER
-  bytes, fingerprint), chain of trust, validation checks, revocation (CRL, OCSP, stapling), certificates in TLS 1.3 and mTLS, pinning,
+- **Certificates and PKI** (`pki/`): inside a certificate (X.509 fields, DER bytes, fingerprint), chain of trust, validation checks,
+  revocation (CRL, OCSP, stapling), certificates in TLS 1.3 and mTLS, pinning,
   Certificate Transparency (a Merkle tree, inclusion and consistency proofs), getting a certificate by ACME.
 
 ## Coming soon

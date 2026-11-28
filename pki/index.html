@@ -155,8 +155,6 @@ a.inl{color:var(--focus)}
 .seal .mono{font-weight:500;font-size:11.5px}
 .vres{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
 .arrowsvg{position:absolute;left:0;top:0;pointer-events:none}
-.bigp{position:absolute;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
-.bigp svg{display:block;margin:0 auto 2px}
 .tryrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
 .tryrow textarea{width:100%;height:48px;resize:vertical;font-size:13px}
 .sigbox{font-family:var(--mono);font-size:12px;word-break:break-all;color:var(--muted)}
@@ -913,7 +911,7 @@ const T = {
   en: {
     title: "Certificates and PKI explorer", home: "All simulators",
     intro: "From the outside in: whose key is it, what a certificate holds, how a browser checks it. Pick a step on the left.",
-    stepOf: n => "Step " + n + " of 9 · PKI",
+    stepOf: n => "Step " + n + " of 8 · PKI",
     steps: [["Black box", "Mallory swaps a key, a CA signature stops her"], ["Inside a certificate", "X.509 fields, extensions, DER bytes, fingerprint"],
             ["Chain of trust", "leaf, intermediate, root, trust store"], ["Validation checks", "the seven checks a browser runs"],
             ["Revocation", "CRL, OCSP, soft-fail, stapling"], ["Certificates in TLS 1.3", "Certificate, CertificateVerify, mTLS"],
@@ -936,7 +934,7 @@ const T = {
     storyTitle: ["Alice needs Bob's public key", "Bob sends his key", "Mallory swaps it", "Mallory reads everything", "Trusty CA signs a name card",
                  "Alice checks the card", "Mallory changes the key on the card", "Mallory signs her own card", "That card is a certificate"],
     story: [
-      "Alice wants to send Bob a secret, so she needs Bob's public key (here 32 bytes). Bob's private key never leaves Bob. Between them is the network, and Mallory sits on it: she can read and change every packet.",
+      "Alice wants to send Bob a secret, so she needs Bob's public key (here 32 bytes). Bob's private key never leaves Bob. Between them is the network, and Mallory sits on it: she can read and change every packet. Alice has a key pair of her own too, but to send Bob a secret she needs only his public key; her own keys come back in step 6 (mTLS).",
       "Bob sends his public key over the network and Alice gets 32 bytes. How does she know they are Bob's? Nothing in the bytes says “Bob”.",
       "Mallory catches Bob's key and sends Alice her own key instead. Alice again gets 32 bytes and cannot tell the difference: a public key alone does not say whose it is.",
       "Alice encrypts her secret with the key she got, which is Mallory's. Mallory decrypts it, reads it, encrypts it again with Bob's real key and passes it on. Bob notices nothing. Encryption alone does not stop the man in the middle.",
@@ -981,20 +979,20 @@ const T = {
       cert: "The whole certificate: one DER SEQUENCE of three parts. It is public; anybody may copy it.",
       tbs: "“To be signed”: everything the CA vouches for. The CA signs exactly these bytes, so changing any of them breaks the signature.",
       version: "The X.509 version. Version 3 (1996) added extensions; it is stored as the number 2.",
-      serial: "A number the issuer gives this certificate, unique for that issuer, up to 20 bytes. Today it must hold at least 64 random bits. CRLs and OCSP name certificates by it (step 5).",
+      serial: "A number the issuer gives this certificate, unique for that issuer, up to 20 bytes. Today it must hold at least 64 random bits. CRLs and OCSP name certificates by it (step 4).",
       sigalg: "The algorithm the issuer used to sign. It must equal the signature algorithm in part 2.",
-      issuer: "Who signed the certificate, as a distinguished name (C, O, CN, each an OID). It must equal the subject of the issuer's own certificate: that is how the chain links (step 3).",
-      validity: "notBefore and notAfter, in UTC. Outside this window every client rejects the certificate (step 4). Public TLS certificates get shorter every year: 200 days from March 2026, 47 days from 2029.",
+      issuer: "Who signed the certificate, as a distinguished name (C, O, CN, each an OID). It must equal the subject of the issuer's own certificate: that is how the chain links (step 2).",
+      validity: "notBefore and notAfter, in UTC. Outside this window every client rejects the certificate (step 3). Public TLS certificates get shorter every year: 200 days from March 2026, 47 days from 2029.",
       subject: "Whose key this is. For web sites the name that counts is in the Subject Alternative Name; browsers ignore the CN (Chrome since version 58, 2017).",
-      spki: "SubjectPublicKeyInfo: the algorithm and the public key. A key pin is the SHA-256 of these bytes (step 7).",
+      spki: "SubjectPublicKeyInfo: the algorithm and the public key. A key pin is the SHA-256 of these bytes (step 6).",
       exts: "Extensions, added in version 3. Each has an OID, a critical flag and a value. A client must reject a certificate with a critical extension it does not understand.",
-      san: "Subject Alternative Name: the names the certificate is for (DNS names, IP addresses, e-mail). A wildcard *.x covers exactly one label on the left (step 4).",
+      san: "Subject Alternative Name: the names the certificate is for (DNS names, IP addresses, e-mail). A wildcard *.x covers exactly one label on the left (step 3).",
       bc: "Basic Constraints: CA:TRUE means the key may sign other certificates; pathlen limits how many CAs may follow below. A leaf must say CA:FALSE.",
       ku: "Key Usage: what the key may do. digitalSignature for TLS servers; keyCertSign and cRLSign only for CAs.",
       eku: "Extended Key Usage: what the certificate is for. serverAuth for web servers, clientAuth for clients (mTLS), codeSigning, emailProtection…",
       ski: "Subject Key Identifier: a short identifier of this certificate's public key.",
       aki: "Authority Key Identifier: the identifier of the issuer's key. It must equal the SKI of the issuer's certificate; it picks the right issuer when two have the same name.",
-      crldp: "CRL Distribution Points: where to download the issuer's list of revoked certificates (step 5).",
+      crldp: "CRL Distribution Points: where to download the issuer's list of revoked certificates (step 4).",
       aia: "Authority Information Access: where to get the issuer's certificate (CA Issuers) and, in older certificates, the OCSP responder.",
       pol: "Certificate policies: under which rules it was issued. 2.23.140.1.2.1 means domain validated (DV), 2.23.140.1.2.2 organisation validated (OV).",
       sct: "Signed Certificate Timestamps: promises from Certificate Transparency logs that the certificate is public. Chrome and Apple require them (Lecture 10).",
@@ -1016,7 +1014,7 @@ const T = {
     // step 3
     kRoot: "root", kInt: "intermediate", kLeaf: "leaf",
     pick3: "Pick a chain", c3reset: "Reset", c3next: "Next check", c3all: "All checks",
-    s3foot: "Here Alice checks only the links. Lecture 10 checks a link by its signature and ends in the trust store; Lecture 11 adds the rest of each link (key identifiers, may the issuer sign, dates). The other checks (the name, what the key is for, revocation) come in step 4.",
+    s3foot: "Here Alice checks only the links. Lecture 10 checks a link by its signature and ends in the trust store; Lecture 11 adds the rest of each link (key identifiers, may the issuer sign, dates). The other checks (the name, what the key is for, revocation) come in step 3.",
     pileT: "What the server sent", issuedBy: "issued by", unused: "not used in the path", viaAIA: "fetched from the AIA address",
     storeT: "Alice's trust store", until: "until", storeNote: "Two roots here; Ubuntu 24.04 has 120.",
     linkT: (c, p) => "Is <b>" + c + "</b> issued by <b>" + p + "</b>?",
@@ -1071,7 +1069,7 @@ const T = {
     checkN: { sig: ["Signatures", "each certificate by the next one's key"], date: ["Dates", "notBefore ≤ now ≤ notAfter, for each"],
               name: ["The name", "the host name against the SAN"], ca: ["May it sign?", "Basic Constraints of every issuer"],
               eku: ["What is the key for?", "Key Usage, Extended Key Usage"], anchor: ["Trust anchor", "the path ends in the trust store"],
-              rev: ["Revocation", "is the leaf on the issuer's CRL? (step 5)"] },
+              rev: ["Revocation", "is the leaf on the issuer's CRL? (step 4)"] },
     allOK: "Every check passed: Alice trusts the chain and the connection goes on.", rejected: "Rejected.",
     firstNote: n => "The red row is the first failed check (check " + n + "); OpenSSL and Chrome report that one. Each check stops a different attack.",
     run4: "Run the checks", say4: "Show what OpenSSL and Chrome say", predict4: "Predict first: will Alice accept this chain, and if not, which check fails first? Then press “Run the checks”.",
@@ -1114,14 +1112,14 @@ const T = {
     hsTitle: ["ClientHello and ServerHello", "Certificate", "CertificateVerify", "Finished", "Mutual TLS: the client side"],
     hsText: [
       "Alice and Bob exchange X25519 key shares (Lecture 5) and derive keys. From here on every message is encrypted. So far nothing proves that the other side is Bob.",
-      "Bob sends his chain, leaf first. The chain is public: anybody, Mallory too, can copy it and send it. Alice validates it as in steps 3 and 4.",
+      "Bob sends his chain, leaf first. The chain is public: anybody, Mallory too, can copy it and send it. Alice validates it as in steps 2 and 3.",
       "Bob proves that he holds the private key of his leaf: he signs a hash of every message so far (the transcript). A copied certificate gives Mallory nothing, because she cannot make this signature.",
       "Both sides send a MAC over the transcript, with keys from the handshake. After that the application data flows.",
       "The server can ask for a certificate too (CertificateRequest). Alice then sends her own Certificate and CertificateVerify, and Bob's server checks them against its own private CA (Lecture 11, Task 7)."],
     d1T: "Two key shares", d1: "ClientHello carries Alice's key share and the server name (SNI) bob.example, so a server with many sites picks the right certificate. ServerHello carries Bob's key share. Both compute the same secret, and the rest of the handshake is encrypted with keys derived from it. Only the next two messages show who Bob is.",
     realLines: "openssl s_client -connect www.coventry.ac.uk:443 (15 November 2026):<br>New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384<br>Server Temp Key: X25519, 253 bits<br>Peer signature type: ECDSA · Peer signing digest: SHA256",
     d2T: "The Certificate message", d2: "Bob's Certificate message carries his chain, leaf first:", entryN: i => "entry " + (i + 1) + ":",
-    d2b: "Each entry can also carry an OCSP staple (step 5; RFC 9846, section 4.5.1.1). The root is not sent: Alice must already have it. www.coventry.ac.uk sends three certificates: its leaf, WE1 and a cross-signed GTS Root R4.",
+    d2b: "Each entry can also carry an OCSP staple (step 4; RFC 9846, section 4.5.1.1). The root is not sent: Alice must already have it. www.coventry.ac.uk sends three certificates: its leaf, WE1 and a cross-signed GTS Root R4.",
     go4: "How Alice checks the chain", go5: "Stapling",
     d3T: "What exactly is signed", d3: "The signed content is 130 bytes (RFC 9846, section 4.5.2; in the older RFC 8446: 4.4.3): 64 spaces, the context string, one zero byte and the SHA-256 transcript hash. Bob signs it with the private key of his leaf (ECDSA P-256); Alice verifies with the public key from that certificate.",
     cvToday: "Bob signs today's handshake", cvMal: "Mallory with a copy of the certificate", cvOld: "an old signature replayed", cvNew: "a new handshake",
@@ -1206,7 +1204,7 @@ const T = {
     adRun5: "The CA checks the CSR",
     adCsrSigOK: "The key inside the CSR verifies its signature: the sender has the private key.", adCsrSigBad: "The signature does not verify: the bytes are not what the key holder signed.",
     adCsrAuthz: { bob: "Bob's account has a valid authorization for www.bob.example (part 4).", changed: "Not checked: the CSR is already rejected.", mal: "Mallory's account has no valid authorization for www.bob.example (part 4)." },
-    adIssued: "The CA issues the certificate and logs it in CT logs (step 8).", adRefused: "The CA refuses.",
+    adIssued: "The CA issues the certificate and logs it in CT logs (step 7).", adRefused: "The CA refuses.",
     adCsrWhy: { bob: "The certificate holds the name from the order and the key from the CSR.",
                 changed: "The CA signs only what the key holder signed: www.cob.example was never signed by Bob's key.",
                 mal: "Mallory's signature is fine: a CSR proves only that she has her own key, never that the name is hers. The name is proved by the challenge, and that failed." },
@@ -1215,7 +1213,7 @@ const T = {
   pl: {
     title: "Certyfikaty i PKI krok po kroku", home: "Wszystkie symulatory",
     intro: "Od ogółu do szczegółu: czyj to klucz, co jest w certyfikacie, jak przeglądarka go sprawdza. Wybierz krok po lewej.",
-    stepOf: n => "Krok " + n + " z 9 · PKI",
+    stepOf: n => "Krok " + n + " z 8 · PKI",
     steps: [["Czarna skrzynka", "Mallory podmienia klucz, podpis CA ją zatrzymuje"], ["Wnętrze certyfikatu", "pola X.509, rozszerzenia, bajty DER, odcisk"],
             ["Łańcuch zaufania", "liść, pośrednie CA, root, magazyn zaufania"], ["Sprawdzenia walidacji", "siedem sprawdzeń przeglądarki"],
             ["Unieważnianie", "CRL, OCSP, soft-fail, stapling"], ["Certyfikaty w TLS 1.3", "Certificate, CertificateVerify, mTLS"],
@@ -1238,7 +1236,7 @@ const T = {
     storyTitle: ["Alice potrzebuje klucza publicznego Boba", "Bob wysyła swój klucz", "Mallory go podmienia", "Mallory czyta wszystko", "Trusty CA podpisuje wizytówkę",
                  "Alice sprawdza wizytówkę", "Mallory zmienia klucz na wizytówce", "Mallory podpisuje własną wizytówkę", "Ta wizytówka to certyfikat"],
     story: [
-      "Alice chce wysłać Bobowi sekret, więc potrzebuje klucza publicznego Boba (tutaj 32 bajty). Klucz prywatny Boba nigdy go nie opuszcza. Między nimi jest sieć, a w niej Mallory: może czytać i zmieniać każdy pakiet.",
+      "Alice chce wysłać Bobowi sekret, więc potrzebuje klucza publicznego Boba (tutaj 32 bajty). Klucz prywatny Boba nigdy go nie opuszcza. Między nimi jest sieć, a w niej Mallory: może czytać i zmieniać każdy pakiet. Alice też ma własną parę kluczy, ale żeby wysłać Bobowi sekret, potrzebuje tylko jego klucza publicznego; jej klucze wrócą w kroku 6 (mTLS).",
       "Bob wysyła swój klucz publiczny przez sieć i Alice dostaje 32 bajty. Skąd wie, że to klucz Boba? Nic w tych bajtach nie mówi „Bob”.",
       "Mallory łapie klucz Boba i wysyła Alice swój własny. Alice znów dostaje 32 bajty i nie widzi różnicy: sam klucz publiczny nie mówi, czyj jest.",
       "Alice szyfruje sekret kluczem, który dostała, czyli kluczem Mallory. Mallory odszyfrowuje, czyta, szyfruje ponownie prawdziwym kluczem Boba i przekazuje dalej. Bob niczego nie zauważa. Samo szyfrowanie nie powstrzymuje człowieka pośrodku.",
@@ -1282,20 +1280,20 @@ const T = {
       cert: "Cały certyfikat: jedna SEQUENCE w DER z trzech części. Jest publiczny, każdy może go skopiować.",
       tbs: "„To be signed”: wszystko, za co ręczy CA. CA podpisuje dokładnie te bajty, więc zmiana któregokolwiek psuje podpis.",
       version: "Wersja X.509. Wersja 3 (1996) dodała rozszerzenia; zapisuje się ją jako liczbę 2.",
-      serial: "Numer nadany przez wystawcę, jednoznaczny u tego wystawcy, do 20 bajtów. Dziś musi mieć co najmniej 64 losowe bity. CRL i OCSP wskazują certyfikat właśnie nim (krok 5).",
+      serial: "Numer nadany przez wystawcę, jednoznaczny u tego wystawcy, do 20 bajtów. Dziś musi mieć co najmniej 64 losowe bity. CRL i OCSP wskazują certyfikat właśnie nim (krok 4).",
       sigalg: "Algorytm, którym podpisał wystawca. Musi być równy algorytmowi podpisu z części 2.",
-      issuer: "Kto podpisał certyfikat, jako nazwa wyróżniająca (C, O, CN, każde to OID). Musi być równa podmiotowi certyfikatu wystawcy: tak łączy się łańcuch (krok 3).",
-      validity: "notBefore i notAfter w UTC. Poza tym oknem każdy klient odrzuca certyfikat (krok 4). Publiczne certyfikaty TLS są co roku krótsze: 200 dni od marca 2026, 47 dni od 2029.",
+      issuer: "Kto podpisał certyfikat, jako nazwa wyróżniająca (C, O, CN, każde to OID). Musi być równa podmiotowi certyfikatu wystawcy: tak łączy się łańcuch (krok 2).",
+      validity: "notBefore i notAfter w UTC. Poza tym oknem każdy klient odrzuca certyfikat (krok 3). Publiczne certyfikaty TLS są co roku krótsze: 200 dni od marca 2026, 47 dni od 2029.",
       subject: "Czyj to klucz. Dla stron WWW liczy się nazwa w Subject Alternative Name; przeglądarki pomijają CN (Chrome od wersji 58, 2017).",
-      spki: "SubjectPublicKeyInfo: algorytm i klucz publiczny. Pin klucza to SHA-256 tych bajtów (krok 7).",
+      spki: "SubjectPublicKeyInfo: algorytm i klucz publiczny. Pin klucza to SHA-256 tych bajtów (krok 6).",
       exts: "Rozszerzenia, dodane w wersji 3. Każde ma OID, flagę critical i wartość. Klient musi odrzucić certyfikat z krytycznym rozszerzeniem, którego nie rozumie.",
-      san: "Subject Alternative Name: nazwy, dla których jest certyfikat (nazwy DNS, adresy IP, e-mail). Gwiazdka *.x obejmuje dokładnie jedną etykietę z lewej (krok 4).",
+      san: "Subject Alternative Name: nazwy, dla których jest certyfikat (nazwy DNS, adresy IP, e-mail). Gwiazdka *.x obejmuje dokładnie jedną etykietę z lewej (krok 3).",
       bc: "Basic Constraints: CA:TRUE znaczy, że klucz może podpisywać inne certyfikaty; pathlen ogranicza, ile CA może być niżej. Liść musi mieć CA:FALSE.",
       ku: "Key Usage: co wolno robić kluczem. digitalSignature dla serwerów TLS; keyCertSign i cRLSign tylko dla CA.",
       eku: "Extended Key Usage: do czego jest certyfikat. serverAuth dla serwerów WWW, clientAuth dla klientów (mTLS), codeSigning, emailProtection…",
       ski: "Subject Key Identifier: krótki identyfikator klucza publicznego tego certyfikatu.",
       aki: "Authority Key Identifier: identyfikator klucza wystawcy. Musi być równy SKI certyfikatu wystawcy; wybiera właściwego wystawcę, gdy dwóch ma tę samą nazwę.",
-      crldp: "CRL Distribution Points: skąd pobrać listę unieważnionych certyfikatów wystawcy (krok 5).",
+      crldp: "CRL Distribution Points: skąd pobrać listę unieważnionych certyfikatów wystawcy (krok 4).",
       aia: "Authority Information Access: skąd wziąć certyfikat wystawcy (CA Issuers) i, w starszych certyfikatach, adres respondera OCSP.",
       pol: "Polityki certyfikacji: według jakich zasad go wydano. 2.23.140.1.2.1 to weryfikacja domeny (DV), 2.23.140.1.2.2 weryfikacja organizacji (OV).",
       sct: "Signed Certificate Timestamps: obietnice logów Certificate Transparency, że certyfikat jest publiczny. Chrome i Apple ich wymagają (wykład 10).",
@@ -1316,7 +1314,7 @@ const T = {
     flipDiff: n => "Zmieniło się " + n + " z 32 bajtów odcisku.",
     kRoot: "root", kInt: "pośredni", kLeaf: "liść",
     pick3: "Wybierz łańcuch", c3reset: "Od początku", c3next: "Następne sprawdzenie", c3all: "Wszystkie sprawdzenia",
-    s3foot: "Tutaj Alice sprawdza tylko ogniwa. Wykład 10 sprawdza ogniwo podpisem i kończy w magazynie zaufania; wykład 11 dodaje resztę sprawdzeń ogniwa (identyfikatory kluczy, czy wystawca może podpisywać, daty). Pozostałe sprawdzenia (nazwa, przeznaczenie klucza, unieważnienie) są w kroku 4.",
+    s3foot: "Tutaj Alice sprawdza tylko ogniwa. Wykład 10 sprawdza ogniwo podpisem i kończy w magazynie zaufania; wykład 11 dodaje resztę sprawdzeń ogniwa (identyfikatory kluczy, czy wystawca może podpisywać, daty). Pozostałe sprawdzenia (nazwa, przeznaczenie klucza, unieważnienie) są w kroku 3.",
     pileT: "Co wysłał serwer", issuedBy: "wystawca:", unused: "nieużyty w ścieżce", viaAIA: "pobrany z adresu AIA",
     storeT: "Magazyn zaufania Alice", until: "do", storeNote: "Tu dwa rooty; Ubuntu 24.04 ma ich 120.",
     linkT: (c, p) => "Czy <b>" + c + "</b> wystawił <b>" + p + "</b>?",
@@ -1370,7 +1368,7 @@ const T = {
     checkN: { sig: ["Podpisy", "każdy certyfikat kluczem następnego"], date: ["Daty", "notBefore ≤ teraz ≤ notAfter, dla każdego"],
               name: ["Nazwa", "nazwa hosta a SAN"], ca: ["Czy może podpisywać?", "Basic Constraints każdego wystawcy"],
               eku: ["Do czego jest klucz?", "Key Usage, Extended Key Usage"], anchor: ["Kotwica zaufania", "ścieżka kończy się w magazynie"],
-              rev: ["Unieważnienie", "czy liść jest na CRL wystawcy? (krok 5)"] },
+              rev: ["Unieważnienie", "czy liść jest na CRL wystawcy? (krok 4)"] },
     allOK: "Wszystkie sprawdzenia przeszły: Alice ufa łańcuchowi i połączenie trwa dalej.", rejected: "Odrzucony.",
     firstNote: n => "Czerwony wiersz to pierwsze nieudane sprawdzenie (nr " + n + "); to je zgłaszają OpenSSL i Chrome. Każde sprawdzenie zatrzymuje inny atak.",
     run4: "Uruchom sprawdzenia", say4: "Pokaż, co mówią OpenSSL i Chrome", predict4: "Najpierw przewidź: czy Alice przyjmie ten łańcuch, a jeśli nie, które sprawdzenie zawiedzie pierwsze? Potem naciśnij „Uruchom sprawdzenia”.",
@@ -1411,14 +1409,14 @@ const T = {
     hsTitle: ["ClientHello i ServerHello", "Certificate", "CertificateVerify", "Finished", "Wzajemne TLS: strona klienta"],
     hsText: [
       "Alice i Bob wymieniają udziały X25519 (wykład 5) i wyprowadzają klucze. Od tej chwili każdy komunikat jest zaszyfrowany. Na razie nic nie dowodzi, że po drugiej stronie jest Bob.",
-      "Bob wysyła swój łańcuch, liść pierwszy. Łańcuch jest publiczny: każdy, także Mallory, może go skopiować i wysłać. Alice sprawdza go jak w krokach 3 i 4.",
+      "Bob wysyła swój łańcuch, liść pierwszy. Łańcuch jest publiczny: każdy, także Mallory, może go skopiować i wysłać. Alice sprawdza go jak w krokach 2 i 3.",
       "Bob dowodzi, że ma klucz prywatny swojego liścia: podpisuje skrót wszystkich dotychczasowych komunikatów (transkrypt). Skopiowany certyfikat nic Mallory nie daje, bo tego podpisu nie zrobi.",
       "Obie strony wysyłają MAC nad transkryptem, kluczami z handshake'u. Potem płyną dane aplikacji.",
       "Serwer też może poprosić o certyfikat (CertificateRequest). Wtedy Alice wysyła własne Certificate i CertificateVerify, a serwer Boba sprawdza je względem swojego prywatnego CA (wykład 11, zadanie 7)."],
     d1T: "Dwa udziały klucza", d1: "ClientHello niesie udział Alice i nazwę serwera (SNI) bob.example, więc serwer z wieloma stronami wybiera właściwy certyfikat. ServerHello niesie udział Boba. Obie strony liczą ten sam sekret, a reszta handshake'u jest szyfrowana kluczami z niego wyprowadzonymi. Kim jest Bob, pokażą dopiero dwa następne komunikaty.",
     realLines: "openssl s_client -connect www.coventry.ac.uk:443 (15 listopada 2026):<br>New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384<br>Server Temp Key: X25519, 253 bits<br>Peer signature type: ECDSA · Peer signing digest: SHA256",
     d2T: "Komunikat Certificate", d2: "Komunikat Certificate Boba niesie jego łańcuch, liść pierwszy:", entryN: i => "wpis " + (i + 1) + ":",
-    d2b: "Każdy wpis może też nieść odpowiedź OCSP (stapling, krok 5; RFC 9846, sekcja 4.5.1.1). Roota się nie wysyła: Alice musi go już mieć. www.coventry.ac.uk wysyła trzy certyfikaty: liść, WE1 i GTS Root R4 podpisany krzyżowo.",
+    d2b: "Każdy wpis może też nieść odpowiedź OCSP (stapling, krok 4; RFC 9846, sekcja 4.5.1.1). Roota się nie wysyła: Alice musi go już mieć. www.coventry.ac.uk wysyła trzy certyfikaty: liść, WE1 i GTS Root R4 podpisany krzyżowo.",
     go4: "Jak Alice sprawdza łańcuch", go5: "Stapling",
     d3T: "Co dokładnie jest podpisywane", d3: "Podpisywana treść ma 130 bajtów (RFC 9846, sekcja 4.5.2; w starszym RFC 8446: 4.4.3): 64 spacje, tekst kontekstu, jeden bajt zero i skrót SHA-256 transkryptu. Bob podpisuje ją kluczem prywatnym swojego liścia (ECDSA P-256); Alice sprawdza kluczem publicznym z tego certyfikatu.",
     cvToday: "Bob podpisuje dzisiejszy handshake", cvMal: "Mallory z kopią certyfikatu", cvOld: "powtórzony stary podpis", cvNew: "nowy handshake",
@@ -1499,7 +1497,7 @@ const T = {
     adRun5: "CA sprawdza CSR",
     adCsrSigOK: "Klucz z CSR weryfikuje jego podpis: nadawca ma klucz prywatny.", adCsrSigBad: "Podpis się nie zgadza: te bajty nie są tym, co podpisał właściciel klucza.",
     adCsrAuthz: { bob: "Konto Boba ma ważną autoryzację dla www.bob.example (część 4).", changed: "Nie sprawdzane: CSR jest już odrzucony.", mal: "Konto Mallory nie ma ważnej autoryzacji dla www.bob.example (część 4)." },
-    adIssued: "CA wydaje certyfikat i wpisuje go do logów CT (krok 8).", adRefused: "CA odmawia.",
+    adIssued: "CA wydaje certyfikat i wpisuje go do logów CT (krok 7).", adRefused: "CA odmawia.",
     adCsrWhy: { bob: "Certyfikat ma nazwę z zamówienia i klucz z CSR.",
                 changed: "CA podpisuje tylko to, co podpisał właściciel klucza: www.cob.example nigdy nie był podpisany kluczem Boba.",
                 mal: "Podpis Mallory jest dobry: CSR dowodzi tylko, że ma własny klucz, nigdy że nazwa jest jej. Nazwy dowodzi wyzwanie, a to się nie udało." },
@@ -1512,7 +1510,11 @@ let lang = "en";
 /* one language setting for all the simulators on the site */
 try { const s = localStorage.getItem("cryptoSimLang"); if (s === "pl" || s === "en") lang = s; } catch (e) {}
 const L = () => T[lang];
-const NSTEPS = 9;
+const NSTEPS = 9;                    // internal levels 0..8
+// HIDDEN FOR NOW: level 0, the "Black box" story (render0, update0, storyBarHTML and its texts stay in the file).
+// The visible steps are the levels FIRST..NSTEPS-1, shown and linked as steps 1..8 (#1 is level 1, "Inside a certificate").
+// To show the story again: FIRST = 0, "of 8" / "z 8" back to 9 in stepOf, and shift the step numbers in the texts and links by one.
+const FIRST = 1;
 // "now" for every check: 15 November 2026, the day the lecture files were saved (all the shipped certificates are valid then)
 const NOW0 = Date.UTC(2026, 10, 15, 12, 0, 0);
 
@@ -1545,7 +1547,7 @@ const roleOf = c => ROLE[c.key] || (c.bc && c.bc.ca ? "r-ca" : "r-neu");
 const ISSUER2 = { bob6: () => TRUSTY6_SPKI, bob: () => CERT.int1.spki, covLeaf: () => CERT.covWE1.spki, covWE1: () => CERT.gtsR4.spki, gtsR4: () => CERT.gtsR4.spki };
 
 const app = {
-  level: 0, story: 1,
+  level: FIRST, story: 1,
   tryCard: null, trySig: "ca",
   c2: 0, f2: "subject", view2: "hex", flipByte: 100, flipBit: 0, all2: false, fp2: false, flip2: false,
   s3: 0, cur3: 0, aia3: false,
@@ -1596,9 +1598,8 @@ function render0() {
   h += '<div class="zone" style="left:0;top:96px;width:300px;height:356px"><div class="zh">' + PERSON(18) + "Alice</div></div>";
   h += '<div class="zone net" style="left:310px;top:96px;width:280px;height:356px"><div class="zh">' + GLOBE + t.net + "<small>" + t.netSub + "</small></div></div>";
   h += '<div class="zone" style="left:610px;top:96px;width:290px;height:356px"><div class="zh">' + PERSON(18) + "Bob</div></div>";
-  if (k === 1) h += '<div class="bigp" style="left:100px;top:180px">' + PERSON(64) + "Alice</div>" + '<div class="bigp" style="left:705px;top:180px">' + PERSON(64) + "Bob</div>";
   // arrows over the network
-  const arr = (x1, x2, y, c) => { const d = x2 < x1 ? -1 : 1; return '<path d="M' + x1 + " " + y + " H" + (x2 - 8 * d) + '" stroke="' + c + '" stroke-width="2.6" fill="none"/><path d="M' + x2 + " " + y + " l" + (-10 * d) + " -6 v12 z" + '" fill="' + c + '"/>'; };
+  const arr = (x1, x2, y, c) => { const d = x2 < x1 ? -1 : 1; return '<g data-m="a' + x1 + "-" + x2 + "-" + y + '"><path d="M' + x1 + " " + y + " H" + (x2 - 8 * d) + '" stroke="' + c + '" stroke-width="2.6" fill="none"/><path d="M' + x2 + " " + y + " l" + (-10 * d) + " -6 v12 z" + '" fill="' + c + '"/></g>'; };
   let svg = "";
   if (k === 2) svg += arr(610, 300, 124, "var(--pub-b)");
   if (k === 3) svg += arr(610, 590, 124, "var(--pub-b)") + arr(310, 300, 124, "var(--mal-b)") + arr(590, 300, 124, "var(--mal-b)");
@@ -1607,35 +1608,35 @@ function render0() {
   if (k === 5) svg += arr(450, 450, 96, "var(--ca-b)");
   h += '<svg class="arrowsvg" width="900" height="452" aria-hidden="true">' + svg + "</svg>";
   // Trusty CA
-  if (on(5)) h += '<div class="obj r-ca' + nw(5) + '" style="left:310px;top:0;width:280px;height:84px"><div class="nh">' + BLDG + "Trusty CA</div><small>" + t.caSub + "</small>" +
+  if (on(5)) h += '<div data-m="ca" class="obj r-ca' + nw(5) + '" style="left:310px;top:0;width:280px;height:84px"><div class="nh">' + BLDG + "Trusty CA</div><small>" + t.caSub + "</small>" +
     '<span class="pill r-prv" style="margin-top:3px">' + KEY_SVG + t.caPriv + "</span></div>";
   // Bob's keys
-  if (on(1)) h += '<div class="obj r-pub" style="left:622px;top:140px;width:266px"><div class="nh">' + LOCK + t.bobPub + '</div><div class="kv">' + bk + "</div><small>" + t.bytes32 + "</small></div>";
-  if (on(1)) h += '<div class="obj r-prv" style="left:622px;top:226px;width:266px"><div class="nh">' + KEY_SVG + t.bobPrv + "</div><small>" + t.stays + "</small></div>";
-  if (k === 4) h += '<div class="obj r-bob new" style="left:622px;top:300px;width:266px"><div class="nh">' + t.bobGets + '</div><div class="kv">"' + t.secret + '"</div><small>' + t.bobNothing + "</small></div>";
+  if (on(1)) h += '<div data-m="bobpub" class="obj r-pub" style="left:622px;top:140px;width:266px"><div class="nh">' + LOCK + t.bobPub + '</div><div class="kv">' + bk + "</div><small>" + t.bytes32 + "</small></div>";
+  if (on(1)) h += '<div data-m="bobprv" class="obj r-prv" style="left:622px;top:226px;width:266px"><div class="nh">' + KEY_SVG + t.bobPrv + "</div><small>" + t.stays + "</small></div>";
+  if (k === 4) h += '<div data-m="bobgets" class="obj r-bob new" style="left:622px;top:300px;width:266px"><div class="nh">' + t.bobGets + '</div><div class="kv">"' + t.secret + '"</div><small>' + t.bobNothing + "</small></div>";
   // the packet on the network
   const cardHTML = (mal, malSig) => '<div class="ncard"><div class="nh" style="font-weight:600">' + t.cardT + '</div><div class="line">name=bob.example</div><div class="line">key=<span class="' + (mal ? "diffc" : "") + '">' + (mal ? mkk : bk) + "</span></div>" +
     '<div class="seal ' + (malSig ? "r-mal" : "r-ca") + '">' + (malSig ? SEAL_M : SEAL) + "<span>" + (malSig ? t.sigMal : t.sigCA) + '<br><span class="mono">' + shortHex(malSig ? CARD6.fakeSig : CARD6.sig, 6) + "</span></span></div></div>";
-  if (k === 2) h += '<div class="obj r-pub new" style="left:322px;top:150px;width:256px"><div class="nh">' + LOCK + t.onWire + '</div><div class="kv">' + bk + "</div></div>";
-  if (k === 3 || k === 4) h += '<div class="obj r-mal' + nw(3) + '" style="left:322px;top:150px;width:256px"><div class="nh">' + LOCK + t.swapped + '</div><div class="kv">' + mkk + "</div><small>" + t.malKey + "</small></div>";
-  if (k === 5) h += '<div class="obj r-neu new" style="left:322px;top:126px;width:256px;padding:0;border:0;background:none">' + cardHTML(false, false) + "</div>";
-  if (k >= 6 && k <= 8) h += '<div class="obj' + nw(6, 7, 8) + '" style="left:322px;top:140px;width:256px;padding:0;border:0">' + cardHTML(k >= 7, k === 8) + "</div>";
-  if (k === 9) h += '<div class="obj r-neu new" style="left:322px;top:140px;width:256px"><div class="nh">' + t.certIs + "</div><small>" + t.certIsSub + "</small></div>";
+  if (k === 2) h += '<div data-m="wire" class="obj r-pub new" style="left:322px;top:150px;width:256px"><div class="nh">' + LOCK + t.onWire + '</div><div class="kv">' + bk + "</div></div>";
+  if (k === 3 || k === 4) h += '<div data-m="wire" class="obj r-mal' + nw(3) + '" style="left:322px;top:150px;width:256px"><div class="nh">' + LOCK + t.swapped + '</div><div class="kv">' + mkk + "</div><small>" + t.malKey + "</small></div>";
+  if (k === 5) h += '<div data-m="wire" class="obj r-neu new" style="left:322px;top:126px;width:256px;padding:0;border:0;background:none">' + cardHTML(false, false) + "</div>";
+  if (k >= 6 && k <= 8) h += '<div data-m="wire" class="obj' + nw(6, 7, 8) + '" style="left:322px;top:140px;width:256px;padding:0;border:0">' + cardHTML(k >= 7, k === 8) + "</div>";
+  if (k === 9) h += '<div data-m="wire" class="obj r-neu new" style="left:322px;top:140px;width:256px"><div class="nh">' + t.certIs + "</div><small>" + t.certIsSub + "</small></div>";
   // Mallory
   const malTxt = [t.mal1, t.mal1, t.mal3, t.mal4, t.mal5, t.mal5, t.mal7, t.mal8, t.mal9][k - 1];
-  h += '<div class="obj r-mal' + nw(1, 3, 7, 8) + (k === 5 || k === 6 ? " dim" : "") + '" style="left:322px;top:330px;width:256px"><div class="nh">' + EYE + "Mallory</div><small>" + malTxt + "</small></div>";
+  h += '<div data-m="mal" class="obj r-mal' + nw(1, 3, 7, 8) + (k === 5 || k === 6 ? " dim" : "") + '" style="left:322px;top:330px;width:256px"><div class="nh">' + EYE + "Mallory</div><small>" + malTxt + "</small></div>";
   // Alice
-  if (k >= 2 && k <= 4) h += '<div class="obj r-pub' + nw(2, 3) + '" style="left:12px;top:140px;width:276px"><div class="nh">' + LOCK + t.aliceGot + '</div><div class="kv">' + (k === 2 ? bk : mkk) + "</div><small>" + (k === 2 ? t.whose : t.cannotTell) + "</small></div>";
-  if (k === 4) h += '<div class="obj r-alice new" style="left:12px;top:240px;width:276px"><div class="nh">' + t.aliceEnc + '</div><div class="kv">"' + t.secret + '"</div><small>' + t.aliceEncSub + "</small></div>";
-  if (k >= 6 && k <= 8) h += '<div class="obj r-alice' + nw(6, 7, 8) + '" style="left:12px;top:140px;width:276px"><div class="nh">' + t.aliceChecks + '</div><div class="kv" style="font-size:12.5px">verify(' + t.caPubShort + ", card, signature)</div>" +
+  if (k >= 2 && k <= 4) h += '<div data-m="alice1" class="obj r-pub' + nw(2, 3) + '" style="left:12px;top:140px;width:276px"><div class="nh">' + LOCK + t.aliceGot + '</div><div class="kv">' + (k === 2 ? bk : mkk) + "</div><small>" + (k === 2 ? t.whose : t.cannotTell) + "</small></div>";
+  if (k === 4) h += '<div data-m="aliceenc" class="obj r-alice new" style="left:12px;top:240px;width:276px"><div class="nh">' + t.aliceEnc + '</div><div class="kv">"' + t.secret + '"</div><small>' + t.aliceEncSub + "</small></div>";
+  if (k >= 6 && k <= 8) h += '<div data-m="alice1" class="obj r-alice' + nw(6, 7, 8) + '" style="left:12px;top:140px;width:276px"><div class="nh">' + t.aliceChecks + '</div><div class="kv" style="font-size:12.5px">verify(' + t.caPubShort + ", card, signature)</div>" +
     '<div class="vres" id="s1v" style="margin-top:4px">' + mk("wait") + "</div></div>";
-  if (k === 9) h += '<div class="obj r-alice new" style="left:12px;top:140px;width:276px"><div class="nh">' + t.aliceNeeds + "</div><small>" + t.aliceNeedsSub + "</small></div>";
-  if (on(5)) h += '<div class="obj r-pub' + nw(5) + '" style="left:12px;top:330px;width:276px"><div class="nh">' + LOCK + t.caPubAtAlice + '</div><div class="kv">' + shortHex(CARD6.caPub, 8) + "</div><small>" + t.caPubAtAliceSub + "</small></div>";
+  if (k === 9) h += '<div data-m="alice1" class="obj r-alice new" style="left:12px;top:140px;width:276px"><div class="nh">' + t.aliceNeeds + "</div><small>" + t.aliceNeedsSub + "</small></div>";
+  if (on(5)) h += '<div data-m="capub" class="obj r-pub' + nw(5) + '" style="left:12px;top:330px;width:276px"><div class="nh">' + LOCK + t.caPubAtAlice + '</div><div class="kv">' + shortHex(CARD6.caPub, 8) + "</div><small>" + t.caPubAtAliceSub + "</small></div>";
   h += "</div></div>" + legendHTML(["alice", "mal", "bob", "ca", "pub", "prv"]) + "</div>";
   // try it yourself
   if (k >= 6) {
     if (app.tryCard === null) app.tryCard = CARD_BOB;
-    h += '<div class="card"><h3>' + t.tryT + '</h3><p class="note" style="margin:0 0 6px">' + t.tryNote + "</p>" +
+    h += '<div class="card" data-m="try"><h3>' + t.tryT + '</h3><p class="note" style="margin:0 0 6px">' + t.tryNote + "</p>" +
       '<div class="tryrow"><button data-action="try" data-c="bob" data-s="ca">' + t.try1 + '</button><button data-action="try" data-c="mal" data-s="ca">' + t.try2 + '</button><button data-action="try" data-c="mal" data-s="mal">' + t.try3 + "</button></div>" +
       '<label class="note">' + t.tryCard + '</label><textarea data-field="card" spellcheck="false" style="width:100%;height:46px">' + esc(app.tryCard) + "</textarea>" +
       '<div class="tryrow"><span class="note">' + t.trySig + '</span><span class="tabs"><button data-action="trysig" data-s="ca" aria-pressed="' + (app.trySig === "ca") + '">' + t.sigCA + '</button><button data-action="trysig" data-s="mal" aria-pressed="' + (app.trySig === "mal") + '">' + t.sigMal + "</button></span></div>" +
@@ -2418,9 +2419,9 @@ const UPDATE = [update0, update1, update2, update3, update4, update5, update6, u
 let SELF = null;                     // null while the self-test runs, then the list of failures
 function buildSide() {
   const t = L();
-  document.getElementById("steps").innerHTML = t.steps.map((s, i) =>
+  document.getElementById("steps").innerHTML = t.steps.map((s, i) => i < FIRST ? "" :
     '<button class="step' + (i < app.level ? " past" : "") + '" data-step="' + i + '" aria-pressed="' + (i === app.level) + '">' +
-    '<span class="gnum">' + (i + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
+    '<span class="gnum">' + (i - FIRST + 1) + "</span><span><b>" + s[0] + "</b><small>" + s[1] + "</small></span></button>").join("");
 }
 function showSelf() {
   const t = L(), st = document.getElementById("selftest");
@@ -2428,11 +2429,12 @@ function showSelf() {
   st.textContent = SELF.length ? t.selfBad(SELF.join(", ")) : t.selfOk;
   st.className = SELF.length ? "badt" : "okt";
 }
-// #1.4 story step 4; #2.3 the third certificate, #2.3.san with its SAN; #3.5, #4.2, #6.3, #7.1 a choice inside the step; #8.2 a tab of step 8; #9.4 part 4 of step 9
+// links count the visible steps: #N is level N - 1 + FIRST. With FIRST = 1: #1.3 the third certificate, #1.3.san with its SAN;
+// #2.5, #3.2, #5.3, #6.1 a choice inside the step; #7.2 a tab of step 7; #8.4 part 4 of step 8
 function hashStr() {
   const l = app.level;
   const sub = l === 0 ? app.story : l === 1 ? app.c2 + 1 : l === 2 ? app.s3 + 1 : l === 3 ? app.s4 + 1 : l === 4 ? null : l === 5 ? app.hs : l === 6 ? (app.pin === "cert" ? 1 : 2) : l === 7 ? app.ct.mode : app.acme.k;
-  return "#" + (l + 1) + (sub ? "." + sub : "") + (l === 1 && app.f2 !== "subject" ? "." + app.f2 : "");
+  return "#" + (l - FIRST + 1) + (sub ? "." + sub : "") + (l === 1 && app.f2 !== "subject" ? "." + app.f2 : "");
 }
 function render() {
   const t = L();
@@ -2447,27 +2449,69 @@ function render() {
   document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
   showSelf();
   buildSide();
-  document.getElementById("mhGrp").textContent = t.stepOf(app.level + 1);
+  document.getElementById("mhGrp").textContent = t.stepOf(app.level - FIRST + 1);
   document.getElementById("mhTitle").textContent = t.steps[app.level][0];
   document.getElementById("mhSub").textContent = t.steps[app.level][1];
   const ex = t.explain[app.level];
   const head = app.level === 0 ? storyBarHTML() : app.level === 5 || app.level === 8 ? "" : '<div class="explain"><b>' + ex[0] + "</b>" + ex[1] + "</div>";
-  const keep = view.scrollTop;
-  view.innerHTML = '<div class="fade">' + head + RENDER[app.level]() + "</div>";
+  const keep = view.scrollTop, same = app.level === shownLevel, before = same ? snapMorph() : null;
+  view.innerHTML = '<div' + (same ? "" : ' class="fade"') + ">" + head + RENDER[app.level]() + "</div>";
   view.scrollTop = keep;
+  shownLevel = app.level;
+  if (before) morph(before);
   UPDATE[app.level]();
   document.getElementById("moreTxt").textContent = t.moreBelow;
   updateMore();
   try { history.replaceState(null, "", hashStr()); } catch (e) {}
 }
+/* smooth changes inside a step: an element with the same data-m glides from its old place, a new one fades in,
+   one that is gone fades out; the text of a story part fades in when it changes */
+let shownLevel = -1;
+const MOTION = !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+function snapMorph() {
+  const m = new Map();
+  view.querySelectorAll("[data-m]").forEach(el => m.set(el.dataset.m, { el, r: el.getBoundingClientRect(), html: el.innerHTML, cls: el.getAttribute("class") || "", par: el.parentElement }));
+  const tx = view.querySelector(".sttext");
+  return { m, text: tx ? tx.innerHTML : null };
+}
+function morph(before) {
+  if (!MOTION || !view.animate) return;
+  const tx = view.querySelector(".sttext");
+  if (tx && before.text !== null && tx.innerHTML !== before.text) {
+    tx.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: "ease-out" });
+    const b = tx.previousElementSibling; if (b) b.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: "ease-out" });
+  }
+  const seen = new Set();
+  view.querySelectorAll("[data-m]").forEach(el => {
+    const o = before.m.get(el.dataset.m);
+    if (!o) { el.animate([{ opacity: 0, transform: "scale(.97)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: 140, easing: "ease-out", fill: "backwards" }); return; }
+    seen.add(el.dataset.m);
+    const r = el.getBoundingClientRect(), dx = o.r.left - r.left, dy = o.r.top - r.top;
+    if (Math.abs(dx) > .5 || Math.abs(dy) > .5) el.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 480, easing: "cubic-bezier(.2,.7,.2,1)" });
+    if (o.html !== el.innerHTML || o.cls !== (el.getAttribute("class") || "")) el.animate([{ opacity: .3 }, { opacity: el.classList.contains("dim") ? .35 : 1 }], { duration: 420, easing: "ease-out" });
+  });
+  // what is gone fades out where it was (only inside the story picture, where everything is placed absolutely)
+  const sch = view.querySelector(".sch"), svg = view.querySelector(".arrowsvg");
+  before.m.forEach((o, k) => {
+    if (seen.has(k)) return;
+    const into = o.par.classList.contains("sch") ? sch : o.par.classList.contains("arrowsvg") ? svg : null;
+    if (!into) return;
+    o.el.querySelectorAll("[id]").forEach(x => x.removeAttribute("id"));
+    o.el.removeAttribute("data-m");
+    o.el.style.pointerEvents = "none";
+    into.appendChild(o.el);
+    o.el.animate([{ opacity: o.el.classList.contains("dim") ? .35 : 1 }, { opacity: 0 }], { duration: 300, easing: "ease-in", fill: "forwards" });
+    setTimeout(() => o.el.remove(), 320);
+  });
+}
 function goTo(level) {
-  app.level = level;
+  app.level = Math.max(FIRST, Math.min(NSTEPS - 1, level));
   view.scrollTop = 0;
   render();
   view.scrollTop = 0;
 }
 function zoomIn() { if (app.level < NSTEPS - 1) goTo(app.level + 1); }
-function zoomOut() { if (app.level > 0) goTo(app.level - 1); }
+function zoomOut() { if (app.level > FIRST) goTo(app.level - 1); }
 function storyGo(k) { app.story = Math.max(1, Math.min(STORY_N, k)); render(); }
 function hsGo(k) { app.hs = Math.max(1, Math.min(HS_N, k)); render(); }
 
@@ -2566,8 +2610,8 @@ document.addEventListener("keydown", e => {
 });
 function readHash() {
   const m = /^#(\d)(?:\.(\d+))?(?:\.([a-z_0-9]+))?$/.exec(location.hash);
-  if (!m || +m[1] < 1 || +m[1] > NSTEPS) return;
-  app.level = +m[1] - 1;
+  if (!m || +m[1] < 1) return;
+  app.level = Math.min(NSTEPS - 1, +m[1] - 1 + FIRST);
   const s = m[2] ? +m[2] : null;
   if (s !== null) {
     if (app.level === 0) app.story = Math.max(1, Math.min(STORY_N, s));
